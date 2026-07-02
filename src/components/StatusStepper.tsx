@@ -18,15 +18,15 @@ const stageIndex: Record<OrderStatus, number> = {
 
 export function StatusStepper({ status }: { status: OrderStatus }) {
   const current = stageIndex[status];
-  const isFinalStage = current === STAGES.length - 1;
   return (
     <div className="flex items-center gap-0">
       {STAGES.map((stage, i) => {
-        // The final stage (Entregue) has no "next" step, so once it is the
-        // current status the process is fully complete — show a checkmark
-        // instead of leaving it as merely "active".
-        const done = i < current || (isFinalStage && i === current);
-        const active = i === current && !isFinalStage;
+        // Each stage label represents a milestone already reached once the
+        // order is at or past that status (e.g. "Expedido" means shipping
+        // already happened), so the current stage also gets a checkmark —
+        // not just the stages strictly before it.
+        const done = i <= current;
+        const active = i === current;
         return (
           <div key={stage.id} className="flex items-center flex-1 last:flex-none">
             <div className="flex flex-col items-center gap-1">

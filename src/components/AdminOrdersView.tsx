@@ -1,11 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ShieldCheck } from "lucide-react";
 import type { OrderVM, OrderStatus } from "@/lib/types";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { NewOrderModal } from "@/components/NewOrderModal";
+
+type SortKey = "reference" | "clientCompany" | "status" | "expectedDate" | "items";
+type SortDir = "asc" | "desc";
+
+function SortableTh({
+  label,
+  sortKey,
+  activeKey,
+  dir,
+  onSort,
+  className = "",
+}: {
+  label: string;
+  sortKey: SortKey;
+  activeKey: SortKey | null;
+  dir: SortDir;
+  onSort: (key: SortKey) => void;
+  className?: string;
+}) {
+  const isActive = activeKey === sortKey;
+  const Icon = isActive ? (dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <th className={`text-left px-5 py-3 ${className}`}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`flex items-center gap-1 font-medium hover:text-slate-700 transition-colors ${
+          isActive ? "text-slate-700" : ""
+        }`}
+      >
+        {label}
+        <Icon size={12} className={isActive ? "text-slate-700" : "text-slate-300"} />
+      </button>
+    </th>
+  );
+}
 
 const ALL_STATUSES: OrderStatus[] = [
   "pending",
@@ -31,12 +67,45 @@ export function AdminOrdersView({
 }) {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
 
   const filtered = orders.filter((o) => {
     if (statusFilter !== "all" && o.status !== statusFilter) return false;
     if (clientFilter !== "all" && o.companyId !== clientFilter) return false;
     return true;
   });
+
+  const sorted = useMemo(() => {
+    if (!sortKey) return filtered;
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      switch (sortKey) {
+        case "reference":
+          return a.reference.localeCompare(b.reference) * dir;
+        case "clientCompany":
+          return a.clientCompany.localeCompare(b.clientCompany) * dir;
+        case "status":
+          return (ALL_STATUSES.indexOf(a.status) - ALL_STATUSES.indexOf(b.status)) * dir;
+        case "expectedDate":
+          return a.expectedDate.localeCompare(b.expectedDate) * dir;
+        case "items":
+          return (a.items.length - b.items.length) * dir;
+        default:
+          return 0;
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, sortKey, sortDir]);
 
   const countByStatus = (s: OrderStatus) =>
     orders.filter((o) => o.status === s).length;
@@ -112,20 +181,48 @@ export function AdminOrdersView({
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 text-xs text-slate-500 font-medium border-b border-slate-100">
-                <th className="text-left px-5 py-3">Referência</th>
-                <th className="text-left px-5 py-3">Cliente</th>
-                <th className="text-left px-5 py-3">Estado</th>
-                <th className="text-left px-5 py-3 hidden sm:table-cell">
-                  Prazo
-                </th>
-                <th className="text-left px-5 py-3 hidden md:table-cell">
-                  Artigos
-                </th>
+                <SortableTh
+                  label="Referência"
+                  sortKey="reference"
+                  activeKey={sortKey}
+                  dir={sortDir}
+                  onSort={handleSort}
+                />
+                <SortableTh
+                  label="Cliente"
+                  sortKey="clientCompany"
+                  activeKey={sortKey}
+                  dir={sortDir}
+                  onSort={handleSort}
+                />
+                <SortableTh
+                  label="Estado"
+                  sortKey="status"
+                  activeKey={sortKey}
+                  dir={sortDir}
+                  onSort={handleSort}
+                />
+                <SortableTh
+                  label="Prazo"
+                  sortKey="expectedDate"
+                  activeKey={sortKey}
+                  dir={sortDir}
+                  onSort={handleSort}
+                  className="hidden sm:table-cell"
+                />
+                <SortableTh
+                  label="Artigos"
+                  sortKey="items"
+                  activeKey={sortKey}
+                  dir={sortDir}
+                  onSort={handleSort}
+                  className="hidden md:table-cell"
+                />
                 <th className="px-5 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.map((order) => (
+              {sorted.map((order) => (
                 <tr
                   key={order.id}
                   className="hover:bg-slate-50 transition-colors"
