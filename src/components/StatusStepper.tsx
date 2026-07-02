@@ -18,11 +18,15 @@ const stageIndex: Record<OrderStatus, number> = {
 
 export function StatusStepper({ status }: { status: OrderStatus }) {
   const current = stageIndex[status];
+  const isFinalStage = current === STAGES.length - 1;
   return (
     <div className="flex items-center gap-0">
       {STAGES.map((stage, i) => {
-        const done = i < current;
-        const active = i === current;
+        // The final stage (Entregue) has no "next" step, so once it is the
+        // current status the process is fully complete — show a checkmark
+        // instead of leaving it as merely "active".
+        const done = i < current || (isFinalStage && i === current);
+        const active = i === current && !isFinalStage;
         return (
           <div key={stage.id} className="flex items-center flex-1 last:flex-none">
             <div className="flex flex-col items-center gap-1">

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Factory, Eye, EyeOff, Info, ShieldCheck } from "lucide-react";
 import { loginAction } from "@/actions/auth";
 
@@ -13,12 +14,14 @@ const CLIENT_ACCOUNTS = [
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState("");
   const [showHints, setShowHints] = useState(false);
   const [pending, startTransition] = useTransition();
+  const resetOk = searchParams.get("reset") === "ok";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +61,12 @@ export function LoginForm() {
             Entrar na sua conta
           </h2>
 
+          {resetOk && (
+            <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 mb-4">
+              Palavra-passe reposta com sucesso. Já pode iniciar sessão.
+            </p>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1.5">
@@ -74,9 +83,17 @@ export function LoginForm() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                Palavra-passe
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-medium text-slate-600">
+                  Palavra-passe
+                </label>
+                <Link
+                  href="/esqueci-password"
+                  className="text-xs text-slate-500 hover:text-accent-dark transition-colors"
+                >
+                  Esqueceu-se da password?
+                </Link>
+              </div>
               <div className="relative">
                 <input
                   type={showPwd ? "text" : "password"}
@@ -110,6 +127,16 @@ export function LoginForm() {
               {pending ? "A entrar..." : "Entrar"}
             </button>
           </form>
+
+          <p className="text-center text-xs text-slate-500 mt-5">
+            Ainda não tem conta?{" "}
+            <Link
+              href="/registo"
+              className="font-medium text-brand hover:text-accent-dark transition-colors"
+            >
+              Registar a minha empresa
+            </Link>
+          </p>
         </div>
 
         <div className="mt-4 bg-blue-50 border border-blue-100 rounded-xl overflow-hidden">

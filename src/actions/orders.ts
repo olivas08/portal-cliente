@@ -43,3 +43,68 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
   revalidatePath("/dashboard");
   revalidatePath(`/dashboard/ordens/${orderId}`);
 }
+
+const createOrderItemSchema = z.object({
+  reference: z.string().trim().min(1, "Referência obrigatória.").max(60),
+  description: z.string().trim().min(1, "Descrição obrigatória.").max(200),
+  quantity: z.coerce.number().positive("Quantidade deve ser maior que zero."),
+  unit: z.string().trim().min(1, "Unidade obrigatória.").max(20),
+  unitPriceEur: z.coerce.number().nonnegative("Preço não pode ser negativo."),
+});
+
+const createOrderSchema = z.object({
+  companyId: z.string().trim().min(1, "Cliente obrigatório."),
+  batchNumber: z.string().trim().min(1, "Nº de lote obrigatório.").max(60),
+  expectedDate: z.string().trim().min(1, "Data prevista obrigatória."),
+  observations: z.string().trim().max(2000).optional(),
+  items: z.array(createOrderItemSchema).min(1, "Adicione pelo menos um artigo."),
+});
+
+export type CreateOrderInput = z.infer<typeof createOrderSchema>;
+
+export async function createOrder(input: CreateOrderInput) {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    throw new Error("Não autorizado.");
+  }
+
+  const data = createOrderSchema.parse(input);
+
+  const company = await prisma.company.findUnique({
+    where: { id: data.companyId },
+  });
+  if (!company) throw new Error("Cliente não encontrado.");
+
+  const year = new Date().getFullYear();
+  const count = await prisma.order.count({
+    where: { reference: { startsWith: `ENC-${year}-` } },
+  });
+  const reference = `ENC-${year}-${String(count + 1).padStart(3, "0")}`;
+
+  const order = await prisma.order.create({
+    data: {
+      reference,
+      companyId: data.companyId,
+      status: "pending",
+      batchNumber: data.batchNumber,
+      createdDate: new Date(),
+      expectedDate: new Date(data.expectedDate),
+      observations: data.observations || undefined,
+      items: {
+        create: data.items.map((item) => ({
+          reference: item.reference,
+          description: item.description,
+          quantity: item.quantity,
+          unit: item.unit,
+          unitPriceEur: item.unitPriceEur,
+        })),
+      },
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+
+  return order.id;
+}
+

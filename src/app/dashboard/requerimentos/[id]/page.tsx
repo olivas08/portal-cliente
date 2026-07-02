@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import { auth } from "@/auth";
 import { getRequestById, getRequestsForCompany } from "@/lib/data";
 import { PortalShell } from "@/components/PortalShell";
@@ -67,6 +67,13 @@ export default async function ClientRequestDetail({
               <div className="flex items-center gap-2 flex-wrap">
                 <RequestTypeBadge type={request.type} />
                 <RequestStatusBadge status={request.status} />
+                <Link
+                  href="/dashboard/requerimentos"
+                  title="Fechar"
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  <X size={16} />
+                </Link>
               </div>
             </div>
           </div>

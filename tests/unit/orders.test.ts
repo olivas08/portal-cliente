@@ -6,6 +6,11 @@ const { mockAuth, prismaMock } = vi.hoisted(() => ({
     order: {
       findUnique: vi.fn(),
       update: vi.fn(),
+      count: vi.fn(),
+      create: vi.fn(),
+    },
+    company: {
+      findUnique: vi.fn(),
     },
   },
 }));
@@ -14,7 +19,7 @@ vi.mock("@/auth", () => ({ auth: mockAuth }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-import { updateOrderStatus } from "@/actions/orders";
+import { updateOrderStatus, createOrder } from "@/actions/orders";
 
 const adminSession = { user: { role: "ADMIN", id: "u1", name: "Admin" } };
 const clientSession = {
@@ -32,6 +37,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.order.findUnique.mockResolvedValue(existingOrder);
   prismaMock.order.update.mockResolvedValue({});
+  prismaMock.company.findUnique.mockResolvedValue({ id: "c1", name: "Auto Peças Mota" });
+  prismaMock.order.count.mockResolvedValue(0);
+  prismaMock.order.create.mockResolvedValue({ id: "o-new" });
 });
 
 describe("updateOrderStatus — authorization", () => {
@@ -92,5 +100,90 @@ describe("updateOrderStatus — status transitions", () => {
     expect(data.status).toBe("production");
     expect(data.shippedDate).toBeNull();
     expect(data.deliveredDate).toBeNull();
+  });
+});
+
+const validOrderInput = {
+  companyId: "c1",
+  batchNumber: "LT-2026-090",
+  expectedDate: "2026-08-01",
+  items: [
+    { reference: "REF-1", description: "Peça X", quantity: 10, unit: "un", unitPriceEur: 2.5 },
+  ],
+};
+
+describe("createOrder — authorization", () => {
+  it("rejects a client", async () => {
+    mockAuth.mockResolvedValue(clientSession);
+    await expect(createOrder(validOrderInput)).rejects.toThrow("Não autorizado.");
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unauthenticated user", async () => {
+    mockAuth.mockResolvedValue(null);
+    await expect(createOrder(validOrderInput)).rejects.toThrow("Não autorizado.");
+  });
+});
+
+describe("createOrder — validation", () => {
+  beforeEach(() => mockAuth.mockResolvedValue(adminSession));
+
+  it("throws when the company does not exist", async () => {
+    prismaMock.company.findUnique.mockResolvedValue(null);
+    await expect(createOrder(validOrderInput)).rejects.toThrow(
+      "Cliente não encontrado."
+    );
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects an order with no items", async () => {
+    await expect(
+      createOrder({ ...validOrderInput, items: [] })
+    ).rejects.toThrow();
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-positive quantity", async () => {
+    await expect(
+      createOrder({
+        ...validOrderInput,
+        items: [{ ...validOrderInput.items[0], quantity: 0 }],
+      })
+    ).rejects.toThrow();
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("createOrder — reference generation", () => {
+  beforeEach(() => mockAuth.mockResolvedValue(adminSession));
+
+  it("generates the first reference of the year", async () => {
+    prismaMock.order.count.mockResolvedValue(0);
+    await createOrder(validOrderInput);
+    const year = new Date().getFullYear();
+    const data = prismaMock.order.create.mock.calls[0][0].data;
+    expect(data.reference).toBe(`ENC-${year}-001`);
+  });
+
+  it("increments the sequence based on existing count", async () => {
+    prismaMock.order.count.mockResolvedValue(41);
+    await createOrder(validOrderInput);
+    const year = new Date().getFullYear();
+    const data = prismaMock.order.create.mock.calls[0][0].data;
+    expect(data.reference).toBe(`ENC-${year}-042`);
+  });
+
+  it("creates nested items with the given values", async () => {
+    await createOrder(validOrderInput);
+    const data = prismaMock.order.create.mock.calls[0][0].data;
+    expect(data.items.create).toEqual([
+      { reference: "REF-1", description: "Peça X", quantity: 10, unit: "un", unitPriceEur: 2.5 },
+    ]);
+  });
+
+  it("returns the new order id", async () => {
+    prismaMock.order.create.mockResolvedValue({ id: "o-created" });
+    const id = await createOrder(validOrderInput);
+    expect(id).toBe("o-created");
   });
 });

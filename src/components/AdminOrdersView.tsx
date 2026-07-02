@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import type { OrderVM, OrderStatus } from "@/lib/types";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
+import { NewOrderModal } from "@/components/NewOrderModal";
 
 const ALL_STATUSES: OrderStatus[] = [
   "pending",
@@ -42,18 +43,21 @@ export function AdminOrdersView({
 
   return (
     <>
-      <div className="flex items-center gap-3 mb-8">
-        <div className="p-2 bg-slate-800 rounded-xl">
-          <ShieldCheck size={20} className="text-white" />
+      <div className="flex items-center justify-between gap-3 mb-8 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-slate-800 rounded-xl">
+            <ShieldCheck size={20} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">
+              Painel Administrativo
+            </h1>
+            <p className="text-slate-500 text-sm mt-0.5">
+              Gestão de todas as encomendas
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">
-            Painel Administrativo
-          </h1>
-          <p className="text-slate-500 text-sm mt-0.5">
-            Gestão de todas as encomendas
-          </p>
-        </div>
+        <NewOrderModal companies={companies} />
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
