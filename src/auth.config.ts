@@ -30,11 +30,15 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user;
       const role = auth?.user?.role;
 
-      const isAdminArea = pathname.startsWith("/admin");
-      const isPortalArea = pathname.startsWith("/dashboard") || isAdminArea;
+      if (!isLoggedIn) return false;
 
-      if (isPortalArea && !isLoggedIn) return false;
-      if (isAdminArea && role !== "ADMIN") return false;
+      // Logged in but wrong area for role → send to their own area.
+      if (pathname.startsWith("/admin") && role !== "ADMIN") {
+        return Response.redirect(new URL("/dashboard", request.nextUrl));
+      }
+      if (pathname.startsWith("/dashboard") && role === "ADMIN") {
+        return Response.redirect(new URL("/admin", request.nextUrl));
+      }
 
       return true;
     },
