@@ -41,10 +41,10 @@ export function OrderItemsTable({
                 <td className="px-5 py-3 text-center text-slate-400">
                   {item.unit}
                 </td>
-                <td className="px-5 py-3 text-right text-slate-500">
+                <td className="px-5 py-3 text-right text-slate-500 whitespace-nowrap">
                   {item.unitPriceEur.toFixed(2)} €
                 </td>
-                <td className="px-5 py-3 text-right font-medium text-slate-700">
+                <td className="px-5 py-3 text-right font-medium text-slate-700 whitespace-nowrap">
                   {(item.quantity * item.unitPriceEur).toFixed(2)} €
                 </td>
               </tr>
@@ -56,9 +56,9 @@ export function OrderItemsTable({
                 colSpan={5}
                 className="px-5 py-3 text-sm font-semibold text-slate-600 text-right"
               >
-                Subtotal (s/ IVA):
+                Total Estimado (s/ IVA):
               </td>
-              <td className="px-5 py-3 text-right font-bold text-slate-800">
+              <td className="px-5 py-3 text-right font-bold text-brand text-base whitespace-nowrap">
                 {subtotal.toFixed(2)} €
               </td>
             </tr>

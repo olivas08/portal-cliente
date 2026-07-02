@@ -40,7 +40,11 @@ export async function PortalShell({
         isAdmin={isAdmin}
         breadcrumb={breadcrumb}
       />
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">{children}</main>
+      <div className="md:pl-64">
+        <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-24 md:pb-10">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
