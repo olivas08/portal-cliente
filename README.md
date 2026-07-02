@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Portal do Cliente — Metalofabril
 
-## Getting Started
+Aplicação real (não mock) do Portal do Cliente para PME industrial, construída com
+Next.js App Router + Server Actions, Prisma e Auth.js. Permite a clientes acompanhar
+encomendas, gerar documentos (PDF) e trocar requerimentos com a fábrica; e a uma conta
+de administração gerir estados de encomendas e responder a requerimentos.
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Next.js 16** (App Router, Server Actions, TypeScript strict)
+- **Prisma 6** + **PostgreSQL** (Supabase)
+- **Auth.js v5** (credentials, bcrypt, JWT sessions, middleware por role)
+- **Tailwind CSS v4** + **lucide-react**
+- **jsPDF** (guia de remessa, certificado de conformidade, fatura pro-forma)
+
+## Arranque local
+
+1. Instalar dependências:
+   ```bash
+   npm install
+   ```
+
+2. Criar `.env` a partir de `.env.example` e preencher com as connection strings do
+   Supabase (Project Settings → Database → Connection string):
+   - `DATABASE_URL` — Transaction pooler (porta 6543)
+   - `DIRECT_URL` — Direct connection (porta 5432)
+   - `AUTH_SECRET` — gerar com `npx auth secret`
+
+3. Aplicar o schema e semear dados de demonstração:
+   ```bash
+   npm run db:migrate      # cria as tabelas (primeira migration)
+   npm run db:seed         # insere empresas, utilizadores, encomendas e requerimentos
+   ```
+
+4. Correr em desenvolvimento:
+   ```bash
+   npm run dev
+   ```
+
+## Contas de demonstração
+
+| Papel   | Email                        | Palavra-passe |
+|---------|------------------------------|---------------|
+| Admin   | admin@metalofabril.pt        | admin2026     |
+| Cliente | compras@motapecas.pt         | mota2026      |
+| Cliente | geral@metalsantos.pt         | santos2026    |
+| Cliente | encomendas@plasticosnorte.pt | pn2026        |
+
+## Scripts
+
+- `npm run dev` — servidor de desenvolvimento
+- `npm run build` / `npm start` — build e execução de produção
+- `npm run db:migrate` — Prisma migrate dev
+- `npm run db:push` — sincroniza o schema sem migration (dev rápido)
+- `npm run db:seed` — semeia a base de dados
+- `npm run db:studio` — Prisma Studio (UI da BD)
+
+## Estrutura
+
+```
+src/
+  app/
+    login/                  # página de login (client)
+    dashboard/              # área do cliente (encomendas + requerimentos)
+    admin/                  # área de administração (gestão + respostas)
+    api/auth/[...nextauth]/ # handler Auth.js
+  actions/                  # server actions (orders, requests, auth)
+  components/               # UI (nav, badges, tabelas, PDF, formulários)
+  lib/                      # prisma, data-access, tipos, geração de PDF
+  auth.ts / auth.config.ts  # configuração Auth.js (config edge-safe partilhada)
+  proxy.ts                  # middleware de proteção de rotas por role
+prisma/
+  schema.prisma             # modelo de dados
+  seed.ts                   # dados de demonstração
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Deploy (Vercel + Supabase)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Criar projeto na Vercel a partir deste repositório.
+2. Definir as variáveis de ambiente (`DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `AUTH_TRUST_HOST`).
+3. O `postinstall` corre `prisma generate` automaticamente.
+4. Aplicar migrations em produção com `npx prisma migrate deploy` (via CI ou localmente contra a BD de produção).
