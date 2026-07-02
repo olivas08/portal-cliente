@@ -31,8 +31,15 @@ export async function createRequest(input: {
 
   const data = createRequestSchema.parse(input);
 
+  const year = new Date().getFullYear();
+  const count = await prisma.request.count({
+    where: { reference: { startsWith: `REQ-${year}-` } },
+  });
+  const reference = `REQ-${year}-${String(count + 1).padStart(3, "0")}`;
+
   const request = await prisma.request.create({
     data: {
+      reference,
       companyId: user.companyId,
       type: data.type,
       subject: data.subject,

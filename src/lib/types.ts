@@ -62,6 +62,7 @@ export interface RequestMessageVM {
 
 export interface RequestVM {
   id: string;
+  reference: string;
   companyId: string;
   clientCompany: string;
   type: RequestType;

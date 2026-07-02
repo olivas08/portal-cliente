@@ -183,6 +183,7 @@ async function main() {
   console.log("✉️  A criar requerimentos...");
   await prisma.request.create({
     data: {
+      reference: "REQ-2026-001",
       companyId: mota.id,
       type: "quote",
       subject: "Orçamento para parafusos M10 grau 10.9",
@@ -208,6 +209,7 @@ async function main() {
   });
   await prisma.request.create({
     data: {
+      reference: "REQ-2026-002",
       companyId: santos.id,
       type: "info",
       subject: "Previsão de entrega da encomenda ENC-2026-061",
@@ -227,6 +229,7 @@ async function main() {
   });
   await prisma.request.create({
     data: {
+      reference: "REQ-2026-003",
       companyId: norte.id,
       type: "complaint",
       subject: "Não conformidade na encomenda ENC-2026-044",

@@ -61,13 +61,13 @@ export function PortalNav({ name, company, isAdmin, breadcrumb }: Props) {
               <Link
                 key={to}
                 href={to}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-l-2 ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors border-l-2 ${
                   active
-                    ? "bg-brand-soft text-white border-accent"
+                    ? "bg-accent text-brand border-accent"
                     : "border-transparent text-slate-400 hover:text-white hover:bg-brand-soft/60"
                 }`}
               >
-                <Icon size={18} className={active ? "text-accent" : ""} />
+                <Icon size={18} className={active ? "text-brand" : ""} />
                 {label}
               </Link>
             );

@@ -29,9 +29,9 @@ export function StatusStepper({ status }: { status: OrderStatus }) {
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${
                   done
-                    ? "bg-slate-700 border-slate-700 text-white"
+                    ? "bg-accent border-accent text-brand"
                     : active
-                    ? "bg-white border-blue-500 text-blue-600"
+                    ? "bg-white border-brand text-brand"
                     : "bg-white border-slate-200 text-slate-300"
                 }`}
               >
@@ -40,7 +40,7 @@ export function StatusStepper({ status }: { status: OrderStatus }) {
               <span
                 className={`text-xs text-center leading-tight hidden sm:block ${
                   active
-                    ? "text-blue-600 font-medium"
+                    ? "text-brand font-medium"
                     : done
                     ? "text-slate-600"
                     : "text-slate-300"
@@ -52,7 +52,7 @@ export function StatusStepper({ status }: { status: OrderStatus }) {
             {i < STAGES.length - 1 && (
               <div
                 className={`flex-1 h-0.5 mx-1 mb-5 transition-colors ${
-                  done ? "bg-slate-700" : "bg-slate-200"
+                  done ? "bg-accent" : "bg-slate-200"
                 }`}
               />
             )}

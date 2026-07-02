@@ -48,6 +48,9 @@ export default async function AdminRequestDetail({
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 mb-5">
             <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
               <div>
+                <p className="text-xs font-mono text-slate-400 mb-0.5">
+                  {request.reference}
+                </p>
                 <h1 className="text-lg font-bold text-slate-800">
                   {request.subject}
                 </h1>

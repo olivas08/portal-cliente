@@ -39,6 +39,9 @@ export default async function ClientRequestsPage() {
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-mono text-slate-400 flex-shrink-0">
+                    {r.reference}
+                  </span>
                   <p className="text-sm font-semibold text-slate-800 truncate">
                     {r.subject}
                   </p>

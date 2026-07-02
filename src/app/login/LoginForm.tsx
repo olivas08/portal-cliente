@@ -105,7 +105,7 @@ export function LoginForm() {
             <button
               type="submit"
               disabled={pending}
-              className="w-full py-2.5 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-700 transition-colors mt-2 disabled:opacity-60"
+              className="w-full py-2.5 bg-accent text-brand text-sm font-semibold rounded-lg hover:bg-accent-dark transition-colors mt-2 disabled:opacity-60"
             >
               {pending ? "A entrar..." : "Entrar"}
             </button>

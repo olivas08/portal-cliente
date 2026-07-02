@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { RequestVM } from "@/lib/types";
-import { RequestStatusBadge } from "@/components/RequestBadges";
+import { RequestStatusBadge, RequestTypeBadge } from "@/components/RequestBadges";
 
 export function RequestListPane({
   requests,
@@ -33,14 +33,22 @@ export function RequestListPane({
               }`}
             >
               <div className="flex items-center justify-between gap-2 mb-1">
-                <p
-                  className={`text-sm font-semibold truncate ${
-                    active ? "text-brand" : "text-slate-700"
-                  }`}
-                >
-                  {r.subject}
-                </p>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-mono text-slate-400 leading-none mb-1">
+                    {r.reference}
+                  </p>
+                  <p
+                    className={`text-sm font-semibold truncate ${
+                      active ? "text-brand" : "text-slate-700"
+                    }`}
+                  >
+                    {r.subject}
+                  </p>
+                </div>
                 <RequestStatusBadge status={r.status} />
+              </div>
+              <div className="flex items-center gap-2 mb-1">
+                <RequestTypeBadge type={r.type} />
               </div>
               <p className="text-xs text-slate-400 truncate">
                 {showCompany ? `${r.clientCompany} · ` : ""}

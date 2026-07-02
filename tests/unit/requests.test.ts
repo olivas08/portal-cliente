@@ -5,6 +5,7 @@ const { mockAuth, prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     request: {
       create: vi.fn(),
+      count: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
     },
@@ -33,6 +34,7 @@ const mota = {
 beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.request.create.mockResolvedValue({ id: "req-new" });
+  prismaMock.request.count.mockResolvedValue(0);
   prismaMock.request.update.mockResolvedValue({});
   prismaMock.requestMessage.create.mockResolvedValue({});
   prismaMock.$transaction.mockResolvedValue([]);

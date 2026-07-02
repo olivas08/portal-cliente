@@ -42,6 +42,7 @@ function toOrderVM(o: OrderWith): OrderVM {
 function toRequestVM(r: RequestWith): RequestVM {
   return {
     id: r.id,
+    reference: r.reference,
     companyId: r.companyId,
     clientCompany: r.company.name,
     type: r.type,
