@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { RequestVM, RequestStatus } from "@/lib/types";
+import { matchesSearch } from "@/lib/search";
+import { SearchInput } from "@/components/SearchInput";
 import {
   RequestStatusBadge,
   RequestTypeBadge,
@@ -27,11 +29,14 @@ export function AdminRequestsView({
     "all"
   );
   const [clientFilter, setClientFilter] = useState("all");
+  const [search, setSearch] = useState("");
 
   const openCount = requests.filter((r) => r.status === "open").length;
   const filtered = requests.filter((r) => {
     if (statusFilter !== "all" && r.status !== statusFilter) return false;
     if (clientFilter !== "all" && r.companyId !== clientFilter) return false;
+    if (!matchesSearch(search, r.reference, r.subject, r.clientCompany))
+      return false;
     return true;
   });
 
@@ -51,7 +56,7 @@ export function AdminRequestsView({
         </div>
       </div>
 
-      <div className="flex gap-2 flex-wrap mb-5">
+      <div className="flex gap-2 flex-wrap items-center mb-5">
         <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
           {STATUS_FILTERS.map(({ id, label }) => (
             <button
@@ -79,6 +84,12 @@ export function AdminRequestsView({
             </option>
           ))}
         </select>
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Pesquisar por referência, assunto ou cliente…"
+          className="w-full sm:w-72"
+        />
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">

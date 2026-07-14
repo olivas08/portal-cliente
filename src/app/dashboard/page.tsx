@@ -1,10 +1,9 @@
 export const dynamic = "force-dynamic";
 
-import Link from "next/link";
-import { Package, Loader, CheckCircle, ChevronRight } from "lucide-react";
+import { Package, Loader, CheckCircle } from "lucide-react";
 import { auth } from "@/auth";
 import { getOrdersForCompany } from "@/lib/data";
-import { OrderStatusBadge } from "@/components/OrderStatusBadge";
+import { ClientOrdersList } from "@/components/ClientOrdersList";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -81,56 +80,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-100">
-        <div className="px-5 py-4 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-800">As Minhas Encomendas</h2>
-        </div>
-        <div className="divide-y divide-slate-100">
-          {myOrders.map((order) => {
-            const isUrgent = order.priority === "urgent";
-            return (
-              <Link
-                key={order.id}
-                href={`/dashboard/ordens/${order.id}`}
-                className={`flex items-center gap-4 px-5 py-4 border-l-4 hover:bg-slate-50 transition-colors ${
-                  isUrgent
-                    ? "border-l-amber-500 bg-amber-50/40"
-                    : "border-l-transparent"
-                }`}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-semibold text-slate-800">
-                      {order.reference}
-                    </p>
-                    {isUrgent && (
-                      <span className="text-[10px] bg-amber-500 text-white font-bold uppercase tracking-wide px-2 py-0.5 rounded-full">
-                        Urgente
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {order.items.length} artigo
-                    {order.items.length !== 1 ? "s" : ""} · Prazo:{" "}
-                    {order.expectedDate}
-                  </p>
-                </div>
-                <OrderStatusBadge status={order.status} />
-                <ChevronRight
-                  size={16}
-                  className="text-slate-300 flex-shrink-0 hidden sm:block"
-                />
-              </Link>
-            );
-          })}
-
-          {myOrders.length === 0 && (
-            <p className="text-sm text-slate-400 text-center py-10">
-              Sem encomendas registadas.
-            </p>
-          )}
-        </div>
-      </div>
+      <ClientOrdersList orders={myOrders} />
     </>
   );
 }

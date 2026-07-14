@@ -103,7 +103,12 @@ export function NewOrderModal({
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Nova Encomenda"
+            className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+          >
             <div className="flex items-center justify-between p-5 border-b border-slate-100 sticky top-0 bg-white">
               <h2 className="font-semibold text-slate-800">Nova Encomenda</h2>
               <button

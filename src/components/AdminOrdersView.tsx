@@ -4,8 +4,10 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, ArrowUpDown, ShieldCheck } from "lucide-react";
 import type { OrderVM, OrderStatus } from "@/lib/types";
+import { matchesSearch } from "@/lib/search";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { NewOrderModal } from "@/components/NewOrderModal";
+import { SearchInput } from "@/components/SearchInput";
 
 type SortKey = "reference" | "clientCompany" | "status" | "expectedDate" | "items";
 type SortDir = "asc" | "desc";
@@ -65,10 +67,25 @@ export function AdminOrdersView({
   orders: OrderVM[];
   companies: { id: string; name: string }[];
 }) {
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
+  const [statusFilters, setStatusFilters] = useState<Set<OrderStatus>>(
+    () => new Set()
+  );
   const [clientFilter, setClientFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+  const [urgentOnly, setUrgentOnly] = useState(false);
+  const [expectedFrom, setExpectedFrom] = useState("");
+  const [expectedTo, setExpectedTo] = useState("");
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const toggleStatus = (s: OrderStatus) => {
+    setStatusFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
+      return next;
+    });
+  };
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -80,10 +97,39 @@ export function AdminOrdersView({
   };
 
   const filtered = orders.filter((o) => {
-    if (statusFilter !== "all" && o.status !== statusFilter) return false;
+    if (statusFilters.size > 0 && !statusFilters.has(o.status)) return false;
     if (clientFilter !== "all" && o.companyId !== clientFilter) return false;
+    if (urgentOnly && o.priority !== "urgent") return false;
+    if (expectedFrom && o.expectedDate < expectedFrom) return false;
+    if (expectedTo && o.expectedDate > expectedTo) return false;
+    if (
+      !matchesSearch(
+        search,
+        o.reference,
+        o.clientCompany,
+        ...o.items.flatMap((i) => [i.reference, i.description])
+      )
+    )
+      return false;
     return true;
   });
+
+  const clearFilters = () => {
+    setStatusFilters(new Set());
+    setClientFilter("all");
+    setSearch("");
+    setUrgentOnly(false);
+    setExpectedFrom("");
+    setExpectedTo("");
+  };
+
+  const hasActiveFilters =
+    statusFilters.size > 0 ||
+    clientFilter !== "all" ||
+    search !== "" ||
+    urgentOnly ||
+    expectedFrom !== "" ||
+    expectedTo !== "";
 
   const sorted = useMemo(() => {
     if (!sortKey) return filtered;
@@ -133,9 +179,9 @@ export function AdminOrdersView({
         {ALL_STATUSES.map((s) => (
           <button
             key={s}
-            onClick={() => setStatusFilter(statusFilter === s ? "all" : s)}
+            onClick={() => toggleStatus(s)}
             className={`bg-white rounded-xl p-4 shadow-sm border text-left transition-all hover:shadow-md ${
-              statusFilter === s
+              statusFilters.has(s)
                 ? "border-slate-700 ring-2 ring-slate-300"
                 : "border-slate-100"
             }`}
@@ -150,7 +196,13 @@ export function AdminOrdersView({
         ))}
       </div>
 
-      <div className="flex gap-2 flex-wrap mb-4">
+      <div className="flex gap-2 flex-wrap items-center mb-4">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Pesquisar por referência, cliente ou artigo…"
+          className="w-full sm:w-72"
+        />
         <select
           value={clientFilter}
           onChange={(e) => setClientFilter(e.target.value)}
@@ -163,12 +215,37 @@ export function AdminOrdersView({
             </option>
           ))}
         </select>
-        {statusFilter !== "all" && (
+        <label className="flex items-center gap-1.5 text-sm text-slate-600 border border-slate-200 rounded-lg px-3 py-1.5 bg-white cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={urgentOnly}
+            onChange={(e) => setUrgentOnly(e.target.checked)}
+            className="accent-amber-500"
+          />
+          Só urgentes
+        </label>
+        <div className="flex items-center gap-1.5 text-sm text-slate-600 border border-slate-200 rounded-lg px-3 py-1.5 bg-white">
+          <span className="text-xs text-slate-400">Prazo</span>
+          <input
+            type="date"
+            value={expectedFrom}
+            onChange={(e) => setExpectedFrom(e.target.value)}
+            className="text-xs text-slate-600 focus:outline-none w-[110px]"
+          />
+          <span className="text-xs text-slate-300">–</span>
+          <input
+            type="date"
+            value={expectedTo}
+            onChange={(e) => setExpectedTo(e.target.value)}
+            className="text-xs text-slate-600 focus:outline-none w-[110px]"
+          />
+        </div>
+        {hasActiveFilters && (
           <button
-            onClick={() => setStatusFilter("all")}
+            onClick={clearFilters}
             className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50"
           >
-            ✕ Limpar filtro
+            ✕ Limpar filtros
           </button>
         )}
         <span className="ml-auto text-xs text-slate-400 self-center">

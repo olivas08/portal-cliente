@@ -8,14 +8,15 @@ test.describe("Admin cria nova encomenda", () => {
     await login(page, ACCOUNTS.admin, "/admin");
 
     await page.getByRole("button", { name: /Nova Encomenda/ }).click();
-    await page.getByPlaceholder("Ex: LT-2026-090").fill(`LT-E2E-${Date.now()}`);
-    await page.locator('input[type="date"]').fill("2026-12-31");
-    await page.getByPlaceholder("Referência").fill("REF-E2E-1");
-    await page.getByPlaceholder("Descrição").fill("Artigo de teste E2E");
-    await page.getByPlaceholder("Qtd").fill("5");
-    await page.getByPlaceholder("Un.").fill("un");
-    await page.getByPlaceholder("Preço €").fill("10");
-    await page.getByRole("button", { name: "Criar Encomenda" }).click();
+    const dialog = page.getByRole("dialog", { name: "Nova Encomenda" });
+    await dialog.getByPlaceholder("Ex: LT-2026-090").fill(`LT-E2E-${Date.now()}`);
+    await dialog.locator('input[type="date"]').fill("2026-12-31");
+    await dialog.getByPlaceholder("Referência").fill("REF-E2E-1");
+    await dialog.getByPlaceholder("Descrição").fill("Artigo de teste E2E");
+    await dialog.getByPlaceholder("Qtd").fill("5");
+    await dialog.getByPlaceholder("Un.").fill("un");
+    await dialog.getByPlaceholder("Preço €").fill("10");
+    await dialog.getByRole("button", { name: "Criar Encomenda" }).click();
 
     await expect(page).toHaveURL(/\/admin\/ordens\/.+/);
     await expect(
