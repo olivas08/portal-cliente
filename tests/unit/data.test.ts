@@ -39,6 +39,18 @@ describe("getOrderById → OrderVM mapping", () => {
           unitPriceEur: 0.35,
         },
       ],
+      documents: [
+        {
+          id: "d1",
+          fileName: "certificado.pdf",
+          storageKey: "orders/o1/certificado.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 1024,
+          uploadedById: "u1",
+          uploadedByName: "Admin",
+          createdAt: new Date("2026-05-27T10:00:00Z"),
+        },
+      ],
     });
 
     const vm = await getOrderById("o1");
@@ -50,6 +62,8 @@ describe("getOrderById → OrderVM mapping", () => {
     expect(vm!.observations).toBeUndefined();
     expect(vm!.items).toHaveLength(1);
     expect(vm!.items[0].unitPriceEur).toBe(0.35);
+    expect(vm!.attachments).toHaveLength(1);
+    expect(vm!.attachments[0].fileName).toBe("certificado.pdf");
   });
 
   it("leaves optional dates undefined when null", async () => {
@@ -68,6 +82,7 @@ describe("getOrderById → OrderVM mapping", () => {
       observations: "ABS V0",
       batchNumber: "LT-2026-067",
       items: [],
+      documents: [],
     });
 
     const vm = await getOrderById("o2");

@@ -25,6 +25,11 @@ de administração gerir estados de encomendas e responder a requerimentos.
    - `DATABASE_URL` — Transaction pooler (porta 6543)
    - `DIRECT_URL` — Direct connection (porta 5432)
    - `AUTH_SECRET` — gerar com `npx auth secret`
+   - `RESEND_API_KEY` / `EMAIL_FROM` — opcional; sem chave, os emails
+     (reposição de password, notificação de estado de encomenda) ficam
+     apenas registados na consola
+   - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` — necessário para o
+     upload de anexos nas encomendas (ver secção "Anexos" abaixo)
 
 3. Aplicar o schema e semear dados de demonstração:
    ```bash
@@ -74,9 +79,26 @@ prisma/
   seed.ts                   # dados de demonstração
 ```
 
+## Anexos (upload de ficheiros nas encomendas)
+
+Os anexos ad-hoc (fichas técnicas, fotos, certificados extra) são guardados no
+Supabase Storage, no mesmo projeto da base de dados:
+
+1. No dashboard do Supabase, ir a **Storage** e criar um bucket **privado**
+   chamado `order-documents`.
+2. Em **Project Settings → API**, copiar o `Project URL` e a `service_role
+   key` (⚠️ nunca expor esta chave no browser) para `SUPABASE_URL` e
+   `SUPABASE_SERVICE_ROLE_KEY` no `.env`.
+
+Sem estas variáveis definidas, o resto da aplicação funciona normalmente — o
+upload de anexos apenas mostra uma mensagem de erro a indicar que o
+armazenamento ainda não está configurado.
+
 ## Deploy (Vercel + Supabase)
 
 1. Criar projeto na Vercel a partir deste repositório.
-2. Definir as variáveis de ambiente (`DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `AUTH_TRUST_HOST`).
+2. Definir as variáveis de ambiente (`DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`,
+   `AUTH_TRUST_HOST`, `RESEND_API_KEY`, `EMAIL_FROM`, `SUPABASE_URL`,
+   `SUPABASE_SERVICE_ROLE_KEY`).
 3. O `postinstall` corre `prisma generate` automaticamente.
 4. Aplicar migrations em produção com `npx prisma migrate deploy` (via CI ou localmente contra a BD de produção).

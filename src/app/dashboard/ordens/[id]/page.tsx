@@ -10,6 +10,7 @@ import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { StatusStepper } from "@/components/StatusStepper";
 import { OrderItemsTable } from "@/components/OrderItemsTable";
 import { OrderDocumentsCards } from "@/components/OrderDocuments";
+import { OrderAttachments } from "@/components/OrderAttachments";
 import { DatesCard } from "@/components/DatesCard";
 
 export default async function ClientOrderDetail({
@@ -74,6 +75,12 @@ export default async function ClientOrderDetail({
         <div className="flex flex-col gap-5">
           <DatesCard order={order} />
           <OrderDocumentsCards order={order} />
+          <OrderAttachments
+            orderId={order.id}
+            attachments={order.attachments}
+            currentUserId={user.id}
+            isAdmin={false}
+          />
         </div>
       </div>
     </>

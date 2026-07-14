@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { auth } from "@/auth";
 import { getOrderById } from "@/lib/data";
 import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
@@ -10,6 +11,7 @@ import { StatusStepper } from "@/components/StatusStepper";
 import { OrderStatusControl } from "@/components/OrderStatusControl";
 import { OrderItemsTable } from "@/components/OrderItemsTable";
 import { OrderDocumentsCards } from "@/components/OrderDocuments";
+import { OrderAttachments } from "@/components/OrderAttachments";
 import { DatesCard } from "@/components/DatesCard";
 
 export default async function AdminOrderDetail({
@@ -18,6 +20,7 @@ export default async function AdminOrderDetail({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const session = await auth();
   const order = await getOrderById(id);
   if (!order) notFound();
 
@@ -80,6 +83,12 @@ export default async function AdminOrderDetail({
         <div className="flex flex-col gap-5">
           <DatesCard order={order} />
           <OrderDocumentsCards order={order} />
+          <OrderAttachments
+            orderId={order.id}
+            attachments={order.attachments}
+            currentUserId={session!.user.id}
+            isAdmin
+          />
         </div>
       </div>
     </>

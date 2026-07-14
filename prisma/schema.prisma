@@ -94,6 +94,7 @@ model Order {
   qualityNotes  String?
   observations  String?
   items         OrderItem[]
+  documents     OrderDocument[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -107,6 +108,19 @@ model OrderItem {
   quantity     Float
   unit         String
   unitPriceEur Float
+}
+
+model OrderDocument {
+  id             String   @id @default(cuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fileName       String
+  storageKey     String
+  mimeType       String
+  sizeBytes      Int
+  uploadedById   String
+  uploadedByName String
+  createdAt      DateTime @default(now())
 }
 
 model Request {

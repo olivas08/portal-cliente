@@ -3,6 +3,7 @@ import type { OrderVM, RequestVM } from "@/lib/types";
 import type {
   Order,
   OrderItem,
+  OrderDocument,
   Request,
   RequestMessage,
   Company,
@@ -10,7 +11,11 @@ import type {
 
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
 
-type OrderWith = Order & { items: OrderItem[]; company: Company };
+type OrderWith = Order & {
+  items: OrderItem[];
+  documents: OrderDocument[];
+  company: Company;
+};
 type RequestWith = Request & { messages: RequestMessage[]; company: Company };
 
 function toOrderVM(o: OrderWith): OrderVM {
@@ -36,6 +41,17 @@ function toOrderVM(o: OrderWith): OrderVM {
       unit: i.unit,
       unitPriceEur: i.unitPriceEur,
     })),
+    attachments: o.documents
+      .map((d) => ({
+        id: d.id,
+        fileName: d.fileName,
+        mimeType: d.mimeType,
+        sizeBytes: d.sizeBytes,
+        uploadedById: d.uploadedById,
+        uploadedByName: d.uploadedByName,
+        createdAt: d.createdAt.toISOString(),
+      }))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   };
 }
 
@@ -62,7 +78,7 @@ function toRequestVM(r: RequestWith): RequestVM {
 export async function getOrdersForCompany(companyId: string): Promise<OrderVM[]> {
   const orders = await prisma.order.findMany({
     where: { companyId },
-    include: { items: true, company: true },
+    include: { items: true, documents: true, company: true },
     orderBy: { createdDate: "desc" },
   });
   return orders.map(toOrderVM);
@@ -70,7 +86,7 @@ export async function getOrdersForCompany(companyId: string): Promise<OrderVM[]>
 
 export async function getAllOrders(): Promise<OrderVM[]> {
   const orders = await prisma.order.findMany({
-    include: { items: true, company: true },
+    include: { items: true, documents: true, company: true },
     orderBy: { createdDate: "desc" },
   });
   return orders.map(toOrderVM);
@@ -79,7 +95,7 @@ export async function getAllOrders(): Promise<OrderVM[]> {
 export async function getOrderById(id: string): Promise<OrderVM | null> {
   const order = await prisma.order.findUnique({
     where: { id },
-    include: { items: true, company: true },
+    include: { items: true, documents: true, company: true },
   });
   return order ? toOrderVM(order) : null;
 }

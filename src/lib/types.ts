@@ -35,6 +35,16 @@ export interface OrderItemVM {
   unitPriceEur: number;
 }
 
+export interface OrderAttachmentVM {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedById: string;
+  uploadedByName: string;
+  createdAt: string;
+}
+
 export interface OrderVM {
   id: string;
   reference: string;
@@ -47,6 +57,7 @@ export interface OrderVM {
   shippedDate?: string;
   deliveredDate?: string;
   items: OrderItemVM[];
+  attachments: OrderAttachmentVM[];
   qualityNotes?: string;
   batchNumber: string;
   observations?: string;
