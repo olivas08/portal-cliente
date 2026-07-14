@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Factory, LogOut, Package, MessageSquare, ShieldCheck } from "lucide-react";
+import { LogOut, Package, MessageSquare, ShieldCheck } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
 import { useBreadcrumb } from "@/components/BreadcrumbContext";
@@ -41,18 +42,18 @@ export function PortalNav({ name, company, isAdmin }: Props) {
     <>
       {/* Desktop sidebar */}
       <aside className="hidden md:flex fixed inset-y-0 left-0 w-64 flex-col bg-brand text-slate-300 z-30">
-        <div className="flex items-center gap-2.5 px-5 h-16 border-b border-brand-line/50">
-          <div className="bg-accent p-1.5 rounded-lg flex-shrink-0">
-            <Factory size={18} className="text-brand" />
-          </div>
-          <div className="min-w-0">
-            <p className="font-bold text-white text-sm leading-none">
-              Metalofabril
-            </p>
-            <p className="text-[11px] text-slate-400 mt-1 leading-none">
-              {isAdmin ? "Administração" : "Portal do Cliente"}
-            </p>
-          </div>
+        <div className="flex flex-col items-center justify-center gap-1 px-5 py-3 border-b border-brand-line/50 bg-white">
+          <Image
+            src="/jolucor-logo.png"
+            alt="Jolucor"
+            width={132}
+            height={38}
+            className="object-contain"
+            priority
+          />
+          <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide leading-none">
+            {isAdmin ? "Administração" : "Portal do Cliente"}
+          </p>
         </div>
 
         <nav className="flex-1 px-3 py-5 space-y-1">
@@ -96,11 +97,17 @@ export function PortalNav({ name, company, isAdmin }: Props) {
       <header className="md:hidden sticky top-0 z-30 bg-brand text-white">
         <div className="h-14 px-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="bg-accent p-1.5 rounded-lg flex-shrink-0">
-              <Factory size={15} className="text-brand" />
+            <div className="bg-white rounded-md p-1 flex-shrink-0">
+              <Image
+                src="/jolucor-logo.png"
+                alt="Jolucor"
+                width={72}
+                height={21}
+                className="object-contain"
+              />
             </div>
             <span className="font-bold text-sm truncate">
-              {breadcrumb ?? "Metalofabril"}
+              {breadcrumb ?? "Jolucor"}
             </span>
           </div>
           <form action={logoutAction}>

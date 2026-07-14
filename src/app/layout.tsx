@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Portal do Cliente · Metalofabril",
-  description: "Acompanhe encomendas, documentos e requerimentos da Metalofabril.",
+  title: "Portal do Cliente · Jolucor",
+  description: "Acompanhe encomendas, documentos e requerimentos da Jolucor.",
 };
 
 export default function RootLayout({

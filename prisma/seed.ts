@@ -29,7 +29,7 @@ async function main() {
   await prisma.user.create({
     data: {
       name: "Sofia Alves",
-      email: "admin@metalofabril.pt",
+      email: "admin@jolucor.pt",
       passwordHash: hash("admin2026"),
       role: "ADMIN",
     },

@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Factory, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import Image from "next/image";
+import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { resetPassword } from "@/actions/auth";
 
 export function ResetPasswordForm() {
@@ -55,10 +56,16 @@ export function ResetPasswordForm() {
     <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center p-4 w-full">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-slate-800 rounded-2xl mb-4">
-            <Factory size={28} className="text-white" />
+          <div className="inline-flex items-center justify-center bg-white rounded-2xl mb-4 p-3 shadow-sm border border-slate-100">
+            <Image
+              src="/jolucor-logo.png"
+              alt="Jolucor"
+              width={200}
+              height={58}
+              className="object-contain"
+              priority
+            />
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">Metalofabril</h1>
           <p className="text-slate-500 text-sm mt-1">Portal do Cliente</p>
         </div>
 

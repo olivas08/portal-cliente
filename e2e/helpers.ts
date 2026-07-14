@@ -1,7 +1,7 @@
 import { Page, expect } from "@playwright/test";
 
 export const ACCOUNTS = {
-  admin: { email: "admin@metalofabril.pt", password: "admin2026" },
+  admin: { email: "admin@jolucor.pt", password: "admin2026" },
   mota: { email: "compras@motapecas.pt", password: "mota2026" },
   santos: { email: "geral@metalsantos.pt", password: "santos2026" },
 } as const;

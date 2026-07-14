@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { PortalNav } from "@/components/PortalNav";
 import { BreadcrumbProvider } from "@/components/BreadcrumbContext";
 
-const FACTORY_NAME = "Metalofabril, Lda.";
+const FACTORY_NAME = "Jolucor - Fabricação e Manutenção Industrial, Lda.";
 
 export default async function AdminLayout({
   children,

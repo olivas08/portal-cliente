@@ -8,7 +8,7 @@ const RESEND_API_URL = "https://api.resend.com/emails";
  */
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "Metalofabril <onboarding@resend.dev>";
+  const from = process.env.EMAIL_FROM ?? "Jolucor <onboarding@resend.dev>";
 
   if (!apiKey) {
     console.log(
@@ -26,11 +26,11 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
     body: JSON.stringify({
       from,
       to,
-      subject: "Repor palavra-passe — Portal Metalofabril",
+      subject: "Repor palavra-passe — Portal Jolucor",
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color:#0f172a;">Repor palavra-passe</h2>
-          <p>Recebemos um pedido para repor a palavra-passe da sua conta no Portal do Cliente Metalofabril.</p>
+          <p>Recebemos um pedido para repor a palavra-passe da sua conta no Portal do Cliente Jolucor.</p>
           <p>
             <a href="${resetUrl}" style="display:inline-block;background:#f59e0b;color:#0f172a;font-weight:600;padding:10px 20px;border-radius:8px;text-decoration:none;">
               Repor palavra-passe
