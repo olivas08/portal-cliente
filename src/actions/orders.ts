@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import type { OrderStatus } from "@/lib/types";
+import { getBaseUrl } from "@/lib/url";
+import { sendOrderStatusUpdateEmail } from "@/lib/email";
+import { ORDER_STATUS_LABELS, type OrderStatus } from "@/lib/types";
 
 const statusSchema = z.enum([
   "pending",
@@ -42,6 +44,37 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
   revalidatePath("/admin");
   revalidatePath("/dashboard");
   revalidatePath(`/dashboard/ordens/${orderId}`);
+
+  await notifyOrderStatusChange(orderId, existing.companyId, existing.reference, parsedStatus);
+}
+
+/**
+ * Best-effort notification to the company's main client user.
+ * Email delivery must never break the admin's status-update flow, so
+ * any failure (missing user, missing email, Resend error) is only logged.
+ */
+async function notifyOrderStatusChange(
+  orderId: string,
+  companyId: string,
+  reference: string,
+  status: OrderStatus
+) {
+  try {
+    const clientUser = await prisma.user.findFirst({
+      where: { companyId, role: "CLIENT" },
+      orderBy: { createdAt: "asc" },
+    });
+    if (!clientUser?.email) return;
+
+    const baseUrl = await getBaseUrl();
+    await sendOrderStatusUpdateEmail(clientUser.email, {
+      reference,
+      statusLabel: ORDER_STATUS_LABELS[status],
+      orderUrl: `${baseUrl}/dashboard/ordens/${orderId}`,
+    });
+  } catch (err) {
+    console.error("[orders] Falha ao notificar cliente por email:", err);
+  }
 }
 
 const createOrderItemSchema = z.object({

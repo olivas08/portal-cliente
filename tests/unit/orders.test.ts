@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { mockAuth, prismaMock } = vi.hoisted(() => ({
+const { mockAuth, prismaMock, mockGetBaseUrl, mockSendOrderStatusUpdateEmail } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
   prismaMock: {
     order: {
@@ -12,12 +12,21 @@ const { mockAuth, prismaMock } = vi.hoisted(() => ({
     company: {
       findUnique: vi.fn(),
     },
+    user: {
+      findFirst: vi.fn(),
+    },
   },
+  mockGetBaseUrl: vi.fn(),
+  mockSendOrderStatusUpdateEmail: vi.fn(),
 }));
 
 vi.mock("@/auth", () => ({ auth: mockAuth }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/url", () => ({ getBaseUrl: mockGetBaseUrl }));
+vi.mock("@/lib/email", () => ({
+  sendOrderStatusUpdateEmail: mockSendOrderStatusUpdateEmail,
+}));
 
 import { updateOrderStatus, createOrder } from "@/actions/orders";
 
@@ -28,6 +37,8 @@ const clientSession = {
 
 const existingOrder = {
   id: "o1",
+  reference: "ENC-2026-001",
+  companyId: "c1",
   status: "production",
   shippedDate: new Date("2026-06-18"),
   deliveredDate: null,
@@ -40,6 +51,12 @@ beforeEach(() => {
   prismaMock.company.findUnique.mockResolvedValue({ id: "c1", name: "Auto Peças Mota" });
   prismaMock.order.count.mockResolvedValue(0);
   prismaMock.order.create.mockResolvedValue({ id: "o-new" });
+  prismaMock.user.findFirst.mockResolvedValue({
+    id: "u2",
+    email: "cliente@empresa.pt",
+  });
+  mockGetBaseUrl.mockResolvedValue("https://portal.example.com");
+  mockSendOrderStatusUpdateEmail.mockResolvedValue(undefined);
 });
 
 describe("updateOrderStatus — authorization", () => {
@@ -100,6 +117,38 @@ describe("updateOrderStatus — status transitions", () => {
     expect(data.status).toBe("production");
     expect(data.shippedDate).toBeNull();
     expect(data.deliveredDate).toBeNull();
+  });
+});
+
+describe("updateOrderStatus — client notification email", () => {
+  beforeEach(() => mockAuth.mockResolvedValue(adminSession));
+
+  it("emails the company's first CLIENT user with the new status", async () => {
+    await updateOrderStatus("o1", "shipped");
+    expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
+      where: { companyId: "c1", role: "CLIENT" },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(mockSendOrderStatusUpdateEmail).toHaveBeenCalledWith(
+      "cliente@empresa.pt",
+      {
+        reference: "ENC-2026-001",
+        statusLabel: "Expedido",
+        orderUrl: "https://portal.example.com/dashboard/ordens/o1",
+      }
+    );
+  });
+
+  it("does not email when the company has no CLIENT user", async () => {
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    await updateOrderStatus("o1", "shipped");
+    expect(mockSendOrderStatusUpdateEmail).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when email delivery fails", async () => {
+    mockSendOrderStatusUpdateEmail.mockRejectedValue(new Error("Resend down"));
+    await expect(updateOrderStatus("o1", "shipped")).resolves.toBeUndefined();
+    expect(prismaMock.order.update).toHaveBeenCalled();
   });
 });
 
