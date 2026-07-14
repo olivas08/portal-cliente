@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LogOut, Package, MessageSquare, ShieldCheck } from "lucide-react";
+import { LogOut, Package, MessageSquare, ShieldCheck, BarChart3 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
 import { useBreadcrumb } from "@/components/BreadcrumbContext";
@@ -28,6 +28,9 @@ export function PortalNav({ name, company, isAdmin }: Props) {
   const navLinks: NavItem[] = [
     { to: base, label: "Encomendas", icon: Package },
     { to: `${base}/requerimentos`, label: "Requerimentos", icon: MessageSquare },
+    ...(isAdmin
+      ? [{ to: "/admin/kpis", label: "Desempenho", icon: BarChart3 }]
+      : []),
   ];
 
   const isActive = (to: string) => {
