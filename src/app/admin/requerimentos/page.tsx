@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 
 import { getAllRequests, getCompanies } from "@/lib/data";
-import { PortalShell } from "@/components/PortalShell";
 import { AdminRequestsView } from "@/components/AdminRequestsView";
 
 export default async function AdminRequestsPage() {
@@ -11,11 +10,9 @@ export default async function AdminRequestsPage() {
   ]);
 
   return (
-    <PortalShell requiredRole="ADMIN">
-      <AdminRequestsView
-        requests={requests}
-        companies={companies.map((c) => ({ id: c.id, name: c.name }))}
-      />
-    </PortalShell>
+    <AdminRequestsView
+      requests={requests}
+      companies={companies.map((c) => ({ id: c.id, name: c.name }))}
+    />
   );
 }

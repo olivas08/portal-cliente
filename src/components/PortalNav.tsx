@@ -5,12 +5,12 @@ import { usePathname } from "next/navigation";
 import { Factory, LogOut, Package, MessageSquare, ShieldCheck } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
+import { useBreadcrumb } from "@/components/BreadcrumbContext";
 
 interface Props {
   name: string;
   company: string;
   isAdmin: boolean;
-  breadcrumb?: string;
 }
 
 interface NavItem {
@@ -19,8 +19,9 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-export function PortalNav({ name, company, isAdmin, breadcrumb }: Props) {
+export function PortalNav({ name, company, isAdmin }: Props) {
   const pathname = usePathname();
+  const breadcrumb = useBreadcrumb();
   const base = isAdmin ? "/admin" : "/dashboard";
 
   const navLinks: NavItem[] = [

@@ -5,7 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, X } from "lucide-react";
 import { auth } from "@/auth";
 import { getRequestById, getRequestsForCompany } from "@/lib/data";
-import { PortalShell } from "@/components/PortalShell";
+import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
 import {
   RequestStatusBadge,
   RequestTypeBadge,
@@ -33,7 +33,8 @@ export default async function ClientRequestDetail({
   const isClosed = request.status === "closed";
 
   return (
-    <PortalShell requiredRole="CLIENT" breadcrumb={request.subject}>
+    <>
+      <BreadcrumbSetter text={request.subject} />
       <Link
         href="/dashboard/requerimentos"
         className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors mb-5 w-fit lg:hidden"
@@ -93,6 +94,6 @@ export default async function ClientRequestDetail({
           )}
         </div>
       </div>
-    </PortalShell>
+    </>
   );
 }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getOrderById } from "@/lib/data";
-import { PortalShell } from "@/components/PortalShell";
+import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { StatusStepper } from "@/components/StatusStepper";
 import { OrderStatusControl } from "@/components/OrderStatusControl";
@@ -22,7 +22,8 @@ export default async function AdminOrderDetail({
   if (!order) notFound();
 
   return (
-    <PortalShell requiredRole="ADMIN" breadcrumb={order.reference}>
+    <>
+      <BreadcrumbSetter text={order.reference} />
       <Link
         href="/admin"
         className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors mb-5 w-fit"
@@ -81,6 +82,6 @@ export default async function AdminOrderDetail({
           <OrderDocumentsCards order={order} />
         </div>
       </div>
-    </PortalShell>
+    </>
   );
 }

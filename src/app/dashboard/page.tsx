@@ -4,7 +4,6 @@ import Link from "next/link";
 import { Package, Loader, CheckCircle, ChevronRight } from "lucide-react";
 import { auth } from "@/auth";
 import { getOrdersForCompany } from "@/lib/data";
-import { PortalShell } from "@/components/PortalShell";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 
 export default async function DashboardPage() {
@@ -43,7 +42,7 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <PortalShell requiredRole="CLIENT">
+    <>
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-800">
           Bem-vindo, {user.name}
@@ -132,6 +131,6 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
-    </PortalShell>
+    </>
   );
 }

@@ -5,7 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { auth } from "@/auth";
 import { getOrderById } from "@/lib/data";
-import { PortalShell } from "@/components/PortalShell";
+import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { StatusStepper } from "@/components/StatusStepper";
 import { OrderItemsTable } from "@/components/OrderItemsTable";
@@ -26,7 +26,8 @@ export default async function ClientOrderDetail({
   if (order.companyId !== user.companyId) redirect("/dashboard");
 
   return (
-    <PortalShell requiredRole="CLIENT" breadcrumb={order.reference}>
+    <>
+      <BreadcrumbSetter text={order.reference} />
       <Link
         href="/dashboard"
         className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors mb-5 w-fit"
@@ -75,6 +76,6 @@ export default async function ClientOrderDetail({
           <OrderDocumentsCards order={order} />
         </div>
       </div>
-    </PortalShell>
+    </>
   );
 }

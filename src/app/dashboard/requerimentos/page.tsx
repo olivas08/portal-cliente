@@ -3,7 +3,6 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { getRequestsForCompany } from "@/lib/data";
-import { PortalShell } from "@/components/PortalShell";
 import {
   RequestStatusBadge,
   RequestTypeBadge,
@@ -18,7 +17,7 @@ export default async function ClientRequestsPage() {
     : [];
 
   return (
-    <PortalShell requiredRole="CLIENT">
+    <>
       <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Requerimentos</h1>
@@ -70,6 +69,6 @@ export default async function ClientRequestsPage() {
           )}
         </div>
       </div>
-    </PortalShell>
+    </>
   );
 }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, X } from "lucide-react";
 import { getRequestById, getAllRequests } from "@/lib/data";
-import { PortalShell } from "@/components/PortalShell";
+import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
 import {
   RequestStatusBadge,
   RequestTypeBadge,
@@ -26,7 +26,8 @@ export default async function AdminRequestDetail({
   const allRequests = await getAllRequests();
 
   return (
-    <PortalShell requiredRole="ADMIN" breadcrumb={request.subject}>
+    <>
+      <BreadcrumbSetter text={request.subject} />
       <Link
         href="/admin/requerimentos"
         className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors mb-5 w-fit lg:hidden"
@@ -94,6 +95,6 @@ export default async function AdminRequestDetail({
           )}
         </div>
       </div>
-    </PortalShell>
+    </>
   );
 }
