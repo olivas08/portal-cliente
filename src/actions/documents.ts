@@ -10,16 +10,44 @@ import {
 } from "@/lib/storage";
 
 const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
-const ALLOWED_MIME_TYPES = new Set([
-  "application/pdf",
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-]);
+
+// Extension -> canonical MIME type for every format we accept. Some browsers/
+// OS combinations (cloud-synced folders, certain Android/Windows setups)
+// report an empty or generic `file.type` ("application/octet-stream")
+// instead of the real MIME type, so we validate — and fall back to — the
+// file extension rather than trusting `file.type` alone.
+const ALLOWED_EXTENSIONS: Record<string, string> = {
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  csv: "text/csv",
+};
+const ALLOWED_MIME_TYPES = new Set(Object.values(ALLOWED_EXTENSIONS));
+const GENERIC_MIME_TYPES = new Set(["", "application/octet-stream"]);
+
+function extensionOf(fileName: string): string {
+  return fileName.slice(fileName.lastIndexOf(".") + 1).toLowerCase();
+}
+
+/**
+ * Resolves the MIME type to trust for a given upload: the browser-reported
+ * type when it's meaningful, otherwise the canonical type for its extension.
+ * Returns null when neither the reported type nor the extension is allowed.
+ */
+function resolveAllowedMimeType(file: File): string | null {
+  if (ALLOWED_MIME_TYPES.has(file.type)) return file.type;
+  if (GENERIC_MIME_TYPES.has(file.type)) {
+    const canonical = ALLOWED_EXTENSIONS[extensionOf(file.name)];
+    if (canonical) return canonical;
+  }
+  return null;
+}
 
 async function requireOrderAccess(orderId: string) {
   const session = await auth();
@@ -44,21 +72,22 @@ export async function uploadOrderDocument(orderId: string, formData: FormData) {
   if (file.size > MAX_SIZE_BYTES) {
     throw new Error("O ficheiro excede o limite de 10MB.");
   }
-  if (!ALLOWED_MIME_TYPES.has(file.type)) {
+  const mimeType = resolveAllowedMimeType(file);
+  if (!mimeType) {
     throw new Error("Tipo de ficheiro não suportado.");
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const storageKey = `orders/${orderId}/${crypto.randomUUID()}-${file.name}`;
 
-  await uploadDocumentFile(storageKey, buffer, file.type);
+  await uploadDocumentFile(storageKey, buffer, mimeType);
 
   await prisma.orderDocument.create({
     data: {
       orderId,
       fileName: file.name,
       storageKey,
-      mimeType: file.type,
+      mimeType,
       sizeBytes: file.size,
       uploadedById: user.id,
       uploadedByName:

@@ -123,6 +123,54 @@ describe("uploadOrderDocument — validation", () => {
     );
     expect(mockUploadDocumentFile).not.toHaveBeenCalled();
   });
+
+  it("rejects a generic mime type when the extension isn't allowed either", async () => {
+    mockAuth.mockResolvedValue(adminSession);
+    const fd = new FormData();
+    fd.set(
+      "file",
+      makeFile("relatorio.html", "application/octet-stream", 10)
+    );
+    await expect(uploadOrderDocument("o1", fd)).rejects.toThrow(
+      "não suportado"
+    );
+    expect(mockUploadDocumentFile).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the file extension when the browser reports no mime type", async () => {
+    // Some browsers/OS combinations (cloud-synced folders, some Android
+    // setups) report an empty file.type even for well-known formats.
+    mockAuth.mockResolvedValue(adminSession);
+    const fd = new FormData();
+    fd.set("file", makeFile("desenho.pdf", "", 2048));
+
+    await uploadOrderDocument("o1", fd);
+
+    expect(mockUploadDocumentFile).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Buffer),
+      "application/pdf"
+    );
+    expect(prismaMock.orderDocument.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ mimeType: "application/pdf" }),
+      })
+    );
+  });
+
+  it("accepts a csv file", async () => {
+    mockAuth.mockResolvedValue(adminSession);
+    const fd = new FormData();
+    fd.set("file", makeFile("pecas.csv", "text/csv", 512));
+
+    await uploadOrderDocument("o1", fd);
+
+    expect(mockUploadDocumentFile).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Buffer),
+      "text/csv"
+    );
+  });
 });
 
 describe("uploadOrderDocument — success", () => {
