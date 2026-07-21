@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { RequestVM, RequestStatus } from "@/lib/types";
+import type { RequestSummaryVM, RequestStatus } from "@/lib/types";
 import { matchesSearch } from "@/lib/search";
 import { SearchInput } from "@/components/SearchInput";
 import {
@@ -22,7 +22,7 @@ export function AdminRequestsView({
   requests,
   companies,
 }: {
-  requests: RequestVM[];
+  requests: RequestSummaryVM[];
   companies: { id: string; name: string }[];
 }) {
   const [statusFilter, setStatusFilter] = useState<RequestStatus | "all">(
@@ -95,7 +95,7 @@ export function AdminRequestsView({
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="divide-y divide-slate-100">
           {filtered.map((r) => {
-            const lastMsg = r.messages[r.messages.length - 1];
+            const lastMsg = r.lastMessage;
             const needsReply = lastMsg?.from === "client";
             return (
               <Link
@@ -118,8 +118,8 @@ export function AdminRequestsView({
                     )}
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    {r.clientCompany} · {r.createdDate} · {r.messages.length}{" "}
-                    mensagem{r.messages.length !== 1 ? "s" : ""}
+                    {r.clientCompany} · {r.createdDate} · {r.messageCount}{" "}
+                    mensagem{r.messageCount !== 1 ? "s" : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">

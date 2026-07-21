@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { RequestVM } from "@/lib/types";
+import type { RequestSummaryVM } from "@/lib/types";
 import { matchesSearch } from "@/lib/search";
 import { SearchInput } from "@/components/SearchInput";
 import {
@@ -11,7 +11,7 @@ import {
 } from "@/components/RequestBadges";
 
 /** Client-side searchable list of the company's own requests. */
-export function ClientRequestsList({ requests }: { requests: RequestVM[] }) {
+export function ClientRequestsList({ requests }: { requests: RequestSummaryVM[] }) {
   const [search, setSearch] = useState("");
 
   const filtered = requests.filter((r) =>
@@ -45,15 +45,15 @@ export function ClientRequestsList({ requests }: { requests: RequestVM[] }) {
                 <p className="text-sm font-semibold text-slate-800 truncate">
                   {r.subject}
                 </p>
-                {r.messages[r.messages.length - 1]?.from === "admin" && (
+                {r.lastMessage?.from === "admin" && (
                   <span className="text-xs bg-purple-100 text-purple-700 font-medium px-2 py-0.5 rounded-full flex-shrink-0">
                     Nova resposta
                   </span>
                 )}
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                {r.createdDate} · {r.messages.length} mensagem
-                {r.messages.length !== 1 ? "s" : ""}
+                {r.createdDate} · {r.messageCount} mensagem
+                {r.messageCount !== 1 ? "s" : ""}
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">

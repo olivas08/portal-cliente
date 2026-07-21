@@ -31,6 +31,7 @@ export function NewOrderModal({
   const [companyId, setCompanyId] = useState(companies[0]?.id ?? "");
   const [batchNumber, setBatchNumber] = useState("");
   const [expectedDate, setExpectedDate] = useState("");
+  const [priority, setPriority] = useState<"normal" | "urgent">("normal");
   const [observations, setObservations] = useState("");
   const [items, setItems] = useState<ItemForm[]>([{ ...emptyItem }]);
   const [error, setError] = useState("");
@@ -53,6 +54,7 @@ export function NewOrderModal({
     setCompanyId(companies[0]?.id ?? "");
     setBatchNumber("");
     setExpectedDate("");
+    setPriority("normal");
     setObservations("");
     setItems([{ ...emptyItem }]);
     setError("");
@@ -67,6 +69,7 @@ export function NewOrderModal({
           companyId,
           batchNumber,
           expectedDate,
+          priority,
           observations: observations || undefined,
           items: items.map((it) => ({
             reference: it.reference,
@@ -163,6 +166,18 @@ export function NewOrderModal({
                   />
                 </div>
               </div>
+
+              <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none w-fit">
+                <input
+                  type="checkbox"
+                  checked={priority === "urgent"}
+                  onChange={(e) =>
+                    setPriority(e.target.checked ? "urgent" : "normal")
+                  }
+                  className="accent-amber-500"
+                />
+                Marcar como <span className="font-medium">urgente</span>
+              </label>
 
               <div>
                 <div className="flex items-center justify-between mb-2">

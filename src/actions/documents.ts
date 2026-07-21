@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { assertCompanyAccess, requireUser } from "@/lib/auth-guard";
+import { NotFoundError, UnauthorizedError } from "@/lib/errors";
 import {
   uploadDocumentFile,
   deleteDocumentFile,
@@ -50,15 +51,11 @@ function resolveAllowedMimeType(file: File): string | null {
 }
 
 async function requireOrderAccess(orderId: string) {
-  const session = await auth();
-  const user = session?.user;
-  if (!user) throw new Error("Não autorizado.");
+  const user = await requireUser();
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
-  if (!order) throw new Error("Encomenda não encontrada.");
-  if (user.role !== "ADMIN" && order.companyId !== user.companyId) {
-    throw new Error("Não autorizado.");
-  }
+  if (!order) throw new NotFoundError("Encomenda não encontrada.");
+  assertCompanyAccess(user, order.companyId);
   return { user, order };
 }
 
@@ -100,20 +97,18 @@ export async function uploadOrderDocument(orderId: string, formData: FormData) {
 }
 
 export async function deleteOrderDocument(documentId: string) {
-  const session = await auth();
-  const user = session?.user;
-  if (!user) throw new Error("Não autorizado.");
+  const user = await requireUser();
 
   const doc = await prisma.orderDocument.findUnique({
     where: { id: documentId },
     include: { order: true },
   });
-  if (!doc) throw new Error("Documento não encontrado.");
+  if (!doc) throw new NotFoundError("Documento não encontrado.");
 
   const isAdmin = user.role === "ADMIN";
   const isOwner = doc.uploadedById === user.id;
   if (!isAdmin && (!isOwner || doc.order.companyId !== user.companyId)) {
-    throw new Error("Não autorizado.");
+    throw new UnauthorizedError();
   }
 
   await deleteDocumentFile(doc.storageKey);
@@ -124,18 +119,14 @@ export async function deleteOrderDocument(documentId: string) {
 }
 
 export async function getOrderDocumentDownloadUrl(documentId: string) {
-  const session = await auth();
-  const user = session?.user;
-  if (!user) throw new Error("Não autorizado.");
+  const user = await requireUser();
 
   const doc = await prisma.orderDocument.findUnique({
     where: { id: documentId },
     include: { order: true },
   });
-  if (!doc) throw new Error("Documento não encontrado.");
-  if (user.role !== "ADMIN" && doc.order.companyId !== user.companyId) {
-    throw new Error("Não autorizado.");
-  }
+  if (!doc) throw new NotFoundError("Documento não encontrado.");
+  assertCompanyAccess(user, doc.order.companyId);
 
   return getDocumentDownloadUrl(doc.storageKey);
 }

@@ -236,3 +236,26 @@ describe("createOrder — reference generation", () => {
     expect(id).toBe("o-created");
   });
 });
+
+describe("createOrder — priority", () => {
+  beforeEach(() => mockAuth.mockResolvedValue(adminSession));
+
+  it("defaults priority to normal when omitted", async () => {
+    await createOrder(validOrderInput);
+    const data = prismaMock.order.create.mock.calls[0][0].data;
+    expect(data.priority).toBe("normal");
+  });
+
+  it("persists an urgent priority when provided", async () => {
+    await createOrder({ ...validOrderInput, priority: "urgent" });
+    const data = prismaMock.order.create.mock.calls[0][0].data;
+    expect(data.priority).toBe("urgent");
+  });
+
+  it("rejects an invalid priority value", async () => {
+    await expect(
+      createOrder({ ...validOrderInput, priority: "super" as never })
+    ).rejects.toThrow();
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+});

@@ -1,5 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import type { OrderVM, RequestVM } from "@/lib/types";
+import type {
+  OrderVM,
+  OrderSummaryVM,
+  RequestVM,
+  RequestSummaryVM,
+  RequestMessageVM,
+} from "@/lib/types";
+import { toIsoDate } from "@/lib/dates";
 import type {
   Order,
   OrderItem,
@@ -9,16 +16,16 @@ import type {
   Company,
 } from "@prisma/client";
 
-const ymd = (d: Date) => d.toISOString().slice(0, 10);
-
-type OrderWith = Order & {
-  items: OrderItem[];
-  documents: OrderDocument[];
-  company: Company;
-};
+type OrderSummaryWith = Order & { items: OrderItem[]; company: Company };
+type OrderWith = OrderSummaryWith & { documents: OrderDocument[] };
 type RequestWith = Request & { messages: RequestMessage[]; company: Company };
+type RequestSummaryWith = Request & {
+  messages: RequestMessage[];
+  company: Company;
+  _count: { messages: number };
+};
 
-function toOrderVM(o: OrderWith): OrderVM {
+function toOrderSummaryVM(o: OrderSummaryWith): OrderSummaryVM {
   return {
     id: o.id,
     reference: o.reference,
@@ -26,10 +33,10 @@ function toOrderVM(o: OrderWith): OrderVM {
     clientCompany: o.company.name,
     status: o.status,
     priority: o.priority,
-    createdDate: ymd(o.createdDate),
-    expectedDate: ymd(o.expectedDate),
-    shippedDate: o.shippedDate ? ymd(o.shippedDate) : undefined,
-    deliveredDate: o.deliveredDate ? ymd(o.deliveredDate) : undefined,
+    createdDate: toIsoDate(o.createdDate),
+    expectedDate: toIsoDate(o.expectedDate),
+    shippedDate: o.shippedDate ? toIsoDate(o.shippedDate) : undefined,
+    deliveredDate: o.deliveredDate ? toIsoDate(o.deliveredDate) : undefined,
     qualityNotes: o.qualityNotes ?? undefined,
     observations: o.observations ?? undefined,
     batchNumber: o.batchNumber,
@@ -41,6 +48,12 @@ function toOrderVM(o: OrderWith): OrderVM {
       unit: i.unit,
       unitPriceEur: i.unitPriceEur,
     })),
+  };
+}
+
+function toOrderVM(o: OrderWith): OrderVM {
+  return {
+    ...toOrderSummaryVM(o),
     attachments: o.documents
       .map((d) => ({
         id: d.id,
@@ -55,6 +68,16 @@ function toOrderVM(o: OrderWith): OrderVM {
   };
 }
 
+function toMessageVM(m: RequestMessage): RequestMessageVM {
+  return {
+    id: m.id,
+    from: m.from,
+    authorName: m.authorName,
+    text: m.text,
+    date: m.date.toISOString(),
+  };
+}
+
 function toRequestVM(r: RequestWith): RequestVM {
   return {
     id: r.id,
@@ -64,32 +87,44 @@ function toRequestVM(r: RequestWith): RequestVM {
     type: r.type,
     subject: r.subject,
     status: r.status,
-    createdDate: ymd(r.createdDate),
-    messages: r.messages.map((m) => ({
-      id: m.id,
-      from: m.from,
-      authorName: m.authorName,
-      text: m.text,
-      date: m.date.toISOString(),
-    })),
+    createdDate: toIsoDate(r.createdDate),
+    messages: r.messages.map(toMessageVM),
   };
 }
 
-export async function getOrdersForCompany(companyId: string): Promise<OrderVM[]> {
-  const orders = await prisma.order.findMany({
-    where: { companyId },
-    include: { items: true, documents: true, company: true },
-    orderBy: { createdDate: "desc" },
-  });
-  return orders.map(toOrderVM);
+function toRequestSummaryVM(r: RequestSummaryWith): RequestSummaryVM {
+  return {
+    id: r.id,
+    reference: r.reference,
+    companyId: r.companyId,
+    clientCompany: r.company.name,
+    type: r.type,
+    subject: r.subject,
+    status: r.status,
+    createdDate: toIsoDate(r.createdDate),
+    // Fetched with `orderBy: date desc, take: 1`, so [0] is the latest message.
+    lastMessage: r.messages[0] ? toMessageVM(r.messages[0]) : null,
+    messageCount: r._count.messages,
+  };
 }
 
-export async function getAllOrders(): Promise<OrderVM[]> {
+export async function getOrdersForCompany(
+  companyId: string,
+): Promise<OrderSummaryVM[]> {
   const orders = await prisma.order.findMany({
-    include: { items: true, documents: true, company: true },
+    where: { companyId },
+    include: { items: true, company: true },
     orderBy: { createdDate: "desc" },
   });
-  return orders.map(toOrderVM);
+  return orders.map(toOrderSummaryVM);
+}
+
+export async function getAllOrders(): Promise<OrderSummaryVM[]> {
+  const orders = await prisma.order.findMany({
+    include: { items: true, company: true },
+    orderBy: { createdDate: "desc" },
+  });
+  return orders.map(toOrderSummaryVM);
 }
 
 export async function getOrderById(id: string): Promise<OrderVM | null> {
@@ -100,21 +135,31 @@ export async function getOrderById(id: string): Promise<OrderVM | null> {
   return order ? toOrderVM(order) : null;
 }
 
-export async function getRequestsForCompany(companyId: string): Promise<RequestVM[]> {
+export async function getRequestsForCompany(
+  companyId: string,
+): Promise<RequestSummaryVM[]> {
   const requests = await prisma.request.findMany({
     where: { companyId },
-    include: { messages: { orderBy: { date: "asc" } }, company: true },
+    include: {
+      company: true,
+      messages: { orderBy: { date: "desc" }, take: 1 },
+      _count: { select: { messages: true } },
+    },
     orderBy: { createdDate: "desc" },
   });
-  return requests.map(toRequestVM);
+  return requests.map(toRequestSummaryVM);
 }
 
-export async function getAllRequests(): Promise<RequestVM[]> {
+export async function getAllRequests(): Promise<RequestSummaryVM[]> {
   const requests = await prisma.request.findMany({
-    include: { messages: { orderBy: { date: "asc" } }, company: true },
+    include: {
+      company: true,
+      messages: { orderBy: { date: "desc" }, take: 1 },
+      _count: { select: { messages: true } },
+    },
     orderBy: { createdDate: "desc" },
   });
-  return requests.map(toRequestVM);
+  return requests.map(toRequestSummaryVM);
 }
 
 export async function getRequestById(id: string): Promise<RequestVM | null> {

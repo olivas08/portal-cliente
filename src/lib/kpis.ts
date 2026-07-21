@@ -1,4 +1,5 @@
-import type { OrderVM } from "@/lib/types";
+import type { OrderSummaryVM } from "@/lib/types";
+import { isoMonth } from "@/lib/dates";
 
 export interface MonthlyKpiPoint {
   /** "YYYY-MM", grouped by delivery month. */
@@ -32,7 +33,7 @@ function average(values: number[]): number | null {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
-function onTimeRate(orders: OrderVM[]): number | null {
+function onTimeRate(orders: OrderSummaryVM[]): number | null {
   if (orders.length === 0) return null;
   const onTime = orders.filter(
     (o) => o.deliveredDate && o.deliveredDate <= o.expectedDate
@@ -45,7 +46,7 @@ function onTimeRate(orders: OrderVM[]): number | null {
  * on the admin "Desempenho" page. Kept side-effect-free and framework-free
  * so it can be unit tested without touching Prisma or the DOM.
  */
-export function computeOrderKpis(orders: OrderVM[]): OrderKpis {
+export function computeOrderKpis(orders: OrderSummaryVM[]): OrderKpis {
   const delivered = orders.filter(
     (o) => o.status === "delivered" && o.deliveredDate
   );
@@ -56,9 +57,9 @@ export function computeOrderKpis(orders: OrderVM[]): OrderKpis {
     daysBetween(o.createdDate, o.deliveredDate!)
   );
 
-  const byMonth = new Map<string, OrderVM[]>();
+  const byMonth = new Map<string, OrderSummaryVM[]>();
   for (const o of delivered) {
-    const month = o.deliveredDate!.slice(0, 7);
+    const month = isoMonth(o.deliveredDate!);
     const group = byMonth.get(month);
     if (group) group.push(o);
     else byMonth.set(month, [o]);

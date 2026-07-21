@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { RequestVM } from "@/lib/types";
+import type { RequestSummaryVM } from "@/lib/types";
 import { RequestStatusBadge, RequestTypeBadge } from "@/components/RequestBadges";
 
 export function RequestListPane({
@@ -8,7 +8,7 @@ export function RequestListPane({
   activeId,
   showCompany = false,
 }: {
-  requests: RequestVM[];
+  requests: RequestSummaryVM[];
   basePath: string;
   activeId: string;
   showCompany?: boolean;
@@ -21,7 +21,7 @@ export function RequestListPane({
       <div className="divide-y divide-slate-100 max-h-[70vh] overflow-y-auto">
         {requests.map((r) => {
           const active = r.id === activeId;
-          const lastMsg = r.messages[r.messages.length - 1];
+          const lastMsg = r.lastMessage;
           return (
             <Link
               key={r.id}

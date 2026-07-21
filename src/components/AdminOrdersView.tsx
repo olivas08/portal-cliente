@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, ArrowUpDown, ShieldCheck } from "lucide-react";
-import type { OrderVM, OrderStatus } from "@/lib/types";
+import type { OrderSummaryVM, OrderStatus } from "@/lib/types";
+import { ORDER_STATUS_SHORT_LABELS } from "@/lib/types";
 import { matchesSearch } from "@/lib/search";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { NewOrderModal } from "@/components/NewOrderModal";
@@ -52,19 +53,12 @@ const ALL_STATUSES: OrderStatus[] = [
   "shipped",
   "delivered",
 ];
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  pending: "Pendente",
-  production: "Em Produção",
-  quality: "Controlo Q.",
-  shipped: "Expedido",
-  delivered: "Entregue",
-};
 
 export function AdminOrdersView({
   orders,
   companies,
 }: {
-  orders: OrderVM[];
+  orders: OrderSummaryVM[];
   companies: { id: string; name: string }[];
 }) {
   const [statusFilters, setStatusFilters] = useState<Set<OrderStatus>>(
@@ -187,7 +181,7 @@ export function AdminOrdersView({
             }`}
           >
             <p className="text-xs text-slate-400 font-medium truncate">
-              {STATUS_LABELS[s]}
+              {ORDER_STATUS_SHORT_LABELS[s]}
             </p>
             <p className="text-2xl font-bold text-slate-800 mt-1">
               {countByStatus(s)}

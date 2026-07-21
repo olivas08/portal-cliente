@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { OrderVM } from "@/lib/types";
+import { formatDatePt } from "@/lib/dates";
 
 const CO = {
   name: "Jolucor - Fabricação e Manutenção Industrial, Lda.",
@@ -9,11 +10,6 @@ const CO = {
   nif: "NIF: PT 500 123 456",
   contact: "Tel: +351 256 850 200 | geral@jolucor.pt",
 };
-
-function fmt(dateStr: string) {
-  const [y, m, d] = dateStr.split("-");
-  return `${d}/${m}/${y}`;
-}
 
 function lastY(doc: jsPDF): number {
   return (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
@@ -57,7 +53,7 @@ function addOrderInfo(doc: jsPDF, order: OrderVM, y: number) {
   doc.setFont("helvetica", "bold");
   doc.text("Data:", 120, y);
   doc.setFont("helvetica", "normal");
-  doc.text(fmt(order.createdDate), 140, y);
+  doc.text(formatDatePt(order.createdDate), 140, y);
 
   doc.setFont("helvetica", "bold");
   doc.text("Cliente:", 20, y + 7);
@@ -73,7 +69,7 @@ function addOrderInfo(doc: jsPDF, order: OrderVM, y: number) {
     doc.setFont("helvetica", "bold");
     doc.text("Prazo acordado:", 20, y + 14);
     doc.setFont("helvetica", "normal");
-    doc.text(fmt(order.expectedDate), 65, y + 14);
+    doc.text(formatDatePt(order.expectedDate), 65, y + 14);
   }
 }
 
@@ -99,7 +95,7 @@ export function generateDeliveryNote(order: OrderVM) {
     doc.setTextColor(60, 60, 60);
     doc.text("Data de expedição:", 20, 79);
     doc.setFont("helvetica", "normal");
-    doc.text(fmt(order.shippedDate), 65, 79);
+    doc.text(formatDatePt(order.shippedDate), 65, 79);
   }
 
   autoTable(doc, {

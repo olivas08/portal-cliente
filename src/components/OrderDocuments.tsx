@@ -3,11 +3,19 @@
 import { FileText, Award, Receipt, Download, Folder } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { OrderVM } from "@/lib/types";
-import {
-  generateDeliveryNote,
-  generateQualityCert,
-  generateProformaInvoice,
-} from "@/lib/generatePdf";
+
+/**
+ * Lazily loads the PDF generator (jsPDF + jspdf-autotable, ~200 kB) only when
+ * the user actually clicks a document button, so it isn't shipped in the
+ * order-detail route bundle on every page load.
+ */
+async function runPdf(
+  generate: (mod: typeof import("@/lib/generatePdf"), order: OrderVM) => void,
+  order: OrderVM,
+) {
+  const mod = await import("@/lib/generatePdf");
+  generate(mod, order);
+}
 
 interface DocRow {
   icon: LucideIcon;
@@ -71,13 +79,13 @@ export function OrderDocumentsCards({ order }: { order: OrderVM }) {
           icon: FileText,
           title: "Guia de Remessa",
           meta: "PDF · Expedição",
-          onClick: () => generateDeliveryNote(order),
+          onClick: () => runPdf((m, o) => m.generateDeliveryNote(o), order),
         },
         {
           icon: Award,
           title: "Certificado de Conformidade",
           meta: canCert ? "PDF · Qualidade" : "Aguarda controlo de qualidade",
-          onClick: () => generateQualityCert(order),
+          onClick: () => runPdf((m, o) => m.generateQualityCert(o), order),
           disabled: !canCert,
           pendingLabel: "Pendente",
         },
@@ -85,7 +93,7 @@ export function OrderDocumentsCards({ order }: { order: OrderVM }) {
           icon: Receipt,
           title: "Fatura Pro-forma",
           meta: "PDF · Financeiro",
-          onClick: () => generateProformaInvoice(order),
+          onClick: () => runPdf((m, o) => m.generateProformaInvoice(o), order),
         },
       ]}
     />

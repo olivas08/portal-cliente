@@ -1,4 +1,4 @@
-// Prisma schema — Portal do Cliente (Metalofabril)
+// Prisma schema — Portal do Cliente (Jolucor)
 // Docs: https://pris.ly/d/prisma-schema
 
 generator client {
@@ -67,6 +67,8 @@ model User {
   company             Company?             @relation(fields: [companyId], references: [id])
   createdAt           DateTime             @default(now())
   passwordResetTokens PasswordResetToken[]
+
+  @@index([companyId])
 }
 
 model PasswordResetToken {
@@ -77,6 +79,8 @@ model PasswordResetToken {
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Order {
@@ -97,6 +101,8 @@ model Order {
   documents     OrderDocument[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+
+  @@index([companyId])
 }
 
 model OrderItem {
@@ -108,6 +114,8 @@ model OrderItem {
   quantity     Float
   unit         String
   unitPriceEur Float
+
+  @@index([orderId])
 }
 
 model OrderDocument {
@@ -121,6 +129,8 @@ model OrderDocument {
   uploadedById   String
   uploadedByName String
   createdAt      DateTime @default(now())
+
+  @@index([orderId])
 }
 
 model Request {
@@ -135,6 +145,8 @@ model Request {
   messages    RequestMessage[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
+
+  @@index([companyId])
 }
 
 model RequestMessage {
@@ -145,4 +157,6 @@ model RequestMessage {
   authorName String
   text       String
   date       DateTime    @default(now())
+
+  @@index([requestId])
 }

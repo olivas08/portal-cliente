@@ -3,13 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import type { OrderVM } from "@/lib/types";
+import type { OrderSummaryVM } from "@/lib/types";
 import { matchesSearch } from "@/lib/search";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { SearchInput } from "@/components/SearchInput";
 
 /** Client-side searchable/filterable list of the company's own orders. */
-export function ClientOrdersList({ orders }: { orders: OrderVM[] }) {
+export function ClientOrdersList({ orders }: { orders: OrderSummaryVM[] }) {
   const [search, setSearch] = useState("");
   const [urgentOnly, setUrgentOnly] = useState(false);
 

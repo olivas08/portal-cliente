@@ -1,8 +1,16 @@
-export type OrderStatus = "pending" | "production" | "quality" | "shipped" | "delivered";
-export type Priority = "normal" | "urgent";
-export type RequestType = "quote" | "complaint" | "info" | "other";
-export type RequestStatus = "open" | "in_review" | "responded" | "closed";
-export type MessageFrom = "client" | "admin";
+import type { $Enums } from "@prisma/client";
+
+/**
+ * Domain enums are the single source of truth in `prisma/schema.prisma`.
+ * We derive the TypeScript unions from the generated Prisma types (via a
+ * type-only import, so nothing from the client leaks into client bundles)
+ * instead of re-declaring them by hand and risking drift.
+ */
+export type OrderStatus = $Enums.OrderStatus;
+export type Priority = $Enums.Priority;
+export type RequestType = $Enums.RequestType;
+export type RequestStatus = $Enums.RequestStatus;
+export type MessageFrom = $Enums.MessageFrom;
 
 export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
   quote: "Pedido de Orçamento",
@@ -26,6 +34,15 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   delivered: "Entregue",
 };
 
+/** Compact variants for tight UI (e.g. the admin status filter cards). */
+export const ORDER_STATUS_SHORT_LABELS: Record<OrderStatus, string> = {
+  pending: "Pendente",
+  production: "Em Produção",
+  quality: "Controlo Q.",
+  shipped: "Expedido",
+  delivered: "Entregue",
+};
+
 export interface OrderItemVM {
   id: string;
   reference: string;
@@ -45,7 +62,13 @@ export interface OrderAttachmentVM {
   createdAt: string;
 }
 
-export interface OrderVM {
+/**
+ * Summary view of an order for list/KPI screens. It deliberately omits
+ * `attachments` because those screens never render them — only the order
+ * detail page does. Keeping them out lets the list queries skip the join to
+ * `OrderDocument` entirely (see `data.ts`).
+ */
+export interface OrderSummaryVM {
   id: string;
   reference: string;
   companyId: string;
@@ -57,10 +80,14 @@ export interface OrderVM {
   shippedDate?: string;
   deliveredDate?: string;
   items: OrderItemVM[];
-  attachments: OrderAttachmentVM[];
   qualityNotes?: string;
   batchNumber: string;
   observations?: string;
+}
+
+/** Full order, including attachments, for the order detail page. */
+export interface OrderVM extends OrderSummaryVM {
+  attachments: OrderAttachmentVM[];
 }
 
 export interface RequestMessageVM {
@@ -71,7 +98,7 @@ export interface RequestMessageVM {
   date: string;
 }
 
-export interface RequestVM {
+interface RequestBaseVM {
   id: string;
   reference: string;
   companyId: string;
@@ -80,5 +107,19 @@ export interface RequestVM {
   subject: string;
   status: RequestStatus;
   createdDate: string;
+}
+
+/**
+ * Summary view of a request for list screens. List cards only need the last
+ * message (for the "aguarda resposta"/"nova resposta" hint) and the total
+ * message count, so we avoid loading the entire thread for every row.
+ */
+export interface RequestSummaryVM extends RequestBaseVM {
+  lastMessage: RequestMessageVM | null;
+  messageCount: number;
+}
+
+/** Full request, including the whole message thread, for the detail page. */
+export interface RequestVM extends RequestBaseVM {
   messages: RequestMessageVM[];
 }
