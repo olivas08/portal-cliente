@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Plus, Pencil, X, Package, ImageOff, Upload, Trash2 } from "lucide-react";
@@ -79,6 +79,14 @@ export function AdminProductsView({ products, companies }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [pending, startTransition] = useTransition();
 
+  // Optimistic active state so the switch flips instantly instead of waiting
+  // for the server round-trip; it reconciles with fresh props after refresh.
+  const [optimisticProducts, applyOptimisticActive] = useOptimistic(
+    products,
+    (state, patch: { id: string; active: boolean }) =>
+      state.map((p) => (p.id === patch.id ? { ...p, active: patch.active } : p)),
+  );
+
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm);
@@ -136,11 +144,12 @@ export function AdminProductsView({ products, companies }: Props) {
 
   const toggleActive = (p: ProductVM) => {
     startTransition(async () => {
+      applyOptimisticActive({ id: p.id, active: !p.active });
       try {
         await setProductActive(p.id, !p.active);
         router.refresh();
       } catch {
-        /* best-effort UI; refresh keeps state consistent */
+        /* best-effort UI; refresh reconciles with the server state */
         router.refresh();
       }
     });
@@ -199,7 +208,7 @@ export function AdminProductsView({ products, companies }: Props) {
         </button>
       </div>
 
-      {products.length === 0 ? (
+      {optimisticProducts.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-slate-100">
           <Package className="mx-auto text-slate-300" size={40} />
           <p className="text-slate-500 text-sm mt-3">
@@ -221,7 +230,7 @@ export function AdminProductsView({ products, companies }: Props) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {products.map((p) => (
+                {optimisticProducts.map((p) => (
                   <tr key={p.id} className={p.active ? "" : "opacity-60"}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3 min-w-0">
@@ -261,14 +270,16 @@ export function AdminProductsView({ products, companies }: Props) {
                     <td className="px-4 py-3 text-center">
                       <button
                         onClick={() => toggleActive(p)}
-                        disabled={pending}
                         aria-label={p.active ? "Desativar" : "Ativar"}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                          p.active ? "bg-emerald-500" : "bg-slate-300"
+                        title={p.active ? "Desativar produto" : "Ativar produto"}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-emerald-400 ${
+                          p.active
+                            ? "bg-emerald-500 hover:bg-emerald-600"
+                            : "bg-slate-300 hover:bg-slate-400"
                         }`}
                       >
                         <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
                             p.active ? "translate-x-4" : "translate-x-0.5"
                           }`}
                         />
