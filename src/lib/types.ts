@@ -11,6 +11,17 @@ export type Priority = $Enums.Priority;
 export type RequestType = $Enums.RequestType;
 export type RequestStatus = $Enums.RequestStatus;
 export type MessageFrom = $Enums.MessageFrom;
+export type NotificationType = $Enums.NotificationType;
+
+export interface NotificationVM {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  href: string;
+  read: boolean;
+  createdAt: string;
+}
 
 export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
   quote: "Pedido de Orçamento",

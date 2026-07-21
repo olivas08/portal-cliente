@@ -13,6 +13,8 @@ const { mockAuth, prismaMock } = vi.hoisted(() => ({
       create: vi.fn(),
     },
     $transaction: vi.fn(),
+    user: { findMany: vi.fn(() => Promise.resolve([])) },
+    notification: { createMany: vi.fn(() => Promise.resolve({ count: 0 })) },
   },
 }));
 

@@ -7,6 +7,7 @@ import { NotFoundError } from "@/lib/errors";
 import { assertCompanyAccess, type SessionUser } from "@/lib/auth-guard";
 import { computeStatusDates } from "@/services/order-status";
 import { createWithReference } from "@/services/reference.service";
+import { notifyAdmins, notifyCompanyClients } from "@/services/notifications.service";
 
 export const orderStatusSchema = z.enum([
   "pending",
@@ -76,6 +77,13 @@ export async function changeOrderStatus(
     existing.reference,
     status,
   );
+
+  await notifyCompanyClients(existing.companyId, {
+    type: "ORDER_STATUS",
+    title: `Encomenda ${existing.reference}`,
+    body: `Novo estado: ${ORDER_STATUS_LABELS[status]}.`,
+    href: `/dashboard/ordens/${existing.id}`,
+  });
 }
 
 export async function createOrder(data: CreateOrderInput): Promise<string> {
@@ -108,6 +116,13 @@ export async function createOrder(data: CreateOrderInput): Promise<string> {
     }),
   );
 
+  await notifyCompanyClients(data.companyId, {
+    type: "ORDER_CREATED",
+    title: `Nova encomenda ${order.reference}`,
+    body: "Foi registada uma nova encomenda no portal.",
+    href: `/dashboard/ordens/${order.id}`,
+  });
+
   return order.id;
 }
 
@@ -126,7 +141,7 @@ export async function reorderOrder(
 ): Promise<string> {
   const source = await prisma.order.findUnique({
     where: { id: data.sourceOrderId },
-    include: { items: true },
+    include: { items: true, company: true },
   });
   if (!source) throw new NotFoundError("Encomenda não encontrada.");
   assertCompanyAccess(actor, source.companyId);
@@ -161,6 +176,13 @@ export async function reorderOrder(
       },
     }),
   );
+
+  await notifyAdmins({
+    type: "ORDER_CREATED",
+    title: `Nova encomenda ${order.reference}`,
+    body: `${source.company?.name ?? "Um cliente"} solicitou uma nova encomenda.`,
+    href: `/admin/ordens/${order.id}`,
+  });
 
   return order.id;
 }

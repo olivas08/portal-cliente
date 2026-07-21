@@ -7,11 +7,15 @@ import { LogOut, Package, MessageSquare, ShieldCheck, BarChart3 } from "lucide-r
 import type { LucideIcon } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
 import { useBreadcrumb } from "@/components/BreadcrumbContext";
+import { NotificationBell } from "@/components/NotificationBell";
+import type { NotificationVM } from "@/lib/types";
 
 interface Props {
   name: string;
   company: string;
   isAdmin: boolean;
+  notifications: NotificationVM[];
+  unreadCount: number;
 }
 
 interface NavItem {
@@ -20,7 +24,7 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-export function PortalNav({ name, company, isAdmin }: Props) {
+export function PortalNav({ name, company, isAdmin, notifications, unreadCount }: Props) {
   const pathname = usePathname();
   const breadcrumb = useBreadcrumb();
   const base = isAdmin ? "/admin" : "/dashboard";
@@ -45,7 +49,14 @@ export function PortalNav({ name, company, isAdmin }: Props) {
     <>
       {/* Desktop sidebar */}
       <aside className="hidden md:flex fixed inset-y-0 left-0 w-64 flex-col bg-brand text-slate-300 z-30">
-        <div className="flex flex-col items-center justify-center gap-1 px-5 py-3 border-b border-brand-line/50 bg-white">
+        <div className="relative flex flex-col items-center justify-center gap-1 px-5 py-3 border-b border-brand-line/50 bg-white">
+          <div className="absolute top-2 right-2">
+            <NotificationBell
+              notifications={notifications}
+              unreadCount={unreadCount}
+              triggerClassName="text-slate-500 hover:bg-slate-100"
+            />
+          </div>
           <Image
             src="/jolucor-logo.png"
             alt="Jolucor"
@@ -113,14 +124,21 @@ export function PortalNav({ name, company, isAdmin }: Props) {
               {breadcrumb ?? "Jolucor"}
             </span>
           </div>
-          <form action={logoutAction}>
-            <button
-              type="submit"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-300 border border-brand-line rounded-lg"
-            >
-              <LogOut size={13} /> Sair
-            </button>
-          </form>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <NotificationBell
+              notifications={notifications}
+              unreadCount={unreadCount}
+              triggerClassName="text-white hover:bg-brand-soft"
+            />
+            <form action={logoutAction}>
+              <button
+                type="submit"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-300 border border-brand-line rounded-lg"
+              >
+                <LogOut size={13} /> Sair
+              </button>
+            </form>
+          </div>
         </div>
       </header>
 

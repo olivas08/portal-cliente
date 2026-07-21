@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { assertCompanyAccess, type ClientUser, type SessionUser } from "@/lib/auth-guard";
 import { createWithReference } from "@/services/reference.service";
+import { notifyAdmins, notifyCompanyClients } from "@/services/notifications.service";
 import type { MessageFrom, RequestStatus } from "@/lib/types";
 
 export const createRequestSchema = z.object({
@@ -59,6 +60,13 @@ export async function createRequest(
     }),
   );
 
+  await notifyAdmins({
+    type: "REQUEST_CREATED",
+    title: `Novo requerimento ${request.reference}`,
+    body: `${actor.name ?? "Cliente"}: ${data.subject}`,
+    href: `/admin/requerimentos/${request.id}`,
+  });
+
   return request.id;
 }
 
@@ -94,6 +102,29 @@ export async function addRequestMessage(
       data: { status: newStatus },
     }),
   ]);
+
+  if (isAdmin) {
+    await notifyCompanyClients(
+      request.companyId,
+      {
+        type: "REQUEST_MESSAGE",
+        title: `Requerimento ${request.reference}`,
+        body: "Nova resposta da fábrica.",
+        href: `/dashboard/requerimentos/${requestId}`,
+      },
+      actor.id,
+    );
+  } else {
+    await notifyAdmins(
+      {
+        type: "REQUEST_MESSAGE",
+        title: `Requerimento ${request.reference}`,
+        body: `Nova mensagem de ${actor.name ?? "cliente"}.`,
+        href: `/admin/requerimentos/${requestId}`,
+      },
+      actor.id,
+    );
+  }
 }
 
 export async function updateRequestStatus(
