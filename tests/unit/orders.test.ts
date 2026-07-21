@@ -30,7 +30,13 @@ vi.mock("@/lib/email", () => ({
   sendOrderStatusUpdateEmail: mockSendOrderStatusUpdateEmail,
 }));
 
-import { updateOrderStatus, createOrder, reorderOrder } from "@/actions/orders";
+import {
+  updateOrderStatus,
+  createOrder,
+  reorderOrder,
+  cancelOrder,
+  reactivateOrder,
+} from "@/actions/orders";
 
 const adminSession = { user: { role: "ADMIN", id: "u1", name: "Admin" } };
 const clientSession = {
@@ -370,5 +376,115 @@ describe("reorderOrder — creation", () => {
     prismaMock.order.create.mockResolvedValue({ id: "o-reorder" });
     const id = await reorderOrder(validReorder);
     expect(id).toBe("o-reorder");
+  });
+});
+
+const pendingOrder = {
+  id: "o1",
+  reference: "ENC-2026-001",
+  companyId: "c1",
+  status: "pending",
+  shippedDate: null,
+  deliveredDate: null,
+};
+
+describe("cancelOrder — authorization & rules", () => {
+  it("rejects an unauthenticated user", async () => {
+    mockAuth.mockResolvedValue(null);
+    await expect(cancelOrder("o1", "rutura de stock")).rejects.toThrow(
+      "Não autorizado.",
+    );
+    expect(prismaMock.order.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects a client from another company", async () => {
+    mockAuth.mockResolvedValue({
+      user: { role: "CLIENT", id: "u9", companyId: "OTHER", name: "Outro" },
+    });
+    prismaMock.order.findUnique.mockResolvedValue(pendingOrder);
+    await expect(cancelOrder("o1", "já não preciso")).rejects.toThrow(
+      "Não autorizado.",
+    );
+    expect(prismaMock.order.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects a client cancelling their own non-pending order", async () => {
+    mockAuth.mockResolvedValue(clientSession);
+    prismaMock.order.findUnique.mockResolvedValue(existingOrder); // production
+    await expect(cancelOrder("o1", "quero cancelar")).rejects.toThrow(
+      /enquanto está pendente/,
+    );
+    expect(prismaMock.order.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects a too-short reason", async () => {
+    mockAuth.mockResolvedValue(adminSession);
+    await expect(cancelOrder("o1", "x")).rejects.toThrow();
+    expect(prismaMock.order.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects cancelling a delivered order", async () => {
+    mockAuth.mockResolvedValue(adminSession);
+    prismaMock.order.findUnique.mockResolvedValue({
+      ...existingOrder,
+      status: "delivered",
+    });
+    await expect(cancelOrder("o1", "motivo válido")).rejects.toThrow(
+      /já não pode ser cancelada/,
+    );
+    expect(prismaMock.order.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("cancelOrder — effects", () => {
+  it("lets a client annul their own pending order", async () => {
+    mockAuth.mockResolvedValue(clientSession);
+    prismaMock.order.findUnique.mockResolvedValue(pendingOrder);
+    await cancelOrder("o1", "já não preciso desta encomenda");
+    const arg = prismaMock.order.update.mock.calls[0][0];
+    expect(arg.where).toEqual({ id: "o1" });
+    expect(arg.data.status).toBe("cancelled");
+    expect(arg.data.cancelReason).toBe("já não preciso desta encomenda");
+    expect(arg.data.cancelledDate).toBeInstanceOf(Date);
+  });
+
+  it("lets an admin cancel an in-progress order", async () => {
+    mockAuth.mockResolvedValue(adminSession);
+    prismaMock.order.findUnique.mockResolvedValue(existingOrder); // production
+    await cancelOrder("o1", "rutura de matéria-prima");
+    const arg = prismaMock.order.update.mock.calls[0][0];
+    expect(arg.data.status).toBe("cancelled");
+    expect(arg.data.cancelReason).toBe("rutura de matéria-prima");
+  });
+});
+
+describe("reactivateOrder", () => {
+  it("rejects a client", async () => {
+    mockAuth.mockResolvedValue(clientSession);
+    await expect(reactivateOrder("o1")).rejects.toThrow("Não autorizado.");
+    expect(prismaMock.order.update).not.toHaveBeenCalled();
+  });
+
+  it("reopens a cancelled order back to pending and clears the reason", async () => {
+    mockAuth.mockResolvedValue(adminSession);
+    prismaMock.order.findUnique.mockResolvedValue({
+      ...existingOrder,
+      status: "cancelled",
+      cancelReason: "rutura",
+    });
+    await reactivateOrder("o1");
+    const arg = prismaMock.order.update.mock.calls[0][0];
+    expect(arg.data.status).toBe("pending");
+    expect(arg.data.cancelReason).toBeNull();
+    expect(arg.data.cancelledDate).toBeNull();
+  });
+
+  it("rejects reactivating an order that is not cancelled", async () => {
+    mockAuth.mockResolvedValue(adminSession);
+    prismaMock.order.findUnique.mockResolvedValue(existingOrder); // production
+    await expect(reactivateOrder("o1")).rejects.toThrow(
+      "A encomenda não está cancelada.",
+    );
+    expect(prismaMock.order.update).not.toHaveBeenCalled();
   });
 });

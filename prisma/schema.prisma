@@ -22,6 +22,7 @@ enum OrderStatus {
   quality
   shipped
   delivered
+  cancelled
 }
 
 enum Priority {
@@ -49,12 +50,13 @@ enum MessageFrom {
 }
 
 model Company {
-  id        String    @id @default(cuid())
-  name      String
-  users     User[]
-  orders    Order[]
-  requests  Request[]
-  createdAt DateTime  @default(now())
+  id            String         @id @default(cuid())
+  name          String
+  users         User[]
+  orders        Order[]
+  requests      Request[]
+  productPrices ProductPrice[]
+  createdAt     DateTime       @default(now())
 }
 
 model User {
@@ -118,6 +120,8 @@ model Order {
   expectedDate  DateTime
   shippedDate   DateTime?
   deliveredDate DateTime?
+  cancelledDate DateTime?
+  cancelReason  String?
   qualityNotes  String?
   observations  String?
   items         OrderItem[]
@@ -182,4 +186,33 @@ model RequestMessage {
   date       DateTime    @default(now())
 
   @@index([requestId])
+}
+
+model Product {
+  id           String         @id @default(cuid())
+  reference    String         @unique
+  name         String
+  description  String
+  unit         String
+  unitPriceEur Float
+  category     String?
+  imageUrl     String?
+  active       Boolean        @default(true)
+  prices       ProductPrice[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([active])
+}
+
+model ProductPrice {
+  id           String  @id @default(cuid())
+  productId    String
+  product      Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  companyId    String
+  company      Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  unitPriceEur Float
+
+  @@unique([productId, companyId])
+  @@index([companyId])
 }

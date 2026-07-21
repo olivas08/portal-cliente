@@ -14,6 +14,7 @@ const stageIndex: Record<OrderStatus, number> = {
   quality: 2,
   shipped: 3,
   delivered: 4,
+  cancelled: -1,
 };
 
 export function StatusStepper({ status }: { status: OrderStatus }) {

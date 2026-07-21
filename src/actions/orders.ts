@@ -1,14 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin, requireClient } from "@/lib/auth-guard";
+import { requireAdmin, requireClient, requireUser } from "@/lib/auth-guard";
 import type { OrderStatus } from "@/lib/types";
 import {
   changeOrderStatus,
+  cancelOrder as cancelOrderService,
+  reactivateOrder as reactivateOrderService,
   createOrder as createOrderService,
   reorderOrder as reorderOrderService,
   createOrderSchema,
   reorderSchema,
+  cancelOrderSchema,
   orderStatusSchema,
   type CreateOrderInput,
   type ReorderInput,
@@ -46,4 +49,27 @@ export async function reorderOrder(input: ReorderInput) {
   revalidatePath("/dashboard");
   revalidatePath("/admin");
   return id;
+}
+
+export async function cancelOrder(orderId: string, reason: string) {
+  const actor = await requireUser();
+  const { reason: parsedReason } = cancelOrderSchema.parse({ reason });
+
+  await cancelOrderService(actor, orderId, parsedReason);
+
+  revalidatePath(`/admin/ordens/${orderId}`);
+  revalidatePath(`/dashboard/ordens/${orderId}`);
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+}
+
+export async function reactivateOrder(orderId: string) {
+  await requireAdmin();
+
+  await reactivateOrderService(orderId);
+
+  revalidatePath(`/admin/ordens/${orderId}`);
+  revalidatePath(`/dashboard/ordens/${orderId}`);
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
 }

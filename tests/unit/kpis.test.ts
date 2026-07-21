@@ -46,6 +46,20 @@ describe("computeOrderKpis — headline numbers", () => {
     expect(kpis.urgentInProgressCount).toBe(1);
   });
 
+  it("excludes cancelled orders from in-progress and counts them separately", () => {
+    const orders = [
+      makeOrder({ id: "o1", status: "delivered" }),
+      makeOrder({ id: "o2", status: "production", priority: "urgent" }),
+      makeOrder({ id: "o3", status: "cancelled", priority: "urgent" }),
+      makeOrder({ id: "o4", status: "cancelled", priority: "normal" }),
+    ];
+    const kpis = computeOrderKpis(orders);
+    expect(kpis.totalOrders).toBe(4);
+    expect(kpis.inProgressCount).toBe(1);
+    expect(kpis.urgentInProgressCount).toBe(1);
+    expect(kpis.cancelledCount).toBe(2);
+  });
+
   it("computes average lead time in days across delivered orders", () => {
     const orders = [
       makeOrder({ id: "o1", createdDate: "2026-05-01", deliveredDate: "2026-05-11" }), // 10 days

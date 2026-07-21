@@ -9,6 +9,8 @@ async function main() {
   await prisma.request.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
+  await prisma.productPrice.deleteMany();
+  await prisma.product.deleteMany();
   await prisma.user.deleteMany();
   await prisma.company.deleteMany();
 
@@ -59,6 +61,83 @@ async function main() {
       passwordHash: hash("pn2026"),
       role: "CLIENT",
       companyId: norte.id,
+    },
+  });
+
+  console.log("🛒 A criar catálogo de produtos...");
+  await prisma.product.create({
+    data: {
+      reference: "PAR-M8-20-IX",
+      name: "Parafuso M8×20 Inox A2",
+      description:
+        "Parafuso de cabeça sextavada M8×20 em aço inox A2, roscagem métrica.",
+      unit: "un",
+      unitPriceEur: 0.35,
+      category: "Fixação",
+      active: true,
+      prices: { create: [{ companyId: mota.id, unitPriceEur: 0.31 }] },
+    },
+  });
+  await prisma.product.create({
+    data: {
+      reference: "POR-M8-IX",
+      name: "Porca Sextavada M8 Inox A2",
+      description: "Porca sextavada M8 em aço inox A2, conforme DIN 934.",
+      unit: "un",
+      unitPriceEur: 0.18,
+      category: "Fixação",
+      active: true,
+    },
+  });
+  await prisma.product.create({
+    data: {
+      reference: "ANI-M8-IX",
+      name: "Anilha Plana M8 Inox",
+      description: "Anilha plana M8 em aço inox, DIN 125.",
+      unit: "un",
+      unitPriceEur: 0.06,
+      category: "Fixação",
+      active: true,
+    },
+  });
+  await prisma.product.create({
+    data: {
+      reference: "CHP-2MM-AISI304",
+      name: "Chapa Inox AISI 304 2mm",
+      description:
+        "Chapa de aço inoxidável AISI 304, espessura 2mm, acabamento 2B. Preço por m².",
+      unit: "m²",
+      unitPriceEur: 48.5,
+      category: "Chapa",
+      active: true,
+      prices: {
+        create: [
+          { companyId: santos.id, unitPriceEur: 44.0 },
+          { companyId: mota.id, unitPriceEur: 46.75 },
+        ],
+      },
+    },
+  });
+  await prisma.product.create({
+    data: {
+      reference: "PERF-L40-INOX",
+      name: "Perfil L 40×40×4 Inox",
+      description: "Cantoneira em L de aço inox 40×40×4mm. Preço por metro.",
+      unit: "m",
+      unitPriceEur: 12.9,
+      category: "Perfis",
+      active: true,
+    },
+  });
+  await prisma.product.create({
+    data: {
+      reference: "TUB-INOX-30",
+      name: "Tubo Inox Ø30 1.5mm",
+      description: "Tubo redondo em aço inox Ø30mm, parede 1.5mm. Preço por metro.",
+      unit: "m",
+      unitPriceEur: 9.4,
+      category: "Perfis",
+      active: false,
     },
   });
 

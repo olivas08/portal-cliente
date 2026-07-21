@@ -52,6 +52,7 @@ const ALL_STATUSES: OrderStatus[] = [
   "quality",
   "shipped",
   "delivered",
+  "cancelled",
 ];
 
 export function AdminOrdersView({

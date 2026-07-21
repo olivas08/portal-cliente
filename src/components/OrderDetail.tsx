@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Ban } from "lucide-react";
 import type { OrderVM } from "@/lib/types";
 import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { StatusStepper } from "@/components/StatusStepper";
 import { OrderStatusControl } from "@/components/OrderStatusControl";
+import { OrderCancelControl } from "@/components/OrderCancelControl";
 import { OrderItemsTable } from "@/components/OrderItemsTable";
 import { OrderDocumentsCards } from "@/components/OrderDocuments";
 import { OrderAttachments } from "@/components/OrderAttachments";
@@ -75,16 +76,40 @@ export function OrderDetail({
           </div>
           <div className="flex flex-col items-end gap-3">
             <OrderStatusBadge status={order.status} />
-            {!isAdmin && <ReorderModal order={order} />}
+            {!isAdmin && order.status !== "cancelled" && (
+              <ReorderModal order={order} />
+            )}
           </div>
         </div>
 
-        <StatusStepper status={order.status} />
+        {order.status === "cancelled" ? (
+          <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+            <Ban size={18} className="text-red-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-red-700">
+                Encomenda cancelada
+              </p>
+              {order.cancelReason && (
+                <p className="text-sm text-red-600 mt-0.5 whitespace-pre-wrap">
+                  {order.cancelReason}
+                </p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <StatusStepper status={order.status} />
+        )}
       </div>
 
-      {isAdmin && (
+      {isAdmin && order.status !== "cancelled" && (
         <OrderStatusControl orderId={order.id} status={order.status} />
       )}
+
+      <OrderCancelControl
+        orderId={order.id}
+        status={order.status}
+        isAdmin={isAdmin}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2">

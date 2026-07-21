@@ -32,6 +32,11 @@ const config: Record<
     cls: "bg-teal-50 text-teal-700 border-teal-200",
     dot: "bg-teal-500",
   },
+  cancelled: {
+    label: "Cancelada",
+    cls: "bg-red-50 text-red-700 border-red-200",
+    dot: "bg-red-500",
+  },
 };
 
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {

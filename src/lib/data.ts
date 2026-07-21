@@ -5,6 +5,8 @@ import type {
   RequestVM,
   RequestSummaryVM,
   RequestMessageVM,
+  ProductVM,
+  CatalogProductVM,
 } from "@/lib/types";
 import { toIsoDate } from "@/lib/dates";
 import type {
@@ -37,6 +39,8 @@ function toOrderSummaryVM(o: OrderSummaryWith): OrderSummaryVM {
     expectedDate: toIsoDate(o.expectedDate),
     shippedDate: o.shippedDate ? toIsoDate(o.shippedDate) : undefined,
     deliveredDate: o.deliveredDate ? toIsoDate(o.deliveredDate) : undefined,
+    cancelledDate: o.cancelledDate ? toIsoDate(o.cancelledDate) : undefined,
+    cancelReason: o.cancelReason ?? undefined,
     qualityNotes: o.qualityNotes ?? undefined,
     observations: o.observations ?? undefined,
     batchNumber: o.batchNumber,
@@ -172,4 +176,47 @@ export async function getRequestById(id: string): Promise<RequestVM | null> {
 
 export async function getCompanies() {
   return prisma.company.findMany({ orderBy: { name: "asc" } });
+}
+
+export async function getProducts(): Promise<ProductVM[]> {
+  const products = await prisma.product.findMany({
+    include: { prices: { include: { company: true } } },
+    orderBy: [{ active: "desc" }, { name: "asc" }],
+  });
+  return products.map((p) => ({
+    id: p.id,
+    reference: p.reference,
+    name: p.name,
+    description: p.description,
+    unit: p.unit,
+    unitPriceEur: p.unitPriceEur,
+    category: p.category,
+    imageUrl: p.imageUrl,
+    active: p.active,
+    companyPrices: p.prices.map((pr) => ({
+      companyId: pr.companyId,
+      companyName: pr.company.name,
+      unitPriceEur: pr.unitPriceEur,
+    })),
+  }));
+}
+
+export async function getCatalogForCompany(
+  companyId: string,
+): Promise<CatalogProductVM[]> {
+  const products = await prisma.product.findMany({
+    where: { active: true },
+    include: { prices: { where: { companyId } } },
+    orderBy: [{ category: "asc" }, { name: "asc" }],
+  });
+  return products.map((p) => ({
+    id: p.id,
+    reference: p.reference,
+    name: p.name,
+    description: p.description,
+    unit: p.unit,
+    unitPriceEur: p.prices[0]?.unitPriceEur ?? p.unitPriceEur,
+    category: p.category,
+    imageUrl: p.imageUrl,
+  }));
 }

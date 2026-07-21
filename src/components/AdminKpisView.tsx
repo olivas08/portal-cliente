@@ -116,7 +116,11 @@ export function AdminKpisView({ kpis }: { kpis: OrderKpis }) {
           icon={Package}
           label="Total de Encomendas"
           value={String(kpis.totalOrders)}
-          foot="Registadas no portal"
+          foot={
+            kpis.cancelledCount > 0
+              ? `${kpis.cancelledCount} cancelada${kpis.cancelledCount !== 1 ? "s" : ""}`
+              : "Registadas no portal"
+          }
           chip="bg-brand text-white"
         />
       </div>

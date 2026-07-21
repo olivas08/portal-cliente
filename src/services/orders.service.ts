@@ -3,9 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { getBaseUrl } from "@/lib/url";
 import { sendOrderStatusUpdateEmail } from "@/lib/email";
 import { ORDER_STATUS_LABELS, type OrderStatus } from "@/lib/types";
-import { NotFoundError } from "@/lib/errors";
+import { NotFoundError, AppError } from "@/lib/errors";
 import { assertCompanyAccess, type SessionUser } from "@/lib/auth-guard";
-import { computeStatusDates } from "@/services/order-status";
+import { computeStatusDates, isCancellable } from "@/services/order-status";
 import { createWithReference } from "@/services/reference.service";
 import { notifyAdmins, notifyCompanyClients } from "@/services/notifications.service";
 
@@ -52,6 +52,16 @@ export const reorderSchema = z.object({
 
 export type ReorderInput = z.infer<typeof reorderSchema>;
 
+export const cancelOrderSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(3, "Indique o motivo do cancelamento.")
+    .max(500, "Motivo demasiado longo."),
+});
+
+export type CancelOrderInput = z.infer<typeof cancelOrderSchema>;
+
 /**
  * Applies a status change and its derived timestamps, then best-effort
  * notifies the client. Callers are responsible for authorization and cache
@@ -63,6 +73,10 @@ export async function changeOrderStatus(
 ): Promise<void> {
   const existing = await prisma.order.findUnique({ where: { id: orderId } });
   if (!existing) throw new NotFoundError("Encomenda não encontrada.");
+
+  if (existing.status === "cancelled") {
+    throw new AppError("Reative a encomenda antes de alterar o estado.");
+  }
 
   const dates = computeStatusDates(status, existing, new Date());
 
@@ -82,6 +96,88 @@ export async function changeOrderStatus(
     type: "ORDER_STATUS",
     title: `Encomenda ${existing.reference}`,
     body: `Novo estado: ${ORDER_STATUS_LABELS[status]}.`,
+    href: `/dashboard/ordens/${existing.id}`,
+  });
+}
+
+/**
+ * Rejects (while pending) or cancels (in progress) an order, recording the
+ * reason and timestamp. Role-aware: an admin may cancel any non-delivered
+ * order; a client may only cancel their own order while it is still pending.
+ * Notifies the opposite party (best-effort).
+ */
+export async function cancelOrder(
+  actor: SessionUser,
+  orderId: string,
+  reason: string,
+): Promise<void> {
+  const existing = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!existing) throw new NotFoundError("Encomenda não encontrada.");
+  assertCompanyAccess(actor, existing.companyId);
+
+  const isClient = actor.role !== "ADMIN";
+  if (isClient && existing.status !== "pending") {
+    throw new AppError(
+      "Só pode anular a encomenda enquanto está pendente. Contacte a fábrica.",
+    );
+  }
+  if (!isCancellable(existing.status)) {
+    throw new AppError("Esta encomenda já não pode ser cancelada.");
+  }
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      status: "cancelled",
+      cancelReason: reason,
+      cancelledDate: new Date(),
+      shippedDate: null,
+      deliveredDate: null,
+    },
+  });
+
+  if (isClient) {
+    await notifyAdmins({
+      type: "ORDER_STATUS",
+      title: `Encomenda ${existing.reference} anulada`,
+      body: `${actor.name ?? "O cliente"} anulou a encomenda: ${reason}`,
+      href: `/admin/ordens/${existing.id}`,
+    });
+  } else {
+    await notifyCompanyClients(existing.companyId, {
+      type: "ORDER_STATUS",
+      title: `Encomenda ${existing.reference} cancelada`,
+      body: `A fábrica cancelou a encomenda: ${reason}`,
+      href: `/dashboard/ordens/${existing.id}`,
+    });
+  }
+}
+
+/**
+ * Reopens a cancelled order back into the pending state, clearing the cancel
+ * reason/timestamp. Admin-only (enforced by the action guard). Notifies the
+ * client that their order is active again.
+ */
+export async function reactivateOrder(orderId: string): Promise<void> {
+  const existing = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!existing) throw new NotFoundError("Encomenda não encontrada.");
+  if (existing.status !== "cancelled") {
+    throw new AppError("A encomenda não está cancelada.");
+  }
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      status: "pending",
+      cancelReason: null,
+      cancelledDate: null,
+    },
+  });
+
+  await notifyCompanyClients(existing.companyId, {
+    type: "ORDER_STATUS",
+    title: `Encomenda ${existing.reference} reaberta`,
+    body: "A encomenda foi reativada e está novamente pendente.",
     href: `/dashboard/ordens/${existing.id}`,
   });
 }

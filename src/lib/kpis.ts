@@ -15,6 +15,7 @@ export interface OrderKpis {
   deliveredCount: number;
   inProgressCount: number;
   urgentInProgressCount: number;
+  cancelledCount: number;
   /** Average days between order creation and delivery, across all delivered orders. */
   avgLeadTimeDays: number | null;
   /** 0-100, share of delivered orders that met the agreed deadline. */
@@ -50,7 +51,10 @@ export function computeOrderKpis(orders: OrderSummaryVM[]): OrderKpis {
   const delivered = orders.filter(
     (o) => o.status === "delivered" && o.deliveredDate
   );
-  const inProgress = orders.filter((o) => o.status !== "delivered");
+  const cancelled = orders.filter((o) => o.status === "cancelled");
+  const inProgress = orders.filter(
+    (o) => o.status !== "delivered" && o.status !== "cancelled"
+  );
   const urgentInProgress = inProgress.filter((o) => o.priority === "urgent");
 
   const leadTimes = delivered.map((o) =>
@@ -81,6 +85,7 @@ export function computeOrderKpis(orders: OrderSummaryVM[]): OrderKpis {
     deliveredCount: delivered.length,
     inProgressCount: inProgress.length,
     urgentInProgressCount: urgentInProgress.length,
+    cancelledCount: cancelled.length,
     avgLeadTimeDays: average(leadTimes),
     onTimeDeliveryRate: onTimeRate(delivered),
     monthly,

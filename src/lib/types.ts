@@ -43,6 +43,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   quality: "Controlo Qualidade",
   shipped: "Expedido",
   delivered: "Entregue",
+  cancelled: "Cancelada",
 };
 
 /** Compact variants for tight UI (e.g. the admin status filter cards). */
@@ -52,6 +53,7 @@ export const ORDER_STATUS_SHORT_LABELS: Record<OrderStatus, string> = {
   quality: "Controlo Q.",
   shipped: "Expedido",
   delivered: "Entregue",
+  cancelled: "Cancelada",
 };
 
 export interface OrderItemVM {
@@ -94,6 +96,8 @@ export interface OrderSummaryVM {
   qualityNotes?: string;
   batchNumber: string | null;
   observations?: string;
+  cancelledDate?: string;
+  cancelReason?: string;
 }
 
 /** Full order, including attachments, for the order detail page. */
@@ -133,4 +137,44 @@ export interface RequestSummaryVM extends RequestBaseVM {
 /** Full request, including the whole message thread, for the detail page. */
 export interface RequestVM extends RequestBaseVM {
   messages: RequestMessageVM[];
+}
+
+/** A per-company negotiated price override for a product. */
+export interface ProductPriceVM {
+  companyId: string;
+  companyName: string;
+  unitPriceEur: number;
+}
+
+/**
+ * Admin-facing product view: the factory's base price plus any per-company
+ * negotiated overrides. Managed on `/admin/produtos`.
+ */
+export interface ProductVM {
+  id: string;
+  reference: string;
+  name: string;
+  description: string;
+  unit: string;
+  unitPriceEur: number;
+  category: string | null;
+  imageUrl: string | null;
+  active: boolean;
+  companyPrices: ProductPriceVM[];
+}
+
+/**
+ * Client-facing catalog item: only active products, already resolved to the
+ * *effective* price for the viewing company (per-company override falling back
+ * to the base price). Never exposes other companies' prices.
+ */
+export interface CatalogProductVM {
+  id: string;
+  reference: string;
+  name: string;
+  description: string;
+  unit: string;
+  unitPriceEur: number;
+  category: string | null;
+  imageUrl: string | null;
 }

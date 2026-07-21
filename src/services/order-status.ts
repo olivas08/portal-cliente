@@ -16,6 +16,15 @@ export const ORDER_STATUS_SEQUENCE: OrderStatus[] = [
 const PRE_SHIPMENT: OrderStatus[] = ["pending", "production", "quality"];
 
 /**
+ * An order can be rejected/cancelled from any stage before it is delivered,
+ * and never once it is already delivered or cancelled. A cancelled order must
+ * be explicitly reactivated before its status can move again.
+ */
+export function isCancellable(status: OrderStatus): boolean {
+  return status !== "delivered" && status !== "cancelled";
+}
+
+/**
  * Pure derivation of the shipped/delivered timestamps for a status change.
  * Kept side-effect free so it can be unit-tested directly, mirroring the
  * approach used for `computeOrderKpis`.
