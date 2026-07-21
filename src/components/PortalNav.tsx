@@ -58,6 +58,7 @@ export function PortalNav({ name, company, isAdmin, notifications, unreadCount }
               notifications={notifications}
               unreadCount={unreadCount}
               triggerClassName="text-slate-500 hover:bg-slate-100"
+              align="left"
             />
           </div>
           <Image

@@ -27,12 +27,19 @@ interface Props {
   unreadCount: number;
   /** Trigger button classes, so the bell fits both the light and dark bars. */
   triggerClassName?: string;
+  /**
+   * Side the panel expands towards. Use "left" when the bell sits near the
+   * left edge (e.g. the sidebar) so the 320px panel opens into the content
+   * instead of overflowing off-screen; "right" for a top-right trigger.
+   */
+  align?: "left" | "right";
 }
 
 export function NotificationBell({
   notifications,
   unreadCount,
   triggerClassName = "text-slate-500 hover:bg-slate-100",
+  align = "right",
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -90,7 +97,11 @@ export function NotificationBell({
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 max-w-[85vw] bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden">
+        <div
+          className={`absolute ${
+            align === "left" ? "left-0" : "right-0"
+          } mt-2 w-80 max-w-[85vw] bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden`}
+        >
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
             <p className="text-sm font-semibold text-slate-800">Notificações</p>
             {unreadCount > 0 && (
