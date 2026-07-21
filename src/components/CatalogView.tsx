@@ -24,6 +24,10 @@ const inputCls =
 export function CatalogView({ products }: Props) {
   const router = useRouter();
   const [cart, setCart] = useState<Record<string, number>>({});
+  // Raw text being typed in the cart quantity fields, so a field can be
+  // momentarily empty (e.g. while deleting to retype) without dropping the
+  // line from the cart. Only committed to `cart` once it's a valid number.
+  const [qtyDraft, setQtyDraft] = useState<Record<string, string>>({});
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("all");
   const [expectedDate, setExpectedDate] = useState("");
@@ -62,17 +66,49 @@ export function CatalogView({ products }: Props) {
     0,
   );
 
-  const setQty = (id: string, qty: number) =>
+  const clearDraft = (id: string) =>
+    setQtyDraft((d) => {
+      if (!(id in d)) return d;
+      const next = { ...d };
+      delete next[id];
+      return next;
+    });
+
+  const setQty = (id: string, qty: number) => {
     setCart((c) => ({ ...c, [id]: Math.max(0, qty) }));
+    clearDraft(id);
+  };
 
-  const add = (id: string) => setCart((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 }));
+  const add = (id: string) => {
+    setCart((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 }));
+    clearDraft(id);
+  };
 
-  const remove = (id: string) =>
+  // Cart quantity field: keep the raw text so it can be empty mid-edit, and
+  // only update the cart when it parses to a valid quantity (>= 1).
+  const onCartQtyChange = (id: string, raw: string) => {
+    setQtyDraft((d) => ({ ...d, [id]: raw }));
+    const n = parseInt(raw, 10);
+    if (raw !== "" && Number.isInteger(n) && n >= 1) {
+      setCart((c) => ({ ...c, [id]: n }));
+    }
+  };
+
+  // On blur, drop the draft (falls back to the committed qty) and guarantee at
+  // least 1 so an emptied field never leaves a zero-quantity line.
+  const onCartQtyBlur = (id: string) => {
+    clearDraft(id);
+    setCart((c) => ({ ...c, [id]: Math.max(1, Math.floor(c[id] || 1)) }));
+  };
+
+  const remove = (id: string) => {
+    clearDraft(id);
     setCart((c) => {
       const next = { ...c };
       delete next[id];
       return next;
     });
+  };
 
   const handleCheckout = (e: React.FormEvent) => {
     e.preventDefault();
@@ -260,8 +296,9 @@ export function CatalogView({ products }: Props) {
                       type="number"
                       min="1"
                       step="1"
-                      value={qty}
-                      onChange={(e) => setQty(product.id, Number(e.target.value))}
+                      value={qtyDraft[product.id] ?? String(qty)}
+                      onChange={(e) => onCartQtyChange(product.id, e.target.value)}
+                      onBlur={() => onCartQtyBlur(product.id)}
                       className="w-14 border border-slate-200 rounded-lg px-2 py-1 text-sm bg-white"
                       aria-label={`Quantidade de ${product.name}`}
                     />
