@@ -4,6 +4,7 @@ import { getBaseUrl } from "@/lib/url";
 import { sendOrderStatusUpdateEmail } from "@/lib/email";
 import { ORDER_STATUS_LABELS, type OrderStatus } from "@/lib/types";
 import { NotFoundError } from "@/lib/errors";
+import { assertCompanyAccess, type SessionUser } from "@/lib/auth-guard";
 import { computeStatusDates } from "@/services/order-status";
 import { createWithReference } from "@/services/reference.service";
 
@@ -33,6 +34,22 @@ export const createOrderSchema = z.object({
 });
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
+
+export const reorderSchema = z.object({
+  sourceOrderId: z.string().trim().min(1, "Encomenda de origem obrigatória."),
+  expectedDate: z.string().trim().min(1, "Data desejada obrigatória."),
+  observations: z.string().trim().max(2000).optional(),
+  items: z
+    .array(
+      z.object({
+        sourceItemId: z.string().trim().min(1),
+        quantity: z.coerce.number().positive("Quantidade deve ser maior que zero."),
+      }),
+    )
+    .min(1, "Selecione pelo menos um artigo."),
+});
+
+export type ReorderInput = z.infer<typeof reorderSchema>;
 
 /**
  * Applies a status change and its derived timestamps, then best-effort
@@ -87,6 +104,60 @@ export async function createOrder(data: CreateOrderInput): Promise<string> {
             unitPriceEur: item.unitPriceEur,
           })),
         },
+      },
+    }),
+  );
+
+  return order.id;
+}
+
+/**
+ * Client self-service reorder: clones the line items of a past order the actor
+ * owns into a brand-new order in the `pending` state, ready for the factory to
+ * confirm by advancing its status. Item reference/description/unit/price are
+ * copied from the source order server-side (never trusted from the client) —
+ * the client may only choose which lines to repeat and in what quantity. The
+ * batch number is intentionally left null: the factory assigns a lot when it
+ * starts production.
+ */
+export async function reorderOrder(
+  actor: SessionUser,
+  data: ReorderInput,
+): Promise<string> {
+  const source = await prisma.order.findUnique({
+    where: { id: data.sourceOrderId },
+    include: { items: true },
+  });
+  if (!source) throw new NotFoundError("Encomenda não encontrada.");
+  assertCompanyAccess(actor, source.companyId);
+
+  const sourceItemsById = new Map(source.items.map((item) => [item.id, item]));
+  const items = data.items.map((line) => {
+    const src = sourceItemsById.get(line.sourceItemId);
+    if (!src) {
+      throw new NotFoundError("Artigo não encontrado na encomenda original.");
+    }
+    return {
+      reference: src.reference,
+      description: src.description,
+      quantity: line.quantity,
+      unit: src.unit,
+      unitPriceEur: src.unitPriceEur,
+    };
+  });
+
+  const order = await createWithReference("ENC", (reference) =>
+    prisma.order.create({
+      data: {
+        reference,
+        companyId: source.companyId,
+        status: "pending",
+        priority: "normal",
+        batchNumber: null,
+        createdDate: new Date(),
+        expectedDate: new Date(data.expectedDate),
+        observations: data.observations || undefined,
+        items: { create: items },
       },
     }),
   );

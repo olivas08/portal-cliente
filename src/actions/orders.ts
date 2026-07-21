@@ -1,14 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth-guard";
+import { requireAdmin, requireClient } from "@/lib/auth-guard";
 import type { OrderStatus } from "@/lib/types";
 import {
   changeOrderStatus,
   createOrder as createOrderService,
+  reorderOrder as reorderOrderService,
   createOrderSchema,
+  reorderSchema,
   orderStatusSchema,
   type CreateOrderInput,
+  type ReorderInput,
 } from "@/services/orders.service";
 
 export async function updateOrderStatus(orderId: string, status: OrderStatus) {
@@ -31,5 +34,16 @@ export async function createOrder(input: CreateOrderInput) {
 
   revalidatePath("/admin");
   revalidatePath("/dashboard");
+  return id;
+}
+
+export async function reorderOrder(input: ReorderInput) {
+  const actor = await requireClient();
+  const data = reorderSchema.parse(input);
+
+  const id = await reorderOrderService(actor, data);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/admin");
   return id;
 }

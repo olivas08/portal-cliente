@@ -8,6 +8,7 @@ import { OrderStatusControl } from "@/components/OrderStatusControl";
 import { OrderItemsTable } from "@/components/OrderItemsTable";
 import { OrderDocumentsCards } from "@/components/OrderDocuments";
 import { OrderAttachments } from "@/components/OrderAttachments";
+import { ReorderModal } from "@/components/ReorderModal";
 import { DatesCard } from "@/components/DatesCard";
 
 interface OrderDetailProps {
@@ -63,16 +64,19 @@ export function OrderDetail({
                 <span className="mx-2 text-slate-200">|</span>
                 Lote:{" "}
                 <span className="font-medium text-slate-700">
-                  {order.batchNumber}
+                  {order.batchNumber ?? "A atribuir"}
                 </span>
               </p>
             ) : (
               <p className="text-sm text-slate-400 mt-1">
-                Lote: {order.batchNumber}
+                Lote: {order.batchNumber ?? "A atribuir"}
               </p>
             )}
           </div>
-          <OrderStatusBadge status={order.status} />
+          <div className="flex flex-col items-end gap-3">
+            <OrderStatusBadge status={order.status} />
+            {!isAdmin && <ReorderModal order={order} />}
+          </div>
         </div>
 
         <StatusStepper status={order.status} />

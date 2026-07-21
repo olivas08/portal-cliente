@@ -81,7 +81,7 @@ export interface OrderSummaryVM {
   deliveredDate?: string;
   items: OrderItemVM[];
   qualityNotes?: string;
-  batchNumber: string;
+  batchNumber: string | null;
   observations?: string;
 }
 

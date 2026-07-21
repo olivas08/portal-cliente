@@ -28,7 +28,7 @@ vi.mock("@/lib/email", () => ({
   sendOrderStatusUpdateEmail: mockSendOrderStatusUpdateEmail,
 }));
 
-import { updateOrderStatus, createOrder } from "@/actions/orders";
+import { updateOrderStatus, createOrder, reorderOrder } from "@/actions/orders";
 
 const adminSession = { user: { role: "ADMIN", id: "u1", name: "Admin" } };
 const clientSession = {
@@ -257,5 +257,116 @@ describe("createOrder — priority", () => {
       createOrder({ ...validOrderInput, priority: "super" as never })
     ).rejects.toThrow();
     expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+});
+
+const sourceOrder = {
+  id: "o1",
+  reference: "ENC-2026-001",
+  companyId: "c1",
+  status: "delivered",
+  items: [
+    {
+      id: "i1",
+      reference: "PAR-M8",
+      description: "Parafuso M8",
+      quantity: 10,
+      unit: "un",
+      unitPriceEur: 0.35,
+    },
+  ],
+};
+
+const validReorder = {
+  sourceOrderId: "o1",
+  expectedDate: "2026-09-01",
+  items: [{ sourceItemId: "i1", quantity: 25 }],
+};
+
+describe("reorderOrder — authorization", () => {
+  beforeEach(() => prismaMock.order.findUnique.mockResolvedValue(sourceOrder));
+
+  it("rejects an unauthenticated user", async () => {
+    mockAuth.mockResolvedValue(null);
+    await expect(reorderOrder(validReorder)).rejects.toThrow("Não autorizado.");
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects an admin (reorder is a client self-service action)", async () => {
+    mockAuth.mockResolvedValue(adminSession);
+    await expect(reorderOrder(validReorder)).rejects.toThrow("Não autorizado.");
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a client from another company", async () => {
+    mockAuth.mockResolvedValue({
+      user: { role: "CLIENT", id: "u9", companyId: "OTHER", name: "Outro" },
+    });
+    await expect(reorderOrder(validReorder)).rejects.toThrow("Não autorizado.");
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("reorderOrder — validation", () => {
+  beforeEach(() => mockAuth.mockResolvedValue(clientSession));
+
+  it("throws when the source order does not exist", async () => {
+    prismaMock.order.findUnique.mockResolvedValue(null);
+    await expect(reorderOrder(validReorder)).rejects.toThrow(
+      "Encomenda não encontrada."
+    );
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+
+  it("throws when a line references an item not in the source order", async () => {
+    prismaMock.order.findUnique.mockResolvedValue(sourceOrder);
+    await expect(
+      reorderOrder({ ...validReorder, items: [{ sourceItemId: "ghost", quantity: 5 }] })
+    ).rejects.toThrow("Artigo não encontrado na encomenda original.");
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-positive quantity", async () => {
+    prismaMock.order.findUnique.mockResolvedValue(sourceOrder);
+    await expect(
+      reorderOrder({ ...validReorder, items: [{ sourceItemId: "i1", quantity: 0 }] })
+    ).rejects.toThrow();
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("reorderOrder — creation", () => {
+  beforeEach(() => {
+    mockAuth.mockResolvedValue(clientSession);
+    prismaMock.order.findUnique.mockResolvedValue(sourceOrder);
+  });
+
+  it("creates a pending order for the source company with no batch number", async () => {
+    await reorderOrder(validReorder);
+    const data = prismaMock.order.create.mock.calls[0][0].data;
+    expect(data.status).toBe("pending");
+    expect(data.companyId).toBe("c1");
+    expect(data.priority).toBe("normal");
+    expect(data.batchNumber).toBeNull();
+  });
+
+  it("copies item reference/description/unit/price from the source and only takes the client quantity", async () => {
+    await reorderOrder(validReorder);
+    const data = prismaMock.order.create.mock.calls[0][0].data;
+    expect(data.items.create).toEqual([
+      {
+        reference: "PAR-M8",
+        description: "Parafuso M8",
+        quantity: 25,
+        unit: "un",
+        unitPriceEur: 0.35,
+      },
+    ]);
+  });
+
+  it("returns the new order id", async () => {
+    prismaMock.order.create.mockResolvedValue({ id: "o-reorder" });
+    const id = await reorderOrder(validReorder);
+    expect(id).toBe("o-reorder");
   });
 });

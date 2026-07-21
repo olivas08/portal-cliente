@@ -90,7 +90,7 @@ model Order {
   company       Company     @relation(fields: [companyId], references: [id])
   status        OrderStatus @default(pending)
   priority      Priority    @default(normal)
-  batchNumber   String
+  batchNumber   String?
   createdDate   DateTime
   expectedDate  DateTime
   shippedDate   DateTime?

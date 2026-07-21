@@ -63,7 +63,7 @@ function addOrderInfo(doc: jsPDF, order: OrderVM, y: number) {
   doc.setFont("helvetica", "bold");
   doc.text("Lote:", 120, y + 7);
   doc.setFont("helvetica", "normal");
-  doc.text(order.batchNumber, 140, y + 7);
+  doc.text(order.batchNumber ?? "A atribuir", 140, y + 7);
 
   if (order.expectedDate) {
     doc.setFont("helvetica", "bold");
@@ -133,7 +133,7 @@ export function generateDeliveryNote(order: OrderVM) {
 
 export function generateQualityCert(order: OrderVM) {
   const doc = new jsPDF();
-  addHeader(doc, "CERTIFICADO DE CONFORMIDADE", `Nº CERT-${order.batchNumber}`);
+  addHeader(doc, "CERTIFICADO DE CONFORMIDADE", `Nº CERT-${order.batchNumber ?? order.reference}`);
   addOrderInfo(doc, order, 58);
 
   autoTable(doc, {
@@ -193,7 +193,7 @@ export function generateQualityCert(order: OrderVM) {
   doc.text("Responsável de Qualidade", 105, sigY + 28, { align: "center" });
 
   addFooter(doc);
-  doc.save(`certificado-${order.batchNumber}.pdf`);
+  doc.save(`certificado-${order.batchNumber ?? order.reference}.pdf`);
 }
 
 export function generateProformaInvoice(order: OrderVM) {
