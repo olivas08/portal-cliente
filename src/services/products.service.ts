@@ -20,10 +20,16 @@ export const productSchema = z.object({
   imageUrl: z
     .string()
     .trim()
-    .url("URL de imagem inválido.")
-    .max(500)
-    .optional()
-    .or(z.literal("")),
+    // Accept an http(s) URL (legacy) or an inline uploaded image (data URL).
+    .max(900_000, "Imagem demasiado grande.")
+    .refine(
+      (v) =>
+        v === "" ||
+        /^https?:\/\//i.test(v) ||
+        /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(v),
+      "Imagem inválida.",
+    )
+    .optional(),
   active: z.coerce.boolean().default(true),
   companyPrices: z.array(companyPriceSchema).default([]),
 });

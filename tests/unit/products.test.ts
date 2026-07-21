@@ -86,6 +86,21 @@ describe("createProduct — creation", () => {
       "Já existe um produto com essa referência.",
     );
   });
+
+  it("accepts an uploaded image as a base64 data URL", async () => {
+    const dataUrl =
+      "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA==";
+    await createProduct({ ...baseProductInput, imageUrl: dataUrl });
+    const data = prismaMock.product.create.mock.calls[0][0].data;
+    expect(data.imageUrl).toBe(dataUrl);
+  });
+
+  it("rejects an image value that is neither a URL nor an image data URL", async () => {
+    await expect(
+      createProduct({ ...baseProductInput, imageUrl: "not-an-image" }),
+    ).rejects.toThrow("Imagem inválida.");
+    expect(prismaMock.product.create).not.toHaveBeenCalled();
+  });
 });
 
 describe("updateProduct — overrides replacement", () => {

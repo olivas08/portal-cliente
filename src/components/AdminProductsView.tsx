@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Plus, Pencil, X, Package, ImageOff } from "lucide-react";
+import { Plus, Pencil, X, Package, ImageOff, Upload, Trash2 } from "lucide-react";
 import type { ProductVM } from "@/lib/types";
 import {
   createProduct,
@@ -37,6 +37,37 @@ const emptyForm = {
 
 type FormState = typeof emptyForm;
 
+// Downscale an uploaded image in the browser and return a compact JPEG data URL,
+// so it can be stored inline in the DB without any external storage service.
+async function fileToResizedDataUrl(
+  file: File,
+  maxDim = 512,
+  quality = 0.8,
+): Promise<string> {
+  const original = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("read"));
+    reader.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new window.Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error("decode"));
+    el.src = original;
+  });
+  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return original;
+  ctx.drawImage(img, 0, 0, w, h);
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
 export function AdminProductsView({ products, companies }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -44,6 +75,8 @@ export function AdminProductsView({ products, companies }: Props) {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
+  const [imageError, setImageError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
   const [pending, startTransition] = useTransition();
 
   const openCreate = () => {
@@ -51,6 +84,7 @@ export function AdminProductsView({ products, companies }: Props) {
     setForm(emptyForm);
     setOverrides({});
     setError("");
+    setImageError("");
     setOpen(true);
   };
 
@@ -72,11 +106,33 @@ export function AdminProductsView({ products, companies }: Props) {
       ),
     );
     setError("");
+    setImageError("");
     setOpen(true);
   };
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
+    setImageError("");
+    if (!file.type.startsWith("image/")) {
+      setImageError("Selecione um ficheiro de imagem.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setImageError("Imagem demasiado grande (máx. 8 MB).");
+      return;
+    }
+    try {
+      const dataUrl = await fileToResizedDataUrl(file);
+      setField("imageUrl", dataUrl);
+    } catch {
+      setImageError("Não foi possível processar a imagem.");
+    }
+  };
 
   const toggleActive = (p: ProductVM) => {
     startTransition(async () => {
@@ -334,15 +390,53 @@ export function AdminProductsView({ products, companies }: Props) {
 
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">
-                  URL da imagem
+                  Imagem
                 </label>
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  className={inputCls}
-                  value={form.imageUrl}
-                  onChange={(e) => setField("imageUrl", e.target.value)}
-                />
+                <div className="flex items-center gap-3">
+                  <div className="h-16 w-16 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0 border border-slate-200">
+                    {form.imageUrl ? (
+                      <Image
+                        src={form.imageUrl}
+                        alt="Pré-visualização"
+                        width={64}
+                        height={64}
+                        className="object-cover h-16 w-16"
+                        unoptimized
+                      />
+                    ) : (
+                      <ImageOff size={18} className="text-slate-300" />
+                    )}
+                  </div>
+                  <div className="flex flex-col items-start gap-1">
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageChange}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50"
+                    >
+                      <Upload size={14} />
+                      {form.imageUrl ? "Trocar imagem" : "Carregar imagem"}
+                    </button>
+                    {form.imageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setField("imageUrl", "")}
+                        className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-600"
+                      >
+                        <Trash2 size={12} /> Remover
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {imageError && (
+                  <p className="text-xs text-red-600 mt-1">{imageError}</p>
+                )}
               </div>
 
               <div>
