@@ -17,6 +17,7 @@ import type {
   WorkstationOeeVM,
   ProductRoutingVM,
   NonConformityVM,
+  OperatorVM,
 } from "@/lib/types";
 import { toIsoDate } from "@/lib/dates";
 import {
@@ -611,4 +612,38 @@ export async function getFactoryOee(): Promise<WorkstationOeeVM | null> {
     runtimeMinutes: oee.runtimeMinutes,
     downtimeMinutes: oee.downtimeMinutes,
   };
+}
+
+export async function getOperatorsWithStats(): Promise<OperatorVM[]> {
+  const operators = await prisma.operator.findMany({
+    orderBy: [{ active: "desc" }, { name: "asc" }],
+    include: {
+      steps: {
+        where: { status: "done" },
+        select: {
+          plannedMinutes: true,
+          actualMinutes: true,
+          downtimeMinutes: true,
+          quantityDone: true,
+          scrapQty: true,
+        },
+      },
+    },
+  });
+
+  return operators.map((op) => {
+    const oee = computeOee(op.steps);
+    const output = op.steps.reduce((sum, s) => sum + s.quantityDone, 0);
+    return {
+      id: op.id,
+      name: op.name,
+      active: op.active,
+      completedSteps: op.steps.length,
+      output,
+      efficiency: oee.performance,
+      quality: oee.quality,
+      avgMinutes:
+        op.steps.length > 0 ? oee.runtimeMinutes / op.steps.length : 0,
+    };
+  });
 }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LogOut, Package, MessageSquare, ShieldCheck, BarChart3, ShoppingCart, Boxes, Factory } from "lucide-react";
+import { LogOut, Package, MessageSquare, ShieldCheck, BarChart3, ShoppingCart, Boxes, Factory, HardHat } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
 import { useBreadcrumb } from "@/components/BreadcrumbContext";
@@ -36,6 +36,9 @@ export function PortalNav({ name, company, isAdmin, notifications, unreadCount }
       : [{ to: "/dashboard/catalogo", label: "Catálogo", icon: ShoppingCart }]),
     ...(isAdmin
       ? [{ to: "/admin/producao", label: "Produção", icon: Factory }]
+      : []),
+    ...(isAdmin
+      ? [{ to: "/admin/operadores", label: "Trabalhadores", icon: HardHat }]
       : []),
     { to: `${base}/requerimentos`, label: "Requerimentos", icon: MessageSquare },
     ...(isAdmin

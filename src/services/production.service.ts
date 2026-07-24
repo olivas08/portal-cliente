@@ -26,6 +26,29 @@ export const operatorLoginSchema = z.object({
 });
 export type OperatorLoginInput = z.infer<typeof operatorLoginSchema>;
 
+const pinSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4,12}$/, "PIN deve ter entre 4 e 12 dígitos.");
+
+export const createOperatorSchema = z.object({
+  name: z.string().trim().min(2, "Nome obrigatório.").max(80),
+  pin: pinSchema,
+});
+export type CreateOperatorInput = z.infer<typeof createOperatorSchema>;
+
+export const resetOperatorPinSchema = z.object({
+  operatorId: z.string().trim().min(1, "Operador obrigatório."),
+  pin: pinSchema,
+});
+export type ResetOperatorPinInput = z.infer<typeof resetOperatorPinSchema>;
+
+export const setOperatorActiveSchema = z.object({
+  operatorId: z.string().trim().min(1, "Operador obrigatório."),
+  active: z.boolean(),
+});
+export type SetOperatorActiveInput = z.infer<typeof setOperatorActiveSchema>;
+
 export const generateWorkOrdersSchema = z.object({
   orderId: z.string().trim().min(1, "Encomenda obrigatória."),
 });
@@ -102,6 +125,50 @@ export async function loginOperator(
   const valid = await bcrypt.compare(input.pin, operator.pinHash);
   if (!valid) throw new UnauthorizedError("PIN incorreto.");
   return { id: operator.id, name: operator.name };
+}
+
+const PIN_SALT_ROUNDS = 10;
+
+/** Creates a shop-floor operator with a bcrypt-hashed PIN. */
+export async function createOperator(input: CreateOperatorInput): Promise<void> {
+  const pinHash = await bcrypt.hash(input.pin, PIN_SALT_ROUNDS);
+  await prisma.operator.create({
+    data: { name: input.name, pinHash },
+  });
+}
+
+/** Resets an operator's PIN (e.g. when forgotten). */
+export async function resetOperatorPin(
+  input: ResetOperatorPinInput,
+): Promise<void> {
+  const operator = await prisma.operator.findUnique({
+    where: { id: input.operatorId },
+    select: { id: true },
+  });
+  if (!operator) throw new NotFoundError("Operador não encontrado.");
+  const pinHash = await bcrypt.hash(input.pin, PIN_SALT_ROUNDS);
+  await prisma.operator.update({
+    where: { id: input.operatorId },
+    data: { pinHash },
+  });
+}
+
+/**
+ * Activates/deactivates an operator. Deactivating preserves all history but
+ * removes the operator from the terminal login and active lists.
+ */
+export async function setOperatorActive(
+  input: SetOperatorActiveInput,
+): Promise<void> {
+  const operator = await prisma.operator.findUnique({
+    where: { id: input.operatorId },
+    select: { id: true },
+  });
+  if (!operator) throw new NotFoundError("Operador não encontrado.");
+  await prisma.operator.update({
+    where: { id: input.operatorId },
+    data: { active: input.active },
+  });
 }
 
 // ── Work order planning ─────────────────────────────────────────────────────

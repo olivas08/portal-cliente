@@ -205,6 +205,18 @@ export const NC_DISPOSITION_LABELS: Record<NcDisposition, string> = {
   scrap: "Sucata",
 };
 
+/** A shop-floor operator with private performance metrics (admin-only). */
+export interface OperatorVM {
+  id: string;
+  name: string;
+  active: boolean;
+  completedSteps: number;
+  output: number;
+  efficiency: number;
+  quality: number;
+  avgMinutes: number;
+}
+
 /** An open quality non-conformity, as shown on the admin quality view. */
 export interface NonConformityVM {
   id: string;
