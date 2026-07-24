@@ -12,6 +12,7 @@ import {
   canStartStep,
   canPauseStep,
   canCompleteStep,
+  canReworkStep,
   rollUpWorkOrderStatus,
   deriveOrderStatusFromProduction,
 } from "@/services/production-status";
@@ -45,10 +46,21 @@ export const stepIdSchema = z.object({
   stepId: z.string().trim().min(1, "Passo obrigatório."),
 });
 
+export const nonConformityIdSchema = z.object({
+  id: z.string().trim().min(1, "Não-conformidade obrigatória."),
+});
+
 export const completeStepSchema = z.object({
   stepId: z.string().trim().min(1, "Passo obrigatório."),
   quantityDone: z.coerce.number().nonnegative("Quantidade inválida."),
   scrapQty: z.coerce.number().nonnegative("Sucata inválida.").default(0),
+  defect: z
+    .object({
+      quantity: z.coerce.number().positive("Quantidade não conforme inválida."),
+      reason: z.string().trim().min(1, "Motivo obrigatório.").max(200),
+      disposition: z.enum(["rework", "scrap"]),
+    })
+    .optional(),
 });
 export type CompleteStepInput = z.infer<typeof completeStepSchema>;
 
@@ -201,6 +213,67 @@ export async function setProductRouting(
       })),
     }),
   ]);
+}
+
+// ── Quality: non-conformities & rework ───────────────────────────────────────
+
+/**
+ * Reopens a completed step for reprocessing: the step returns to `pending`
+ * (re-entering its station queue) and the work order status is recomputed.
+ * Any open rework non-conformity on that step is marked resolved.
+ */
+export async function reworkStep(stepId: string): Promise<void> {
+  const now = new Date();
+  await prisma.$transaction(async (tx) => {
+    const step = await tx.workOrderStep.findUnique({
+      where: { id: stepId },
+      include: { workOrder: { include: { steps: true } } },
+    });
+    if (!step) throw new NotFoundError("Passo não encontrado.");
+    if (!canReworkStep(step.status)) {
+      throw new AppError("Só passos concluídos podem ser reprocessados.");
+    }
+    const wo = step.workOrder;
+    if (wo.status === "cancelled") {
+      throw new AppError("Ordem de fabrico cancelada.");
+    }
+
+    await tx.workOrderStep.update({
+      where: { id: stepId },
+      data: { status: "pending", finishedAt: null, quantityDone: 0 },
+    });
+
+    const nextSteps = wo.steps.map((s) =>
+      s.id === stepId ? { ...s, status: "pending" as const } : s,
+    );
+    const woStatus = rollUpWorkOrderStatus(
+      wo.status === "done" ? "in_progress" : wo.status,
+      nextSteps,
+    );
+    await tx.workOrder.update({
+      where: { id: wo.id },
+      data: {
+        status: woStatus,
+        finishedAt: woStatus === "done" ? wo.finishedAt : null,
+      },
+    });
+
+    await tx.nonConformity.updateMany({
+      where: { stepId, disposition: "rework", status: "open" },
+      data: { status: "resolved", resolvedAt: now },
+    });
+  });
+}
+
+/** Marks a non-conformity resolved (e.g. after scrapping the defective parts). */
+export async function resolveNonConformity(id: string): Promise<void> {
+  const nc = await prisma.nonConformity.findUnique({ where: { id } });
+  if (!nc) throw new NotFoundError("Não-conformidade não encontrada.");
+  if (nc.status === "resolved") return;
+  await prisma.nonConformity.update({
+    where: { id },
+    data: { status: "resolved", resolvedAt: new Date() },
+  });
 }
 
 /** Releases a planned work order to the shop floor (steps become queueable). */
@@ -416,6 +489,19 @@ export async function completeStep(
         operatorId: operator.id,
       },
     });
+
+    if (input.defect) {
+      await tx.nonConformity.create({
+        data: {
+          workOrderId: wo.id,
+          stepId: input.stepId,
+          quantity: input.defect.quantity,
+          reason: input.defect.reason,
+          disposition: input.defect.disposition,
+          operatorId: operator.id,
+        },
+      });
+    }
 
     const nextSteps = wo.steps.map((s) =>
       s.id === input.stepId ? { ...s, status: "done" as const } : s,

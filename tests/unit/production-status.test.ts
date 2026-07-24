@@ -4,6 +4,7 @@ import {
   canStartStep,
   canPauseStep,
   canCompleteStep,
+  canReworkStep,
   isStepReady,
   currentStep,
   rollUpWorkOrderStatus,
@@ -51,6 +52,13 @@ describe("step transition guards", () => {
     expect(canCompleteStep("paused")).toBe(true);
     expect(canCompleteStep("pending")).toBe(false);
     expect(canCompleteStep("done")).toBe(false);
+  });
+
+  it("allows rework only from a completed step", () => {
+    expect(canReworkStep("done")).toBe(true);
+    expect(canReworkStep("in_progress")).toBe(false);
+    expect(canReworkStep("paused")).toBe(false);
+    expect(canReworkStep("pending")).toBe(false);
   });
 });
 

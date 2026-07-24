@@ -6,6 +6,7 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 A limpar dados existentes...");
   await prisma.workOrderStep.deleteMany();
+  await prisma.nonConformity.deleteMany();
   await prisma.workOrder.deleteMany();
   await prisma.routingOperation.deleteMany();
   await prisma.operator.deleteMany();
@@ -311,7 +312,7 @@ async function main() {
   const minsAgo = (m: number) => new Date(now.getTime() - m * 60_000);
 
   // ENC-2026-058 (urgente, em produção) — 1ª OF a meio, 2ª lançada.
-  await prisma.workOrder.create({
+  const wo001 = await prisma.workOrder.create({
     data: {
       reference: "OF-2026-001",
       orderId: ord058.id,
@@ -331,7 +332,22 @@ async function main() {
         ],
       },
     },
+    include: { steps: true },
   });
+
+  const wo001Corte = wo001.steps.find((s) => s.sequence === 1);
+  if (wo001Corte) {
+    await prisma.nonConformity.create({
+      data: {
+        workOrderId: wo001.id,
+        stepId: wo001Corte.id,
+        quantity: 3,
+        reason: "Rebarba excessiva no bordo cortado",
+        disposition: "rework",
+        operatorId: operators["João Ferreira"],
+      },
+    });
+  }
   await prisma.workOrder.create({
     data: {
       reference: "OF-2026-002",

@@ -14,6 +14,8 @@ export type MessageFrom = $Enums.MessageFrom;
 export type NotificationType = $Enums.NotificationType;
 export type WorkOrderStatus = $Enums.WorkOrderStatus;
 export type StepStatus = $Enums.StepStatus;
+export type NcDisposition = $Enums.NcDisposition;
+export type NcStatus = $Enums.NcStatus;
 
 export interface NotificationVM {
   id: string;
@@ -197,6 +199,27 @@ export const STEP_STATUS_LABELS: Record<StepStatus, string> = {
   paused: "Em pausa",
   done: "Concluída",
 };
+
+export const NC_DISPOSITION_LABELS: Record<NcDisposition, string> = {
+  rework: "Reprocessar",
+  scrap: "Sucata",
+};
+
+/** An open quality non-conformity, as shown on the admin quality view. */
+export interface NonConformityVM {
+  id: string;
+  workOrderRef: string;
+  productName: string;
+  orderId: string;
+  stepId: string | null;
+  stepName: string | null;
+  quantity: number;
+  reason: string;
+  disposition: NcDisposition;
+  canRework: boolean;
+  operatorName: string | null;
+  createdAt: string;
+}
 
 /** A single routing step of a work order, as shown on the admin board. */
 export interface WorkOrderStepVM {

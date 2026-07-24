@@ -34,6 +34,11 @@ export function canCompleteStep(status: StepStatus): boolean {
   return status === "in_progress" || status === "paused";
 }
 
+/** Only a completed step can be reopened for rework (reprocessing). */
+export function canReworkStep(status: StepStatus): boolean {
+  return status === "done";
+}
+
 /**
  * A step is ready to be worked when every lower-sequence step of the same work
  * order is done and the step itself is not yet done (flow-shop routing).

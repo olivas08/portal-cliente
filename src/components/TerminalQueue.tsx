@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Play, Pause, CheckCircle2, Package, AlertCircle } from "lucide-react";
+import { Play, Pause, CheckCircle2, Package, AlertCircle, AlertTriangle } from "lucide-react";
 import type { TerminalStepVM } from "@/lib/types";
 import { STEP_STATUS_LABELS } from "@/lib/types";
 import {
@@ -102,13 +102,14 @@ export function TerminalQueue({ queue }: Props) {
               defaultQty={step.quantityPlanned}
               pending={pending}
               onCancel={() => setCompleting(null)}
-              onConfirm={(quantityDone, scrapQty) =>
+              onConfirm={(quantityDone, scrapQty, defect) =>
                 run(
                   () =>
                     completeStepAction({
                       stepId: step.stepId,
                       quantityDone,
                       scrapQty,
+                      defect,
                     }),
                   () => setCompleting(null),
                 )
@@ -161,10 +162,34 @@ function CompleteForm({
   defaultQty: number;
   pending: boolean;
   onCancel: () => void;
-  onConfirm: (quantityDone: number, scrapQty: number) => void;
+  onConfirm: (
+    quantityDone: number,
+    scrapQty: number,
+    defect?: { quantity: number; reason: string; disposition: "rework" | "scrap" },
+  ) => void;
 }) {
   const [qty, setQty] = useState(String(defaultQty));
   const [scrap, setScrap] = useState("0");
+  const [ncOpen, setNcOpen] = useState(false);
+  const [ncQty, setNcQty] = useState("1");
+  const [ncReason, setNcReason] = useState("");
+  const [ncDisposition, setNcDisposition] = useState<"rework" | "scrap">(
+    "rework",
+  );
+
+  const ncInvalid = ncOpen && (Number(ncQty) <= 0 || ncReason.trim() === "");
+
+  const submit = () => {
+    const defect =
+      ncOpen && !ncInvalid
+        ? {
+            quantity: Number(ncQty) || 0,
+            reason: ncReason.trim(),
+            disposition: ncDisposition,
+          }
+        : undefined;
+    onConfirm(Number(qty) || 0, Number(scrap) || 0, defect);
+  };
 
   return (
     <div className="mt-3 rounded-lg bg-slate-900 border border-slate-700 p-3">
@@ -192,6 +217,68 @@ function CompleteForm({
           />
         </label>
       </div>
+
+      {!ncOpen ? (
+        <button
+          type="button"
+          onClick={() => setNcOpen(true)}
+          className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-red-300 hover:text-red-200"
+        >
+          <AlertTriangle size={14} /> Registar não conforme
+        </button>
+      ) : (
+        <div className="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-300">
+              <AlertTriangle size={14} /> Não-conformidade
+            </span>
+            <button
+              type="button"
+              onClick={() => setNcOpen(false)}
+              className="text-xs text-slate-400 hover:text-slate-200"
+            >
+              Remover
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-xs text-slate-400">
+              Qtd. não conforme
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                value={ncQty}
+                onChange={(e) => setNcQty(e.target.value)}
+                className="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </label>
+            <label className="text-xs text-slate-400">
+              Destino
+              <select
+                value={ncDisposition}
+                onChange={(e) =>
+                  setNcDisposition(e.target.value as "rework" | "scrap")
+                }
+                className="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+              >
+                <option value="rework">Reprocessar</option>
+                <option value="scrap">Sucata</option>
+              </select>
+            </label>
+          </div>
+          <label className="text-xs text-slate-400 block mt-3">
+            Motivo
+            <input
+              type="text"
+              value={ncReason}
+              onChange={(e) => setNcReason(e.target.value)}
+              placeholder="Ex.: dimensão fora de tolerância"
+              className="mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+          </label>
+        </div>
+      )}
+
       <div className="flex gap-2 mt-3">
         <button
           onClick={onCancel}
@@ -201,8 +288,8 @@ function CompleteForm({
           Cancelar
         </button>
         <button
-          onClick={() => onConfirm(Number(qty) || 0, Number(scrap) || 0)}
-          disabled={pending}
+          onClick={submit}
+          disabled={pending || ncInvalid}
           className="flex-1 rounded-lg bg-amber-500 text-slate-900 font-bold py-2.5 hover:bg-amber-400 disabled:opacity-60"
         >
           Confirmar conclusão

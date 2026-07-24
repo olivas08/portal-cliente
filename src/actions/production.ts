@@ -15,6 +15,8 @@ import {
   deleteWorkOrder as deleteWorkOrderService,
   setWorkOrderPriority as setWorkOrderPriorityService,
   setProductRouting as setProductRoutingService,
+  reworkStep as reworkStepService,
+  resolveNonConformity as resolveNonConformityService,
   loginOperator,
   startStep,
   pauseStep,
@@ -24,6 +26,7 @@ import {
   workOrderIdSchema,
   setWorkOrderPrioritySchema,
   setProductRoutingSchema,
+  nonConformityIdSchema,
   stepIdSchema,
   completeStepSchema,
   type OperatorLoginInput,
@@ -109,6 +112,28 @@ export async function setProductRouting(input: SetProductRoutingInput) {
 
   revalidatePath(ADMIN_ROUTING);
   revalidatePath(ADMIN_BOARD);
+}
+
+const ADMIN_QUALITY = "/admin/producao/qualidade";
+
+export async function reworkStep(stepId: string) {
+  await requireAdmin();
+  const data = stepIdSchema.parse({ stepId });
+
+  await reworkStepService(data.stepId);
+
+  revalidatePath(ADMIN_QUALITY);
+  revalidatePath(ADMIN_BOARD);
+  revalidatePath(TERMINAL);
+}
+
+export async function resolveNonConformity(id: string) {
+  await requireAdmin();
+  const data = nonConformityIdSchema.parse({ id });
+
+  await resolveNonConformityService(data.id);
+
+  revalidatePath(ADMIN_QUALITY);
 }
 
 export async function operatorLogin(input: OperatorLoginInput) {

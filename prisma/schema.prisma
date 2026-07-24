@@ -238,6 +238,18 @@ enum StepStatus {
   done
 }
 
+/// How a non-conformity is dispositioned: `rework` sends the part back through
+/// the step for reprocessing; `scrap` writes it off.
+enum NcDisposition {
+  rework
+  scrap
+}
+
+enum NcStatus {
+  open
+  resolved
+}
+
 /// A shop-floor workstation / process stage. `clientStageLabel` is the
 /// customer-friendly abstraction shown in the portal (clients never see
 /// machine or operator names).
@@ -282,6 +294,7 @@ model Operator {
   pinHash   String
   active    Boolean         @default(true)
   steps     WorkOrderStep[]
+  nonConformities NonConformity[]
   createdAt DateTime        @default(now())
 
   @@index([active])
@@ -308,6 +321,7 @@ model WorkOrder {
   startedAt       DateTime?
   finishedAt      DateTime?
   steps           WorkOrderStep[]
+  nonConformities NonConformity[]
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
@@ -337,7 +351,29 @@ model WorkOrderStep {
   finishedAt     DateTime?
   operatorId     String?
   operator       Operator?   @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  nonConformities NonConformity[]
 
   @@index([workOrderId])
   @@index([workstationId, status])
+}
+
+/// A quality non-conformity raised against a work order (optionally a specific
+/// step): defective quantity, the reason, and its disposition (rework/scrap).
+model NonConformity {
+  id          String         @id @default(cuid())
+  workOrderId String
+  workOrder   WorkOrder      @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  stepId      String?
+  step        WorkOrderStep? @relation(fields: [stepId], references: [id], onDelete: SetNull)
+  quantity    Float          @default(0)
+  reason      String
+  disposition NcDisposition
+  status      NcStatus       @default(open)
+  operatorId  String?
+  operator    Operator?      @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  createdAt   DateTime       @default(now())
+  resolvedAt  DateTime?
+
+  @@index([workOrderId])
+  @@index([status])
 }

@@ -15,6 +15,7 @@ import type {
   WorkstationOptionVM,
   WorkstationLoadVM,
   ProductRoutingVM,
+  NonConformityVM,
 } from "@/lib/types";
 import { toIsoDate } from "@/lib/dates";
 import {
@@ -516,4 +517,34 @@ export async function getWorkstationLoad(): Promise<WorkstationLoadVM[]> {
       readyCount,
     };
   });
+}
+
+export async function getOpenNonConformities(): Promise<NonConformityVM[]> {
+  const ncs = await prisma.nonConformity.findMany({
+    where: { status: "open" },
+    orderBy: { createdAt: "desc" },
+    include: {
+      workOrder: { select: { reference: true, orderId: true, productName: true } },
+      step: { select: { name: true, status: true } },
+      operator: { select: { name: true } },
+    },
+  });
+
+  return ncs.map((nc) => ({
+    id: nc.id,
+    workOrderRef: nc.workOrder.reference,
+    productName: nc.workOrder.productName,
+    orderId: nc.workOrder.orderId,
+    stepId: nc.stepId,
+    stepName: nc.step?.name ?? null,
+    quantity: nc.quantity,
+    reason: nc.reason,
+    disposition: nc.disposition,
+    canRework:
+      nc.disposition === "rework" &&
+      nc.stepId !== null &&
+      nc.step?.status === "done",
+    operatorName: nc.operator?.name ?? null,
+    createdAt: nc.createdAt.toISOString(),
+  }));
 }
