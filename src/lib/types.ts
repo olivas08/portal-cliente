@@ -12,6 +12,8 @@ export type RequestType = $Enums.RequestType;
 export type RequestStatus = $Enums.RequestStatus;
 export type MessageFrom = $Enums.MessageFrom;
 export type NotificationType = $Enums.NotificationType;
+export type WorkOrderStatus = $Enums.WorkOrderStatus;
+export type StepStatus = $Enums.StepStatus;
 
 export interface NotificationVM {
   id: string;
@@ -177,4 +179,94 @@ export interface CatalogProductVM {
   unitPriceEur: number;
   category: string | null;
   imageUrl: string | null;
+}
+
+// ── Produção (Ordens de Fabrico) ────────────────────────────────────────────
+
+export const WORK_ORDER_STATUS_LABELS: Record<WorkOrderStatus, string> = {
+  planned: "Planeada",
+  released: "Lançada",
+  in_progress: "Em Curso",
+  done: "Concluída",
+};
+
+export const STEP_STATUS_LABELS: Record<StepStatus, string> = {
+  pending: "Por iniciar",
+  in_progress: "Em curso",
+  paused: "Em pausa",
+  done: "Concluída",
+};
+
+/** A single routing step of a work order, as shown on the admin board. */
+export interface WorkOrderStepVM {
+  id: string;
+  sequence: number;
+  name: string;
+  workstationId: string;
+  workstationName: string;
+  clientStageLabel: string;
+  status: StepStatus;
+  plannedMinutes: number;
+  actualMinutes: number;
+  quantityDone: number;
+  scrapQty: number;
+  operatorName: string | null;
+  ready: boolean;
+}
+
+/** Admin-facing work order with its steps and progress. */
+export interface WorkOrderVM {
+  id: string;
+  reference: string;
+  orderId: string;
+  orderReference: string;
+  clientCompany: string;
+  productRef: string;
+  productName: string;
+  quantityPlanned: number;
+  quantityDone: number;
+  status: WorkOrderStatus;
+  priority: Priority;
+  progress: number;
+  plannedEnd?: string;
+  steps: WorkOrderStepVM[];
+}
+
+/** A step queued at a workstation, for the shop-floor terminal. */
+export interface TerminalStepVM {
+  stepId: string;
+  workOrderId: string;
+  workOrderReference: string;
+  orderReference: string;
+  productName: string;
+  sequence: number;
+  stepName: string;
+  status: StepStatus;
+  quantityPlanned: number;
+  quantityDone: number;
+  plannedMinutes: number;
+  priority: Priority;
+}
+
+/** A workstation option for the terminal station picker. */
+export interface WorkstationVM {
+  id: string;
+  code: string;
+  name: string;
+  clientStageLabel: string;
+  active: boolean;
+  queueCount: number;
+}
+
+/** Client-facing production stage in the abstracted stepper. */
+export interface ClientStageVM {
+  label: string;
+  state: "done" | "current" | "upcoming";
+}
+
+/** Client-facing production summary for an order (no machine/operator names). */
+export interface OrderProductionVM {
+  progress: number;
+  stages: ClientStageVM[];
+  estimatedCompletion?: string;
 }

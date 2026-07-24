@@ -79,6 +79,7 @@ enum NotificationType {
   ORDER_CREATED
   REQUEST_CREATED
   REQUEST_MESSAGE
+  PRODUCTION_UPDATE
 }
 
 model Notification {
@@ -109,12 +110,12 @@ model PasswordResetToken {
 }
 
 model Order {
-  id            String      @id @default(cuid())
-  reference     String      @unique
+  id            String          @id @default(cuid())
+  reference     String          @unique
   companyId     String
-  company       Company     @relation(fields: [companyId], references: [id])
-  status        OrderStatus @default(pending)
-  priority      Priority    @default(normal)
+  company       Company         @relation(fields: [companyId], references: [id])
+  status        OrderStatus     @default(pending)
+  priority      Priority        @default(normal)
   batchNumber   String?
   createdDate   DateTime
   expectedDate  DateTime
@@ -126,21 +127,23 @@ model Order {
   observations  String?
   items         OrderItem[]
   documents     OrderDocument[]
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  workOrders    WorkOrder[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   @@index([companyId])
 }
 
 model OrderItem {
-  id           String @id @default(cuid())
+  id           String      @id @default(cuid())
   orderId      String
-  order        Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order        Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   reference    String
   description  String
   quantity     Float
   unit         String
   unitPriceEur Float
+  workOrders   WorkOrder[]
 
   @@index([orderId])
 }
@@ -215,4 +218,104 @@ model ProductPrice {
 
   @@unique([productId, companyId])
   @@index([companyId])
+}
+
+// ── Produção (Ordens de Fabrico) ────────────────────────────────────────────
+
+enum WorkOrderStatus {
+  planned
+  released
+  in_progress
+  done
+}
+
+enum StepStatus {
+  pending
+  in_progress
+  paused
+  done
+}
+
+/// A shop-floor workstation / process stage. `clientStageLabel` is the
+/// customer-friendly abstraction shown in the portal (clients never see
+/// machine or operator names).
+model Workstation {
+  id               String          @id @default(cuid())
+  code             String          @unique
+  name             String
+  clientStageLabel String
+  sequence         Int             @default(0)
+  active           Boolean         @default(true)
+  steps            WorkOrderStep[]
+  createdAt        DateTime        @default(now())
+
+  @@index([active])
+}
+
+/// A shop-floor operator. Authenticates on the shared terminal with a PIN
+/// (bcrypt hash) — operators are not portal session users.
+model Operator {
+  id        String          @id @default(cuid())
+  name      String
+  pinHash   String
+  active    Boolean         @default(true)
+  steps     WorkOrderStep[]
+  createdAt DateTime        @default(now())
+
+  @@index([active])
+}
+
+/// A production work order: what to make, how many, and its progress. Usually
+/// one per order line (`orderItemId`). Product reference/name are snapshotted
+/// at creation, mirroring the OrderItem snapshot pattern.
+model WorkOrder {
+  id              String          @id @default(cuid())
+  reference       String          @unique
+  orderId         String
+  order           Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItemId     String?
+  orderItem       OrderItem?      @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  productRef      String
+  productName     String
+  quantityPlanned Float
+  quantityDone    Float           @default(0)
+  status          WorkOrderStatus @default(planned)
+  priority        Priority        @default(normal)
+  plannedStart    DateTime?
+  plannedEnd      DateTime?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  steps           WorkOrderStep[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+}
+
+/// One routing operation of a work order, pinned to a workstation. Steps run
+/// in `sequence` order; a step becomes available once every lower-sequence
+/// step of the same work order is done. Elapsed work time is accumulated in
+/// `actualMinutes` across pause/resume cycles (`startedAt` marks the current
+/// running interval).
+model WorkOrderStep {
+  id             String      @id @default(cuid())
+  workOrderId    String
+  workOrder      WorkOrder   @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  sequence       Int
+  name           String
+  workstationId  String
+  workstation    Workstation @relation(fields: [workstationId], references: [id])
+  status         StepStatus  @default(pending)
+  plannedMinutes Int         @default(0)
+  actualMinutes  Float       @default(0)
+  quantityDone   Float       @default(0)
+  scrapQty       Float       @default(0)
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  operatorId     String?
+  operator       Operator?   @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+
+  @@index([workOrderId])
+  @@index([workstationId, status])
 }

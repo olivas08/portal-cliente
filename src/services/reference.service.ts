@@ -1,15 +1,15 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
-export type ReferencePrefix = "ENC" | "REQ";
+export type ReferencePrefix = "ENC" | "REQ" | "OF";
 
 const MAX_ATTEMPTS = 5;
 
 async function countForYear(prefix: ReferencePrefix, year: number): Promise<number> {
   const where = { reference: { startsWith: `${prefix}-${year}-` } };
-  return prefix === "ENC"
-    ? prisma.order.count({ where })
-    : prisma.request.count({ where });
+  if (prefix === "ENC") return prisma.order.count({ where });
+  if (prefix === "REQ") return prisma.request.count({ where });
+  return prisma.workOrder.count({ where });
 }
 
 async function nextCandidate(prefix: ReferencePrefix): Promise<string> {

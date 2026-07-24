@@ -7,8 +7,18 @@ import type {
   RequestMessageVM,
   ProductVM,
   CatalogProductVM,
+  WorkOrderVM,
+  WorkOrderStepVM,
+  WorkstationVM,
+  TerminalStepVM,
+  OrderProductionVM,
 } from "@/lib/types";
 import { toIsoDate } from "@/lib/dates";
+import {
+  isStepReady,
+  workOrderProgress,
+  buildClientStages,
+} from "@/services/production-status";
 import type {
   Order,
   OrderItem,
@@ -219,4 +229,211 @@ export async function getCatalogForCompany(
     category: p.category,
     imageUrl: p.imageUrl,
   }));
+}
+
+// ── Produção (Ordens de Fabrico) ────────────────────────────────────────────
+
+type StepWith = {
+  id: string;
+  sequence: number;
+  name: string;
+  workstationId: string;
+  status: import("@prisma/client").StepStatus;
+  plannedMinutes: number;
+  actualMinutes: number;
+  quantityDone: number;
+  scrapQty: number;
+  workstation: { name: string; clientStageLabel: string; sequence: number };
+  operator: { name: string } | null;
+};
+
+function toStepVM(step: StepWith, allSteps: StepWith[]): WorkOrderStepVM {
+  return {
+    id: step.id,
+    sequence: step.sequence,
+    name: step.name,
+    workstationId: step.workstationId,
+    workstationName: step.workstation.name,
+    clientStageLabel: step.workstation.clientStageLabel,
+    status: step.status,
+    plannedMinutes: step.plannedMinutes,
+    actualMinutes: Math.round(step.actualMinutes),
+    quantityDone: step.quantityDone,
+    scrapQty: step.scrapQty,
+    operatorName: step.operator?.name ?? null,
+    ready: isStepReady(step, allSteps),
+  };
+}
+
+export async function getWorkOrders(): Promise<WorkOrderVM[]> {
+  const workOrders = await prisma.workOrder.findMany({
+    include: {
+      order: { include: { company: true } },
+      steps: {
+        include: { workstation: true, operator: true },
+        orderBy: { sequence: "asc" },
+      },
+    },
+    orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+  });
+
+  return workOrders.map((wo) => ({
+    id: wo.id,
+    reference: wo.reference,
+    orderId: wo.orderId,
+    orderReference: wo.order.reference,
+    clientCompany: wo.order.company.name,
+    productRef: wo.productRef,
+    productName: wo.productName,
+    quantityPlanned: wo.quantityPlanned,
+    quantityDone: wo.quantityDone,
+    status: wo.status,
+    priority: wo.priority,
+    progress: workOrderProgress(wo.steps),
+    plannedEnd: wo.plannedEnd ? toIsoDate(wo.plannedEnd) : undefined,
+    steps: wo.steps.map((s) => toStepVM(s, wo.steps)),
+  }));
+}
+
+export async function getActiveOperators(): Promise<
+  { id: string; name: string }[]
+> {
+  return prisma.operator.findMany({
+    where: { active: true },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+}
+
+export async function getWorkstationsWithQueue(): Promise<WorkstationVM[]> {
+  const workstations = await prisma.workstation.findMany({
+    where: { active: true },
+    orderBy: { sequence: "asc" },
+    include: {
+      steps: {
+        where: {
+          status: { in: ["pending", "in_progress", "paused"] },
+          workOrder: { status: { in: ["released", "in_progress"] } },
+        },
+        include: {
+          workOrder: { include: { steps: { select: { sequence: true, status: true } } } },
+        },
+      },
+    },
+  });
+
+  return workstations.map((ws) => {
+    const queueCount = ws.steps.filter((s) =>
+      isStepReady(s, s.workOrder.steps),
+    ).length;
+    return {
+      id: ws.id,
+      code: ws.code,
+      name: ws.name,
+      clientStageLabel: ws.clientStageLabel,
+      active: ws.active,
+      queueCount,
+    };
+  });
+}
+
+export async function getTerminalQueue(
+  workstationId: string,
+): Promise<TerminalStepVM[]> {
+  const steps = await prisma.workOrderStep.findMany({
+    where: {
+      workstationId,
+      status: { in: ["pending", "in_progress", "paused"] },
+      workOrder: { status: { in: ["released", "in_progress"] } },
+    },
+    include: {
+      workOrder: {
+        include: {
+          order: { select: { reference: true } },
+          steps: { select: { sequence: true, status: true } },
+        },
+      },
+    },
+  });
+
+  return steps
+    .filter((s) => isStepReady(s, s.workOrder.steps))
+    .map((s) => ({
+      stepId: s.id,
+      workOrderId: s.workOrderId,
+      workOrderReference: s.workOrder.reference,
+      orderReference: s.workOrder.order.reference,
+      productName: s.workOrder.productName,
+      sequence: s.sequence,
+      stepName: s.name,
+      status: s.status,
+      quantityPlanned: s.workOrder.quantityPlanned,
+      quantityDone: s.quantityDone,
+      plannedMinutes: s.plannedMinutes,
+      priority: s.workOrder.priority,
+    }))
+    .sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority === "urgent" ? -1 : 1;
+      return a.orderReference.localeCompare(b.orderReference);
+    });
+}
+
+export async function getOrdersWithoutProduction(): Promise<
+  { id: string; reference: string; clientCompany: string; itemCount: number }[]
+> {
+  const orders = await prisma.order.findMany({
+    where: {
+      status: { in: ["pending", "production"] },
+      items: { some: { workOrders: { none: {} } } },
+    },
+    include: { company: true, _count: { select: { items: true } } },
+    orderBy: { createdDate: "desc" },
+  });
+  return orders.map((o) => ({
+    id: o.id,
+    reference: o.reference,
+    clientCompany: o.company.name,
+    itemCount: o._count.items,
+  }));
+}
+
+/**
+ * Client-facing production summary for an order: abstracted stage stepper and
+ * overall progress, with no machine or operator names. Returns null when the
+ * order has no production planned yet.
+ */
+export async function getOrderProduction(
+  orderId: string,
+): Promise<OrderProductionVM | null> {
+  const workOrders = await prisma.workOrder.findMany({
+    where: { orderId, status: { not: "planned" } },
+    include: {
+      steps: {
+        include: { workstation: { select: { clientStageLabel: true, sequence: true } } },
+      },
+    },
+  });
+  if (workOrders.length === 0) return null;
+
+  const allSteps = workOrders.flatMap((wo) => wo.steps);
+  if (allSteps.length === 0) return null;
+
+  const stages = buildClientStages(
+    allSteps.map((s) => ({
+      clientStageLabel: s.workstation.clientStageLabel,
+      stationSequence: s.workstation.sequence,
+      stepStatus: s.status,
+    })),
+  );
+
+  const plannedEnds = workOrders
+    .map((wo) => wo.plannedEnd)
+    .filter((d): d is Date => d !== null)
+    .sort((a, b) => b.getTime() - a.getTime());
+
+  return {
+    progress: workOrderProgress(allSteps),
+    stages,
+    estimatedCompletion: plannedEnds[0] ? toIsoDate(plannedEnds[0]) : undefined,
+  };
 }

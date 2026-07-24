@@ -5,6 +5,10 @@ const prisma = new PrismaClient();
 
 async function main() {
   console.log("🌱 A limpar dados existentes...");
+  await prisma.workOrderStep.deleteMany();
+  await prisma.workOrder.deleteMany();
+  await prisma.operator.deleteMany();
+  await prisma.workstation.deleteMany();
   await prisma.requestMessage.deleteMany();
   await prisma.request.deleteMany();
   await prisma.orderItem.deleteMany();
@@ -63,6 +67,33 @@ async function main() {
       companyId: norte.id,
     },
   });
+
+  console.log("🏭 A criar postos de trabalho e operadores...");
+  const stationDefs = [
+    { code: "CORTE", name: "Corte a Laser", clientStageLabel: "Corte", sequence: 1 },
+    { code: "CNC", name: "Maquinação CNC", clientStageLabel: "Maquinação", sequence: 2 },
+    { code: "SOLD", name: "Soldadura", clientStageLabel: "Montagem", sequence: 3 },
+    { code: "ACAB", name: "Acabamento", clientStageLabel: "Acabamento", sequence: 4 },
+    { code: "INSP", name: "Inspeção Final", clientStageLabel: "Controlo de Qualidade", sequence: 5 },
+  ];
+  const stations: Record<string, string> = {};
+  for (const def of stationDefs) {
+    const ws = await prisma.workstation.create({ data: def });
+    stations[def.code] = ws.id;
+  }
+
+  const operatorDefs = [
+    { name: "João Ferreira", pin: "1234" },
+    { name: "Miguel Costa", pin: "2345" },
+    { name: "Carla Sousa", pin: "3456" },
+  ];
+  const operators: Record<string, string> = {};
+  for (const def of operatorDefs) {
+    const op = await prisma.operator.create({
+      data: { name: def.name, pinHash: hash(def.pin) },
+    });
+    operators[def.name] = op.id;
+  }
 
   console.log("🛒 A criar catálogo de produtos...");
   await prisma.product.create({
@@ -142,7 +173,7 @@ async function main() {
   });
 
   console.log("📦 A criar encomendas...");
-  await prisma.order.create({
+  const ord041 = await prisma.order.create({
     data: {
       reference: "ENC-2026-041",
       companyId: mota.id,
@@ -163,8 +194,9 @@ async function main() {
         ],
       },
     },
+    include: { items: true },
   });
-  await prisma.order.create({
+  const ord058 = await prisma.order.create({
     data: {
       reference: "ENC-2026-058",
       companyId: mota.id,
@@ -181,6 +213,7 @@ async function main() {
         ],
       },
     },
+    include: { items: true },
   });
   await prisma.order.create({
     data: {
@@ -254,6 +287,75 @@ async function main() {
         create: [
           { reference: "INJ-ABS-C300", description: "Injetado ABS Suporte Ref. C300", quantity: 100, unit: "un", unitPriceEur: 4.8 },
           { reference: "INJ-ABS-D400", description: "Injetado ABS Clip Ref. D400", quantity: 300, unit: "un", unitPriceEur: 1.9 },
+        ],
+      },
+    },
+  });
+
+  console.log("🏭 A criar ordens de fabrico...");
+  const now = new Date();
+  const minsAgo = (m: number) => new Date(now.getTime() - m * 60_000);
+
+  // ENC-2026-058 (urgente, em produção) — 1ª OF a meio, 2ª lançada.
+  await prisma.workOrder.create({
+    data: {
+      reference: "OF-2026-001",
+      orderId: ord058.id,
+      orderItemId: ord058.items[0].id,
+      productRef: ord058.items[0].reference,
+      productName: ord058.items[0].description,
+      quantityPlanned: ord058.items[0].quantity,
+      status: "in_progress",
+      priority: "urgent",
+      startedAt: minsAgo(180),
+      steps: {
+        create: [
+          { sequence: 1, name: "Corte a Laser", workstationId: stations.CORTE, status: "done", plannedMinutes: 30, actualMinutes: 28, quantityDone: 50, finishedAt: minsAgo(150), startedAt: null, operatorId: operators["João Ferreira"] },
+          { sequence: 2, name: "Maquinação CNC", workstationId: stations.CNC, status: "in_progress", plannedMinutes: 45, startedAt: minsAgo(25), operatorId: operators["Miguel Costa"] },
+          { sequence: 3, name: "Acabamento", workstationId: stations.ACAB, status: "pending", plannedMinutes: 20 },
+          { sequence: 4, name: "Inspeção Final", workstationId: stations.INSP, status: "pending", plannedMinutes: 15 },
+        ],
+      },
+    },
+  });
+  await prisma.workOrder.create({
+    data: {
+      reference: "OF-2026-002",
+      orderId: ord058.id,
+      orderItemId: ord058.items[1].id,
+      productRef: ord058.items[1].reference,
+      productName: ord058.items[1].description,
+      quantityPlanned: ord058.items[1].quantity,
+      status: "released",
+      priority: "urgent",
+      steps: {
+        create: [
+          { sequence: 1, name: "Corte a Laser", workstationId: stations.CORTE, status: "pending", plannedMinutes: 25 },
+          { sequence: 2, name: "Acabamento", workstationId: stations.ACAB, status: "pending", plannedMinutes: 20 },
+          { sequence: 3, name: "Inspeção Final", workstationId: stations.INSP, status: "pending", plannedMinutes: 15 },
+        ],
+      },
+    },
+  });
+
+  // ENC-2026-041 (entregue) — OF concluída, para a coluna "Concluída".
+  await prisma.workOrder.create({
+    data: {
+      reference: "OF-2026-003",
+      orderId: ord041.id,
+      orderItemId: ord041.items[0].id,
+      productRef: ord041.items[0].reference,
+      productName: ord041.items[0].description,
+      quantityPlanned: ord041.items[0].quantity,
+      quantityDone: ord041.items[0].quantity,
+      status: "done",
+      startedAt: new Date("2026-05-20T08:00:00"),
+      finishedAt: new Date("2026-05-22T16:00:00"),
+      steps: {
+        create: [
+          { sequence: 1, name: "Corte a Laser", workstationId: stations.CORTE, status: "done", plannedMinutes: 30, actualMinutes: 32, quantityDone: 500, operatorId: operators["João Ferreira"] },
+          { sequence: 2, name: "Acabamento", workstationId: stations.ACAB, status: "done", plannedMinutes: 20, actualMinutes: 18, quantityDone: 500, operatorId: operators["Carla Sousa"] },
+          { sequence: 3, name: "Inspeção Final", workstationId: stations.INSP, status: "done", plannedMinutes: 15, actualMinutes: 14, quantityDone: 500, operatorId: operators["Carla Sousa"] },
         ],
       },
     },

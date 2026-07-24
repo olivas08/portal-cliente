@@ -11,6 +11,8 @@ import { OrderDocumentsCards } from "@/components/OrderDocuments";
 import { OrderAttachments } from "@/components/OrderAttachments";
 import { ReorderModal } from "@/components/ReorderModal";
 import { DatesCard } from "@/components/DatesCard";
+import { ProductionProgress } from "@/components/ProductionProgress";
+import type { OrderProductionVM } from "@/lib/types";
 
 interface OrderDetailProps {
   order: OrderVM;
@@ -18,6 +20,7 @@ interface OrderDetailProps {
   isAdmin: boolean;
   backHref: string;
   backLabel: string;
+  production?: OrderProductionVM | null;
 }
 
 /**
@@ -32,6 +35,7 @@ export function OrderDetail({
   isAdmin,
   backHref,
   backLabel,
+  production,
 }: OrderDetailProps) {
   return (
     <>
@@ -100,6 +104,10 @@ export function OrderDetail({
           <StatusStepper status={order.status} />
         )}
       </div>
+
+      {production && order.status !== "cancelled" && (
+        <ProductionProgress production={production} />
+      )}
 
       {isAdmin && order.status !== "cancelled" && (
         <OrderStatusControl orderId={order.id} status={order.status} />

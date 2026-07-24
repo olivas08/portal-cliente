@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { getOrderById } from "@/lib/data";
+import { getOrderById, getOrderProduction } from "@/lib/data";
 import { OrderDetail } from "@/components/OrderDetail";
 
 export default async function ClientOrderDetail({
@@ -18,6 +18,8 @@ export default async function ClientOrderDetail({
   if (!order) notFound();
   if (order.companyId !== user.companyId) redirect("/dashboard");
 
+  const production = await getOrderProduction(id);
+
   return (
     <OrderDetail
       order={order}
@@ -25,6 +27,7 @@ export default async function ClientOrderDetail({
       isAdmin={false}
       backHref="/dashboard"
       backLabel="Voltar às encomendas"
+      production={production}
     />
   );
 }
