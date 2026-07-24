@@ -10,6 +10,11 @@ import {
 import {
   generateWorkOrdersForOrder,
   releaseWorkOrder as releaseWorkOrderService,
+  cancelWorkOrder as cancelWorkOrderService,
+  reopenWorkOrder as reopenWorkOrderService,
+  deleteWorkOrder as deleteWorkOrderService,
+  setWorkOrderPriority as setWorkOrderPriorityService,
+  setProductRouting as setProductRoutingService,
   loginOperator,
   startStep,
   pauseStep,
@@ -17,10 +22,13 @@ import {
   operatorLoginSchema,
   generateWorkOrdersSchema,
   workOrderIdSchema,
+  setWorkOrderPrioritySchema,
+  setProductRoutingSchema,
   stepIdSchema,
   completeStepSchema,
   type OperatorLoginInput,
   type CompleteStepInput,
+  type SetProductRoutingInput,
 } from "@/services/production.service";
 
 const ADMIN_BOARD = "/admin/producao";
@@ -49,7 +57,59 @@ export async function releaseWorkOrder(workOrderId: string) {
   revalidatePath(TERMINAL);
 }
 
-// ── Shop-floor terminal ─────────────────────────────────────────────────────
+export async function cancelWorkOrder(workOrderId: string) {
+  await requireAdmin();
+  const data = workOrderIdSchema.parse({ workOrderId });
+
+  await cancelWorkOrderService(data.workOrderId);
+
+  revalidatePath(ADMIN_BOARD);
+  revalidatePath(TERMINAL);
+}
+
+export async function reopenWorkOrder(workOrderId: string) {
+  await requireAdmin();
+  const data = workOrderIdSchema.parse({ workOrderId });
+
+  await reopenWorkOrderService(data.workOrderId);
+
+  revalidatePath(ADMIN_BOARD);
+  revalidatePath(TERMINAL);
+}
+
+export async function deleteWorkOrder(workOrderId: string) {
+  await requireAdmin();
+  const data = workOrderIdSchema.parse({ workOrderId });
+
+  await deleteWorkOrderService(data.workOrderId);
+
+  revalidatePath(ADMIN_BOARD);
+}
+
+export async function setWorkOrderPriority(
+  workOrderId: string,
+  priority: "normal" | "urgent",
+) {
+  await requireAdmin();
+  const data = setWorkOrderPrioritySchema.parse({ workOrderId, priority });
+
+  await setWorkOrderPriorityService(data.workOrderId, data.priority);
+
+  revalidatePath(ADMIN_BOARD);
+  revalidatePath(TERMINAL);
+}
+
+const ADMIN_ROUTING = "/admin/producao/roteiros";
+
+export async function setProductRouting(input: SetProductRoutingInput) {
+  await requireAdmin();
+  const data = setProductRoutingSchema.parse(input);
+
+  await setProductRoutingService(data);
+
+  revalidatePath(ADMIN_ROUTING);
+  revalidatePath(ADMIN_BOARD);
+}
 
 export async function operatorLogin(input: OperatorLoginInput) {
   const data = operatorLoginSchema.parse(input);

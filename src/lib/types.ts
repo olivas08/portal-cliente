@@ -188,6 +188,7 @@ export const WORK_ORDER_STATUS_LABELS: Record<WorkOrderStatus, string> = {
   released: "Lançada",
   in_progress: "Em Curso",
   done: "Concluída",
+  cancelled: "Cancelada",
 };
 
 export const STEP_STATUS_LABELS: Record<StepStatus, string> = {
@@ -269,4 +270,26 @@ export interface OrderProductionVM {
   progress: number;
   stages: ClientStageVM[];
   estimatedCompletion?: string;
+}
+
+/** A workstation option for admin selectors (routing editor, etc.). */
+export interface WorkstationOptionVM {
+  id: string;
+  name: string;
+  clientStageLabel: string;
+}
+
+/** One operation in a product's routing. */
+export interface RoutingOperationVM {
+  name: string;
+  workstationId: string;
+  plannedMinutes: number;
+}
+
+/** A product together with its current routing, for the routing editor. */
+export interface ProductRoutingVM {
+  id: string;
+  reference: string;
+  name: string;
+  operations: RoutingOperationVM[];
 }

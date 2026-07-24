@@ -105,6 +105,15 @@ describe("rollUpWorkOrderStatus", () => {
       rollUpWorkOrderStatus("in_progress", [step(1, "done"), step(2, "done")]),
     ).toBe("done");
   });
+
+  it("never auto-changes a cancelled work order", () => {
+    expect(
+      rollUpWorkOrderStatus("cancelled", [step(1, "done"), step(2, "done")]),
+    ).toBe("cancelled");
+    expect(
+      rollUpWorkOrderStatus("cancelled", [step(1, "in_progress")]),
+    ).toBe("cancelled");
+  });
 });
 
 describe("workOrderProgress", () => {
@@ -155,6 +164,24 @@ describe("deriveOrderStatusFromProduction", () => {
 
   it("returns null with no work orders", () => {
     expect(deriveOrderStatusFromProduction("pending", [])).toBeNull();
+  });
+
+  it("ignores cancelled work orders when deriving status", () => {
+    expect(
+      deriveOrderStatusFromProduction("production", [
+        { status: "done" },
+        { status: "cancelled" },
+      ]),
+    ).toBe("quality");
+  });
+
+  it("returns null when every work order is cancelled", () => {
+    expect(
+      deriveOrderStatusFromProduction("production", [
+        { status: "cancelled" },
+        { status: "cancelled" },
+      ]),
+    ).toBeNull();
   });
 });
 

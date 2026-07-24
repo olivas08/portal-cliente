@@ -3,10 +3,17 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Factory, Rocket, Plus, AlertCircle, CircleDot, CheckCircle2, Circle, PauseCircle } from "lucide-react";
+import { Factory, Rocket, Plus, AlertCircle, CircleDot, CheckCircle2, Circle, PauseCircle, Ban, Trash2, Flame, Undo2, Route } from "lucide-react";
 import type { WorkOrderVM, WorkOrderStatus, StepStatus } from "@/lib/types";
 import { WORK_ORDER_STATUS_LABELS } from "@/lib/types";
-import { generateWorkOrders, releaseWorkOrder } from "@/actions/production";
+import {
+  generateWorkOrders,
+  releaseWorkOrder,
+  cancelWorkOrder,
+  reopenWorkOrder,
+  deleteWorkOrder,
+  setWorkOrderPriority,
+} from "@/actions/production";
 import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
 
 interface UnplannedOrder {
@@ -61,6 +68,7 @@ export function AdminProductionBoard({ workOrders, unplanned }: Props) {
 
   const byStatus = (status: WorkOrderStatus) =>
     workOrders.filter((wo) => wo.status === status);
+  const cancelled = workOrders.filter((wo) => wo.status === "cancelled");
 
   return (
     <>
@@ -70,12 +78,18 @@ export function AdminProductionBoard({ workOrders, unplanned }: Props) {
         <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center">
           <Factory size={20} className="text-white" />
         </div>
-        <div>
+        <div className="flex-1">
           <h1 className="text-xl font-bold text-slate-800">Produção</h1>
           <p className="text-sm text-slate-500">
             Ordens de fabrico e progresso no chão de fábrica
           </p>
         </div>
+        <Link
+          href="/admin/producao/roteiros"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          <Route size={16} /> Roteiros
+        </Link>
       </div>
 
       {error && (
@@ -205,14 +219,62 @@ export function AdminProductionBoard({ workOrders, unplanned }: Props) {
                     })}
                   </ul>
 
-                  {wo.status === "planned" && (
-                    <button
-                      onClick={() => run(() => releaseWorkOrder(wo.id))}
-                      disabled={pending}
-                      className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-lg bg-sky-600 text-white text-xs font-semibold px-3 py-2 hover:bg-sky-500 disabled:opacity-60"
-                    >
-                      <Rocket size={14} /> Lançar para produção
-                    </button>
+                  {wo.status !== "done" && (
+                    <div className="mt-3 flex items-center gap-2">
+                      {wo.status === "planned" && (
+                        <button
+                          onClick={() => run(() => releaseWorkOrder(wo.id))}
+                          disabled={pending}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-sky-600 text-white text-xs font-semibold px-3 py-2 hover:bg-sky-500 disabled:opacity-60"
+                        >
+                          <Rocket size={14} /> Lançar
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() =>
+                          run(() =>
+                            setWorkOrderPriority(
+                              wo.id,
+                              wo.priority === "urgent" ? "normal" : "urgent",
+                            ),
+                          )
+                        }
+                        disabled={pending}
+                        title={
+                          wo.priority === "urgent"
+                            ? "Repor prioridade normal"
+                            : "Marcar como urgente"
+                        }
+                        className={`flex items-center justify-center rounded-lg border px-2.5 py-2 disabled:opacity-60 ${
+                          wo.priority === "urgent"
+                            ? "border-amber-300 bg-amber-50 text-amber-600"
+                            : "border-slate-200 text-slate-400 hover:bg-slate-50"
+                        }`}
+                      >
+                        <Flame size={14} />
+                      </button>
+
+                      {wo.status === "planned" ? (
+                        <button
+                          onClick={() => run(() => deleteWorkOrder(wo.id))}
+                          disabled={pending}
+                          title="Eliminar ordem"
+                          className="flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 px-2.5 py-2 hover:bg-red-50 hover:text-red-500 disabled:opacity-60"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => run(() => cancelWorkOrder(wo.id))}
+                          disabled={pending}
+                          title="Cancelar ordem"
+                          className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 text-slate-500 px-2.5 py-2 hover:bg-red-50 hover:text-red-600 disabled:opacity-60"
+                        >
+                          <Ban size={14} />
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
@@ -220,6 +282,38 @@ export function AdminProductionBoard({ workOrders, unplanned }: Props) {
           );
         })}
       </div>
+
+      {cancelled.length > 0 && (
+        <div className="mt-8">
+          <h3 className="text-sm font-semibold text-slate-500 mb-3">
+            Ordens canceladas
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {cancelled.map((wo) => (
+              <div
+                key={wo.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-500 line-through">
+                    {wo.reference}
+                  </p>
+                  <p className="text-xs text-slate-400 truncate">
+                    {wo.orderReference} · {wo.productName}
+                  </p>
+                </div>
+                <button
+                  onClick={() => run(() => reopenWorkOrder(wo.id))}
+                  disabled={pending}
+                  className="flex items-center gap-1.5 shrink-0 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-semibold px-3 py-2 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  <Undo2 size={14} /> Reabrir
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </>
   );
 }

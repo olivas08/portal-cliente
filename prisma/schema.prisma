@@ -202,6 +202,7 @@ model Product {
   imageUrl     String?
   active       Boolean        @default(true)
   prices       ProductPrice[]
+  routing      RoutingOperation[]
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
@@ -227,6 +228,7 @@ enum WorkOrderStatus {
   released
   in_progress
   done
+  cancelled
 }
 
 enum StepStatus {
@@ -247,9 +249,29 @@ model Workstation {
   sequence         Int             @default(0)
   active           Boolean         @default(true)
   steps            WorkOrderStep[]
+  routingOps       RoutingOperation[]
   createdAt        DateTime        @default(now())
 
   @@index([active])
+}
+
+/// A single operation in a product's manufacturing routing (its standard
+/// sequence of workstations and expected times). Used to pre-fill a work
+/// order's steps; products without a routing fall back to all active
+/// workstations.
+model RoutingOperation {
+  id             String      @id @default(cuid())
+  productId      String
+  product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sequence       Int
+  name           String
+  workstationId  String
+  workstation    Workstation @relation(fields: [workstationId], references: [id])
+  plannedMinutes Int         @default(0)
+  createdAt      DateTime    @default(now())
+
+  @@index([productId])
+  @@index([workstationId])
 }
 
 /// A shop-floor operator. Authenticates on the shared terminal with a PIN

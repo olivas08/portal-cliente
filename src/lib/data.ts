@@ -12,6 +12,8 @@ import type {
   WorkstationVM,
   TerminalStepVM,
   OrderProductionVM,
+  WorkstationOptionVM,
+  ProductRoutingVM,
 } from "@/lib/types";
 import { toIsoDate } from "@/lib/dates";
 import {
@@ -406,7 +408,7 @@ export async function getOrderProduction(
   orderId: string,
 ): Promise<OrderProductionVM | null> {
   const workOrders = await prisma.workOrder.findMany({
-    where: { orderId, status: { not: "planned" } },
+    where: { orderId, status: { notIn: ["planned", "cancelled"] } },
     include: {
       steps: {
         include: { workstation: { select: { clientStageLabel: true, sequence: true } } },
@@ -436,4 +438,31 @@ export async function getOrderProduction(
     stages,
     estimatedCompletion: plannedEnds[0] ? toIsoDate(plannedEnds[0]) : undefined,
   };
+}
+
+export async function getWorkstationOptions(): Promise<WorkstationOptionVM[]> {
+  const workstations = await prisma.workstation.findMany({
+    where: { active: true },
+    orderBy: { sequence: "asc" },
+    select: { id: true, name: true, clientStageLabel: true },
+  });
+  return workstations;
+}
+
+export async function getProductsWithRouting(): Promise<ProductRoutingVM[]> {
+  const products = await prisma.product.findMany({
+    where: { active: true },
+    orderBy: { name: "asc" },
+    include: { routing: { orderBy: { sequence: "asc" } } },
+  });
+  return products.map((p) => ({
+    id: p.id,
+    reference: p.reference,
+    name: p.name,
+    operations: p.routing.map((op) => ({
+      name: op.name,
+      workstationId: op.workstationId,
+      plannedMinutes: op.plannedMinutes,
+    })),
+  }));
 }

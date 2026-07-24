@@ -60,6 +60,7 @@ export function rollUpWorkOrderStatus(
   steps: StepLike[],
 ): WorkOrderStatus {
   if (current === "planned") return "planned";
+  if (current === "cancelled") return "cancelled";
   if (steps.length === 0) return current;
   if (steps.every((s) => s.status === "done")) return "done";
   const anyStarted = steps.some((s) => s.status !== "pending");
@@ -82,11 +83,13 @@ export function deriveOrderStatusFromProduction(
   orderStatus: OrderStatus,
   workOrders: { status: WorkOrderStatus }[],
 ): OrderStatus | null {
-  if (workOrders.length === 0) return null;
-  const anyStarted = workOrders.some(
+  // Cancelled work orders never block or drive the order's status.
+  const active = workOrders.filter((w) => w.status !== "cancelled");
+  if (active.length === 0) return null;
+  const anyStarted = active.some(
     (w) => w.status === "in_progress" || w.status === "done",
   );
-  const allDone = workOrders.every((w) => w.status === "done");
+  const allDone = active.every((w) => w.status === "done");
 
   if (orderStatus === "pending" && anyStarted) return "production";
   if (orderStatus === "production" && allDone) return "quality";

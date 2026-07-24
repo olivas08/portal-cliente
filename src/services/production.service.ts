@@ -33,6 +33,14 @@ export const workOrderIdSchema = z.object({
   workOrderId: z.string().trim().min(1, "Ordem de fabrico obrigatória."),
 });
 
+export const setWorkOrderPrioritySchema = z.object({
+  workOrderId: z.string().trim().min(1, "Ordem de fabrico obrigatória."),
+  priority: z.enum(["normal", "urgent"]),
+});
+export type SetWorkOrderPriorityInput = z.infer<
+  typeof setWorkOrderPrioritySchema
+>;
+
 export const stepIdSchema = z.object({
   stepId: z.string().trim().min(1, "Passo obrigatório."),
 });
@@ -43,6 +51,23 @@ export const completeStepSchema = z.object({
   scrapQty: z.coerce.number().nonnegative("Sucata inválida.").default(0),
 });
 export type CompleteStepInput = z.infer<typeof completeStepSchema>;
+
+export const setProductRoutingSchema = z.object({
+  productId: z.string().trim().min(1, "Produto obrigatório."),
+  operations: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1, "Nome da operação obrigatório.").max(80),
+        workstationId: z.string().trim().min(1, "Posto obrigatório."),
+        plannedMinutes: z.coerce
+          .number()
+          .int("Minutos devem ser inteiros.")
+          .nonnegative("Minutos inválidos."),
+      }),
+    )
+    .max(20, "Roteiro demasiado longo."),
+});
+export type SetProductRoutingInput = z.infer<typeof setProductRoutingSchema>;
 
 const DEFAULT_STEP_MINUTES = 30;
 
@@ -85,11 +110,11 @@ export async function generateWorkOrdersForOrder(orderId: string): Promise<numbe
     throw new AppError("Não é possível planear produção de uma encomenda cancelada.");
   }
 
-  const workstations = await prisma.workstation.findMany({
+  const fallbackStations = await prisma.workstation.findMany({
     where: { active: true },
     orderBy: { sequence: "asc" },
   });
-  if (workstations.length === 0) {
+  if (fallbackStations.length === 0) {
     throw new AppError("Configure pelo menos um posto de trabalho.");
   }
 
@@ -98,7 +123,30 @@ export async function generateWorkOrdersForOrder(orderId: string): Promise<numbe
     throw new AppError("Esta encomenda já tem produção planeada.");
   }
 
+  // Resolve each line to its catalogue product routing (matched by reference).
+  const products = await prisma.product.findMany({
+    where: { reference: { in: pending.map((i) => i.reference) } },
+    include: { routing: { orderBy: { sequence: "asc" } } },
+  });
+  const routingByRef = new Map(products.map((p) => [p.reference, p.routing]));
+
   for (const item of pending) {
+    const routing = routingByRef.get(item.reference);
+    const steps =
+      routing && routing.length > 0
+        ? routing.map((op, index) => ({
+            sequence: index + 1,
+            name: op.name,
+            workstationId: op.workstationId,
+            plannedMinutes: op.plannedMinutes,
+          }))
+        : fallbackStations.map((ws, index) => ({
+            sequence: index + 1,
+            name: ws.name,
+            workstationId: ws.id,
+            plannedMinutes: DEFAULT_STEP_MINUTES,
+          }));
+
     await createWithReference("OF", (reference) =>
       prisma.workOrder.create({
         data: {
@@ -109,20 +157,50 @@ export async function generateWorkOrdersForOrder(orderId: string): Promise<numbe
           productName: item.description,
           quantityPlanned: item.quantity,
           priority: order.priority,
-          steps: {
-            create: workstations.map((ws, index) => ({
-              sequence: index + 1,
-              name: ws.name,
-              workstationId: ws.id,
-              plannedMinutes: DEFAULT_STEP_MINUTES,
-            })),
-          },
+          steps: { create: steps },
         },
       }),
     );
   }
 
   return pending.length;
+}
+
+// ── Routing templates ───────────────────────────────────────────────────────
+
+/**
+ * Replaces a product's routing with the given ordered operations (delete +
+ * recreate in one transaction). Sequence is derived from array order.
+ */
+export async function setProductRouting(
+  input: SetProductRoutingInput,
+): Promise<void> {
+  const product = await prisma.product.findUnique({
+    where: { id: input.productId },
+    select: { id: true },
+  });
+  if (!product) throw new NotFoundError("Produto não encontrado.");
+
+  if (input.operations.length > 0) {
+    const ids = [...new Set(input.operations.map((o) => o.workstationId))];
+    const found = await prisma.workstation.count({ where: { id: { in: ids } } });
+    if (found !== ids.length) {
+      throw new AppError("Posto de trabalho inválido no roteiro.");
+    }
+  }
+
+  await prisma.$transaction([
+    prisma.routingOperation.deleteMany({ where: { productId: input.productId } }),
+    prisma.routingOperation.createMany({
+      data: input.operations.map((op, index) => ({
+        productId: input.productId,
+        sequence: index + 1,
+        name: op.name,
+        workstationId: op.workstationId,
+        plannedMinutes: op.plannedMinutes,
+      })),
+    }),
+  ]);
 }
 
 /** Releases a planned work order to the shop floor (steps become queueable). */
@@ -136,6 +214,103 @@ export async function releaseWorkOrder(workOrderId: string): Promise<void> {
     where: { id: workOrderId },
     data: { status: "released" },
   });
+}
+
+/** Sets a work order's priority (used to bump urgent jobs up the queue). */
+export async function setWorkOrderPriority(
+  workOrderId: string,
+  priority: "normal" | "urgent",
+): Promise<void> {
+  const wo = await prisma.workOrder.findUnique({ where: { id: workOrderId } });
+  if (!wo) throw new NotFoundError("Ordem de fabrico não encontrada.");
+  if (wo.status === "done" || wo.status === "cancelled") {
+    throw new AppError("Não é possível repriorizar uma ordem terminada.");
+  }
+  await prisma.workOrder.update({
+    where: { id: workOrderId },
+    data: { priority },
+  });
+}
+
+/**
+ * Deletes a work order that has not started yet (planned only). Started or
+ * finished work orders keep their history and must be cancelled instead.
+ */
+export async function deleteWorkOrder(workOrderId: string): Promise<void> {
+  const wo = await prisma.workOrder.findUnique({ where: { id: workOrderId } });
+  if (!wo) throw new NotFoundError("Ordem de fabrico não encontrada.");
+  if (wo.status !== "planned") {
+    throw new AppError("Só pode eliminar ordens ainda por lançar. Cancele-a.");
+  }
+  await prisma.workOrder.delete({ where: { id: workOrderId } });
+}
+
+/** Cancels a work order, stopping any running step and rolling up the order. */
+export async function cancelWorkOrder(workOrderId: string): Promise<void> {
+  const now = new Date();
+  const notify = await prisma.$transaction(async (tx) => {
+    const wo = await tx.workOrder.findUnique({
+      where: { id: workOrderId },
+      include: { steps: true },
+    });
+    if (!wo) throw new NotFoundError("Ordem de fabrico não encontrada.");
+    if (wo.status === "cancelled") {
+      throw new AppError("Esta ordem de fabrico já está cancelada.");
+    }
+    if (wo.status === "done") {
+      throw new AppError("Não é possível cancelar uma ordem concluída.");
+    }
+
+    // Bank time on any running step and freeze the steps.
+    for (const step of wo.steps) {
+      if (step.status === "in_progress") {
+        await tx.workOrderStep.update({
+          where: { id: step.id },
+          data: {
+            status: "paused",
+            startedAt: null,
+            actualMinutes:
+              step.actualMinutes + elapsedMinutes(step.startedAt, now),
+          },
+        });
+      }
+    }
+
+    await tx.workOrder.update({
+      where: { id: workOrderId },
+      data: { status: "cancelled", finishedAt: now },
+    });
+
+    return applyOrderRollup(tx, wo.orderId, now);
+  });
+
+  await dispatchOrderNotification(notify);
+}
+
+/** Reopens a cancelled work order, restoring its status from its steps. */
+export async function reopenWorkOrder(workOrderId: string): Promise<void> {
+  const now = new Date();
+  const notify = await prisma.$transaction(async (tx) => {
+    const wo = await tx.workOrder.findUnique({
+      where: { id: workOrderId },
+      include: { steps: true },
+    });
+    if (!wo) throw new NotFoundError("Ordem de fabrico não encontrada.");
+    if (wo.status !== "cancelled") {
+      throw new AppError("A ordem de fabrico não está cancelada.");
+    }
+
+    const restored = rollUpWorkOrderStatus("released", wo.steps);
+    const woDone = restored === "done";
+    await tx.workOrder.update({
+      where: { id: workOrderId },
+      data: { status: restored, finishedAt: woDone ? now : null },
+    });
+
+    return applyOrderRollup(tx, wo.orderId, now);
+  });
+
+  await dispatchOrderNotification(notify);
 }
 
 // ── Shop-floor execution ────────────────────────────────────────────────────
@@ -156,6 +331,9 @@ export async function startStep(
     const wo = step.workOrder;
     if (wo.status === "planned") {
       throw new AppError("Lance a ordem de fabrico antes de a iniciar.");
+    }
+    if (wo.status === "cancelled") {
+      throw new AppError("Esta ordem de fabrico foi cancelada.");
     }
     if (!canStartStep(step.status)) {
       throw new AppError("Este passo já está em curso ou concluído.");
@@ -215,7 +393,10 @@ export async function completeStep(
   const notify = await prisma.$transaction(async (tx) => {
     const step = await tx.workOrderStep.findUnique({
       where: { id: input.stepId },
-      include: { workOrder: { include: { steps: true, order: true } } },
+      include: {
+        workstation: { select: { clientStageLabel: true } },
+        workOrder: { include: { steps: true, order: true } },
+      },
     });
     if (!step) throw new NotFoundError("Passo não encontrado.");
     if (!canCompleteStep(step.status)) {
@@ -250,10 +431,37 @@ export async function completeStep(
       },
     });
 
-    return applyOrderRollup(tx, wo.orderId, now);
+    const order = await applyOrderRollup(tx, wo.orderId, now);
+
+    // A stage-level notification is only worthwhile when the order status did
+    // not already change (that carries its own, higher-signal notification).
+    let stage: StageNotification | null = null;
+    if (!order) {
+      const label = step.workstation.clientStageLabel;
+      const stageSteps = await tx.workOrderStep.findMany({
+        where: {
+          workstation: { clientStageLabel: label },
+          workOrder: { orderId: wo.orderId, status: { not: "cancelled" } },
+        },
+        select: { status: true },
+      });
+      const stageDone =
+        stageSteps.length > 0 && stageSteps.every((s) => s.status === "done");
+      if (stageDone) {
+        stage = {
+          companyId: wo.order.companyId,
+          reference: wo.order.reference,
+          orderId: wo.orderId,
+          stageLabel: label,
+        };
+      }
+    }
+
+    return { order, stage };
   });
 
-  await dispatchOrderNotification(notify);
+  await dispatchOrderNotification(notify.order);
+  await dispatchStageNotification(notify.stage);
 }
 
 // ── Internal helpers ────────────────────────────────────────────────────────
@@ -263,6 +471,13 @@ interface OrderNotification {
   reference: string;
   orderId: string;
   status: keyof typeof ORDER_STATUS_LABELS;
+}
+
+interface StageNotification {
+  companyId: string;
+  reference: string;
+  orderId: string;
+  stageLabel: string;
 }
 
 /**
@@ -308,6 +523,19 @@ async function dispatchOrderNotification(
     type: "PRODUCTION_UPDATE",
     title: `Encomenda ${notify.reference}`,
     body: `A sua encomenda avançou para: ${ORDER_STATUS_LABELS[notify.status]}.`,
+    href: `/dashboard/ordens/${notify.orderId}`,
+  });
+}
+
+/** Best-effort client notification when a client-facing stage is completed. */
+async function dispatchStageNotification(
+  notify: StageNotification | null,
+): Promise<void> {
+  if (!notify) return;
+  await notifyCompanyClients(notify.companyId, {
+    type: "PRODUCTION_UPDATE",
+    title: `Encomenda ${notify.reference}`,
+    body: `Fase concluída: ${notify.stageLabel}.`,
     href: `/dashboard/ordens/${notify.orderId}`,
   });
 }

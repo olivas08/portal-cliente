@@ -7,6 +7,7 @@ async function main() {
   console.log("🌱 A limpar dados existentes...");
   await prisma.workOrderStep.deleteMany();
   await prisma.workOrder.deleteMany();
+  await prisma.routingOperation.deleteMany();
   await prisma.operator.deleteMany();
   await prisma.workstation.deleteMany();
   await prisma.requestMessage.deleteMany();
@@ -131,7 +132,7 @@ async function main() {
       active: true,
     },
   });
-  await prisma.product.create({
+  const chpProduct = await prisma.product.create({
     data: {
       reference: "CHP-2MM-AISI304",
       name: "Chapa Inox AISI 304 2mm",
@@ -149,7 +150,7 @@ async function main() {
       },
     },
   });
-  await prisma.product.create({
+  const perfProduct = await prisma.product.create({
     data: {
       reference: "PERF-L40-INOX",
       name: "Perfil L 40×40×4 Inox",
@@ -170,6 +171,19 @@ async function main() {
       category: "Perfis",
       active: false,
     },
+  });
+
+  console.log("🧭 A criar roteiros de produção...");
+  await prisma.routingOperation.createMany({
+    data: [
+      { productId: chpProduct.id, sequence: 1, name: "Corte a Laser", workstationId: stations.CORTE, plannedMinutes: 25 },
+      { productId: chpProduct.id, sequence: 2, name: "Quinagem", workstationId: stations.CNC, plannedMinutes: 40 },
+      { productId: chpProduct.id, sequence: 3, name: "Acabamento", workstationId: stations.ACAB, plannedMinutes: 20 },
+      { productId: chpProduct.id, sequence: 4, name: "Inspeção Final", workstationId: stations.INSP, plannedMinutes: 15 },
+      { productId: perfProduct.id, sequence: 1, name: "Corte", workstationId: stations.CORTE, plannedMinutes: 15 },
+      { productId: perfProduct.id, sequence: 2, name: "Soldadura", workstationId: stations.SOLD, plannedMinutes: 35 },
+      { productId: perfProduct.id, sequence: 3, name: "Inspeção Final", workstationId: stations.INSP, plannedMinutes: 10 },
+    ],
   });
 
   console.log("📦 A criar encomendas...");
