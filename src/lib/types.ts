@@ -315,6 +315,20 @@ export interface WorkstationLoadVM {
   readyCount: number;
 }
 
+/** OEE (Availability × Performance × Quality) for one workstation. */
+export interface WorkstationOeeVM {
+  id: string;
+  name: string;
+  clientStageLabel: string;
+  availability: number;
+  performance: number;
+  quality: number;
+  oee: number;
+  completedSteps: number;
+  runtimeMinutes: number;
+  downtimeMinutes: number;
+}
+
 /** One operation in a product's routing. */
 export interface RoutingOperationVM {
   name: string;

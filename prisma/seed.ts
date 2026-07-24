@@ -325,7 +325,7 @@ async function main() {
       startedAt: minsAgo(180),
       steps: {
         create: [
-          { sequence: 1, name: "Corte a Laser", workstationId: stations.CORTE, status: "done", plannedMinutes: 30, actualMinutes: 28, quantityDone: 50, finishedAt: minsAgo(150), startedAt: null, operatorId: operators["João Ferreira"] },
+          { sequence: 1, name: "Corte a Laser", workstationId: stations.CORTE, status: "done", plannedMinutes: 30, actualMinutes: 28, downtimeMinutes: 6, quantityDone: 50, finishedAt: minsAgo(150), startedAt: null, operatorId: operators["João Ferreira"] },
           { sequence: 2, name: "Maquinação CNC", workstationId: stations.CNC, status: "in_progress", plannedMinutes: 45, startedAt: minsAgo(25), operatorId: operators["Miguel Costa"] },
           { sequence: 3, name: "Acabamento", workstationId: stations.ACAB, status: "pending", plannedMinutes: 20 },
           { sequence: 4, name: "Inspeção Final", workstationId: stations.INSP, status: "pending", plannedMinutes: 15 },
@@ -383,9 +383,9 @@ async function main() {
       finishedAt: new Date("2026-05-22T16:00:00"),
       steps: {
         create: [
-          { sequence: 1, name: "Corte a Laser", workstationId: stations.CORTE, status: "done", plannedMinutes: 30, actualMinutes: 32, quantityDone: 500, operatorId: operators["João Ferreira"] },
-          { sequence: 2, name: "Acabamento", workstationId: stations.ACAB, status: "done", plannedMinutes: 20, actualMinutes: 18, quantityDone: 500, operatorId: operators["Carla Sousa"] },
-          { sequence: 3, name: "Inspeção Final", workstationId: stations.INSP, status: "done", plannedMinutes: 15, actualMinutes: 14, quantityDone: 500, operatorId: operators["Carla Sousa"] },
+          { sequence: 1, name: "Corte a Laser", workstationId: stations.CORTE, status: "done", plannedMinutes: 30, actualMinutes: 34, downtimeMinutes: 12, quantityDone: 492, scrapQty: 8, operatorId: operators["João Ferreira"] },
+          { sequence: 2, name: "Acabamento", workstationId: stations.ACAB, status: "done", plannedMinutes: 20, actualMinutes: 18, downtimeMinutes: 4, quantityDone: 500, operatorId: operators["Carla Sousa"] },
+          { sequence: 3, name: "Inspeção Final", workstationId: stations.INSP, status: "done", plannedMinutes: 15, actualMinutes: 14, downtimeMinutes: 2, quantityDone: 500, operatorId: operators["Carla Sousa"] },
         ],
       },
     },

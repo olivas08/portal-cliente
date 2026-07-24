@@ -345,9 +345,11 @@ model WorkOrderStep {
   status         StepStatus  @default(pending)
   plannedMinutes Int         @default(0)
   actualMinutes  Float       @default(0)
+  downtimeMinutes Float      @default(0)
   quantityDone   Float       @default(0)
   scrapQty       Float       @default(0)
   startedAt      DateTime?
+  pausedAt       DateTime?
   finishedAt     DateTime?
   operatorId     String?
   operator       Operator?   @relation(fields: [operatorId], references: [id], onDelete: SetNull)

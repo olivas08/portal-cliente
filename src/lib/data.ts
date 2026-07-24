@@ -14,6 +14,7 @@ import type {
   OrderProductionVM,
   WorkstationOptionVM,
   WorkstationLoadVM,
+  WorkstationOeeVM,
   ProductRoutingVM,
   NonConformityVM,
 } from "@/lib/types";
@@ -22,6 +23,7 @@ import {
   isStepReady,
   workOrderProgress,
   buildClientStages,
+  computeOee,
 } from "@/services/production-status";
 import type {
   Order,
@@ -547,4 +549,66 @@ export async function getOpenNonConformities(): Promise<NonConformityVM[]> {
     operatorName: nc.operator?.name ?? null,
     createdAt: nc.createdAt.toISOString(),
   }));
+}
+
+export async function getWorkstationOee(): Promise<WorkstationOeeVM[]> {
+  const workstations = await prisma.workstation.findMany({
+    where: { active: true },
+    orderBy: { sequence: "asc" },
+    include: {
+      steps: {
+        where: { status: "done" },
+        select: {
+          plannedMinutes: true,
+          actualMinutes: true,
+          downtimeMinutes: true,
+          quantityDone: true,
+          scrapQty: true,
+        },
+      },
+    },
+  });
+
+  return workstations.map((ws) => {
+    const oee = computeOee(ws.steps);
+    return {
+      id: ws.id,
+      name: ws.name,
+      clientStageLabel: ws.clientStageLabel,
+      availability: oee.availability,
+      performance: oee.performance,
+      quality: oee.quality,
+      oee: oee.oee,
+      completedSteps: ws.steps.length,
+      runtimeMinutes: oee.runtimeMinutes,
+      downtimeMinutes: oee.downtimeMinutes,
+    };
+  });
+}
+
+export async function getFactoryOee(): Promise<WorkstationOeeVM | null> {
+  const steps = await prisma.workOrderStep.findMany({
+    where: { status: "done", workstation: { active: true } },
+    select: {
+      plannedMinutes: true,
+      actualMinutes: true,
+      downtimeMinutes: true,
+      quantityDone: true,
+      scrapQty: true,
+    },
+  });
+  if (steps.length === 0) return null;
+  const oee = computeOee(steps);
+  return {
+    id: "factory",
+    name: "Fábrica",
+    clientStageLabel: "",
+    availability: oee.availability,
+    performance: oee.performance,
+    quality: oee.quality,
+    oee: oee.oee,
+    completedSteps: steps.length,
+    runtimeMinutes: oee.runtimeMinutes,
+    downtimeMinutes: oee.downtimeMinutes,
+  };
 }

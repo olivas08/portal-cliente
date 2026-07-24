@@ -11,6 +11,7 @@ import {
   workOrderProgress,
   deriveOrderStatusFromProduction,
   buildClientStages,
+  computeOee,
 } from "@/services/production-status";
 import type { StepStatus } from "@/lib/types";
 
@@ -217,5 +218,60 @@ describe("buildClientStages", () => {
       { label: "Corte", state: "done" },
       { label: "Maquinação", state: "current" },
     ]);
+  });
+});
+
+describe("computeOee", () => {
+  it("returns all-zero factors with no data", () => {
+    const r = computeOee([]);
+    expect(r.availability).toBe(0);
+    expect(r.performance).toBe(0);
+    expect(r.quality).toBe(0);
+    expect(r.oee).toBe(0);
+  });
+
+  it("computes A×P×Q from aggregated steps", () => {
+    // runtime 90, downtime 10 -> A = 0.9
+    // planned 72 / runtime 90 -> P = 0.8
+    // good 95 / (95+5) -> Q = 0.95
+    const r = computeOee([
+      {
+        plannedMinutes: 72,
+        actualMinutes: 90,
+        downtimeMinutes: 10,
+        quantityDone: 95,
+        scrapQty: 5,
+      },
+    ]);
+    expect(r.availability).toBeCloseTo(0.9);
+    expect(r.performance).toBeCloseTo(0.8);
+    expect(r.quality).toBeCloseTo(0.95);
+    expect(r.oee).toBeCloseTo(0.9 * 0.8 * 0.95);
+  });
+
+  it("caps performance at 100% when faster than planned", () => {
+    const r = computeOee([
+      {
+        plannedMinutes: 120,
+        actualMinutes: 60,
+        downtimeMinutes: 0,
+        quantityDone: 10,
+        scrapQty: 0,
+      },
+    ]);
+    expect(r.performance).toBe(1);
+    expect(r.availability).toBe(1);
+    expect(r.quality).toBe(1);
+  });
+
+  it("aggregates multiple steps before dividing", () => {
+    const r = computeOee([
+      { plannedMinutes: 30, actualMinutes: 40, downtimeMinutes: 0, quantityDone: 8, scrapQty: 2 },
+      { plannedMinutes: 30, actualMinutes: 40, downtimeMinutes: 20, quantityDone: 10, scrapQty: 0 },
+    ]);
+    // runtime 80, downtime 20 -> A 0.8; planned 60/80 -> P 0.75; good 18/20 -> Q 0.9
+    expect(r.availability).toBeCloseTo(0.8);
+    expect(r.performance).toBeCloseTo(0.75);
+    expect(r.quality).toBeCloseTo(0.9);
   });
 });

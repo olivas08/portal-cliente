@@ -417,7 +417,16 @@ export async function startStep(
 
     await tx.workOrderStep.update({
       where: { id: stepId },
-      data: { status: "in_progress", startedAt: now, operatorId: operator.id },
+      data: {
+        status: "in_progress",
+        startedAt: now,
+        pausedAt: null,
+        downtimeMinutes:
+          step.status === "paused" && step.pausedAt
+            ? step.downtimeMinutes + elapsedMinutes(step.pausedAt, now)
+            : step.downtimeMinutes,
+        operatorId: operator.id,
+      },
     });
 
     const nextSteps = wo.steps.map((s) =>
@@ -451,6 +460,7 @@ export async function pauseStep(
     data: {
       status: "paused",
       startedAt: null,
+      pausedAt: now,
       actualMinutes: step.actualMinutes + elapsedMinutes(step.startedAt, now),
       operatorId: operator.id,
     },

@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "WorkOrderStep" ADD COLUMN "downtimeMinutes" DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE "WorkOrderStep" ADD COLUMN "pausedAt" TIMESTAMP(3);

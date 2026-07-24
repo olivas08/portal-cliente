@@ -144,3 +144,58 @@ export function buildClientStages(inputs: ClientStageInput[]): ClientStageVM[] {
     return { label, state: "upcoming" as const };
   });
 }
+
+/** Raw inputs for an OEE calculation, aggregated from completed steps. */
+export interface OeeInput {
+  plannedMinutes: number;
+  actualMinutes: number;
+  downtimeMinutes: number;
+  quantityDone: number;
+  scrapQty: number;
+}
+
+/** OEE factors, each 0..1. `oee` is the product of the three. */
+export interface Oee {
+  availability: number;
+  performance: number;
+  quality: number;
+  oee: number;
+  runtimeMinutes: number;
+  downtimeMinutes: number;
+}
+
+/**
+ * Overall Equipment Effectiveness = Availability × Performance × Quality.
+ * - Availability = runtime / (runtime + downtime)
+ * - Performance  = planned / runtime (capped at 100%: you can't be "more than
+ *   fully" performant, even when you beat the standard time)
+ * - Quality      = good / (good + scrap)
+ * Returns all-zero factors when there is no production data.
+ */
+export function computeOee(steps: OeeInput[]): Oee {
+  let planned = 0;
+  let runtime = 0;
+  let downtime = 0;
+  let good = 0;
+  let scrap = 0;
+  for (const s of steps) {
+    planned += s.plannedMinutes;
+    runtime += s.actualMinutes;
+    downtime += s.downtimeMinutes;
+    good += s.quantityDone;
+    scrap += s.scrapQty;
+  }
+
+  const availability = runtime + downtime > 0 ? runtime / (runtime + downtime) : 0;
+  const performance = runtime > 0 ? Math.min(1, planned / runtime) : 0;
+  const quality = good + scrap > 0 ? good / (good + scrap) : 0;
+
+  return {
+    availability,
+    performance,
+    quality,
+    oee: availability * performance * quality,
+    runtimeMinutes: runtime,
+    downtimeMinutes: downtime,
+  };
+}
