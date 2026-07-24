@@ -13,6 +13,7 @@ import type {
   TerminalStepVM,
   OrderProductionVM,
   WorkstationOptionVM,
+  WorkstationLoadVM,
   ProductRoutingVM,
 } from "@/lib/types";
 import { toIsoDate } from "@/lib/dates";
@@ -465,4 +466,54 @@ export async function getProductsWithRouting(): Promise<ProductRoutingVM[]> {
       plannedMinutes: op.plannedMinutes,
     })),
   }));
+}
+
+export async function getWorkstationLoad(): Promise<WorkstationLoadVM[]> {
+  const workstations = await prisma.workstation.findMany({
+    where: { active: true },
+    orderBy: { sequence: "asc" },
+    include: {
+      steps: {
+        where: {
+          status: { in: ["pending", "in_progress", "paused"] },
+          workOrder: { status: { in: ["released", "in_progress"] } },
+        },
+        include: {
+          workOrder: {
+            select: {
+              id: true,
+              steps: { select: { sequence: true, status: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return workstations.map((ws) => {
+    let activeMinutes = 0;
+    let waitingMinutes = 0;
+    let readyCount = 0;
+    const workOrderIds = new Set<string>();
+
+    for (const step of ws.steps) {
+      const minutes = step.plannedMinutes ?? 0;
+      if (step.status === "in_progress") activeMinutes += minutes;
+      else waitingMinutes += minutes;
+      if (isStepReady(step, step.workOrder.steps)) readyCount += 1;
+      workOrderIds.add(step.workOrder.id);
+    }
+
+    return {
+      id: ws.id,
+      name: ws.name,
+      clientStageLabel: ws.clientStageLabel,
+      activeMinutes,
+      waitingMinutes,
+      totalMinutes: activeMinutes + waitingMinutes,
+      stepCount: ws.steps.length,
+      workOrderCount: workOrderIds.size,
+      readyCount,
+    };
+  });
 }

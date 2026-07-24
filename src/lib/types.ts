@@ -279,6 +279,19 @@ export interface WorkstationOptionVM {
   clientStageLabel: string;
 }
 
+/** Aggregated backlog/load for one workstation (capacity view). */
+export interface WorkstationLoadVM {
+  id: string;
+  name: string;
+  clientStageLabel: string;
+  activeMinutes: number;
+  waitingMinutes: number;
+  totalMinutes: number;
+  stepCount: number;
+  workOrderCount: number;
+  readyCount: number;
+}
+
 /** One operation in a product's routing. */
 export interface RoutingOperationVM {
   name: string;
