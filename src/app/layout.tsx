@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { PRODUCT, TENANT } from "@/lib/branding";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Portal do Cliente · Jolucor",
-  description: "Acompanhe encomendas, documentos e requerimentos da Jolucor.",
+  title: `${PRODUCT.name} · ${TENANT.name}`,
+  description: `${PRODUCT.name} — plataforma de gestão e produção industrial.`,
 };
 
 export default function RootLayout({

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { PRODUCT } from "@/lib/branding";
 import { Eye, EyeOff, Info, ShieldCheck } from "lucide-react";
 import { loginAction } from "@/actions/auth";
 
@@ -52,15 +53,15 @@ export function LoginForm() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center bg-white rounded-2xl mb-4 p-3 shadow-sm border border-slate-100">
             <Image
-              src="/jolucor-logo.png"
-              alt="Jolucor"
+              src={PRODUCT.logo}
+              alt={PRODUCT.name}
               width={200}
               height={58}
               className="object-contain"
               priority
             />
           </div>
-          <p className="text-slate-500 text-sm mt-1">Portal do Cliente</p>
+          <p className="text-slate-500 text-sm mt-1">{PRODUCT.modules.portal}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-8">

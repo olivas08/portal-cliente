@@ -6,8 +6,9 @@ import {
   countUnread,
   listNotifications,
 } from "@/services/notifications.service";
+import { TENANT } from "@/lib/branding";
 
-const FACTORY_NAME = "Jolucor - Fabricação e Manutenção Industrial, Lda.";
+const FACTORY_NAME = TENANT.legalName;
 
 export default async function AdminLayout({
   children,

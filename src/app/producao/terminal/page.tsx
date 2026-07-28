@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Factory, ChevronRight } from "lucide-react";
 import { getOperator } from "@/lib/operator-session";
+import { PRODUCT } from "@/lib/branding";
 import {
   getActiveOperators,
   getWorkstationsWithQueue,
@@ -38,7 +39,7 @@ export default async function TerminalPage({
             <Factory size={18} className="text-slate-900" />
           </div>
           <div>
-            <p className="font-bold leading-tight">Terminal de Produção</p>
+            <p className="font-bold leading-tight">{PRODUCT.modules.station}</p>
             <p className="text-xs text-slate-400">{operator.name}</p>
           </div>
         </Link>

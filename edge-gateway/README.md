@@ -1,6 +1,6 @@
-# OIC Edge Gateway
+# Operon Link (Edge Gateway)
 
-Bridges factory machines to the OIC cloud portal so production counts (conformes
+Bridges factory machines to the Operon cloud so production counts (conformes
 e sucata) come **directly from the machine** instead of being typed by the
 operator — eliminating manual error and tampering.
 

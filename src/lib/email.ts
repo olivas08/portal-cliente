@@ -1,3 +1,5 @@
+import { PRODUCT, TENANT } from "@/lib/branding";
+
 const RESEND_API_URL = "https://api.resend.com/emails";
 
 /**
@@ -8,7 +10,7 @@ const RESEND_API_URL = "https://api.resend.com/emails";
  */
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "Jolucor <onboarding@resend.dev>";
+  const from = process.env.EMAIL_FROM ?? `${TENANT.name} <onboarding@resend.dev>`;
 
   if (!apiKey) {
     console.log(
@@ -26,11 +28,11 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
     body: JSON.stringify({
       from,
       to,
-      subject: "Repor palavra-passe — Portal Jolucor",
+      subject: `Repor palavra-passe — ${PRODUCT.modules.portal}`,
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color:#0f172a;">Repor palavra-passe</h2>
-          <p>Recebemos um pedido para repor a palavra-passe da sua conta no Portal do Cliente Jolucor.</p>
+          <p>Recebemos um pedido para repor a palavra-passe da sua conta no ${PRODUCT.modules.portal} da ${TENANT.name}.</p>
           <p>
             <a href="${resetUrl}" style="display:inline-block;background:#f59e0b;color:#0f172a;font-weight:600;padding:10px 20px;border-radius:8px;text-decoration:none;">
               Repor palavra-passe
@@ -62,7 +64,7 @@ export async function sendOrderStatusUpdateEmail(
 ) {
   const { reference, statusLabel, orderUrl } = params;
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "Jolucor <onboarding@resend.dev>";
+  const from = process.env.EMAIL_FROM ?? `${TENANT.name} <onboarding@resend.dev>`;
 
   if (!apiKey) {
     console.log(
@@ -90,7 +92,7 @@ export async function sendOrderStatusUpdateEmail(
               Ver encomenda no portal
             </a>
           </p>
-          <p style="color:#64748b;font-size:13px;">Portal do Cliente Jolucor.</p>
+          <p style="color:#64748b;font-size:13px;">${PRODUCT.modules.portal} · ${TENANT.name}.</p>
         </div>
       `,
     }),

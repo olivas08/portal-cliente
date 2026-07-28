@@ -2,13 +2,14 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { OrderVM } from "@/lib/types";
 import { formatDatePt } from "@/lib/dates";
+import { TENANT } from "@/lib/branding";
 
 const CO = {
-  name: "Jolucor - Fabricação e Manutenção Industrial, Lda.",
-  address: "Zona Industrial de Vale de Cambra, Lote 12",
-  city: "3730-100 Vale de Cambra · Portugal",
-  nif: "NIF: PT 500 123 456",
-  contact: "Tel: +351 256 850 200 | geral@jolucor.pt",
+  name: TENANT.legalName,
+  address: TENANT.address,
+  city: TENANT.city,
+  nif: TENANT.nif,
+  contact: TENANT.contact,
 };
 
 function lastY(doc: jsPDF): number {

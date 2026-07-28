@@ -1,9 +1,9 @@
 {
-  "name": "oic-edge-gateway",
+  "name": "operon-link",
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Edge gateway: bridges factory machines (MQTT / Modbus TCP) to the OIC cloud portal (HTTPS). Runs on a Raspberry Pi / industrial gateway.",
+  "description": "Operon Link — edge gateway bridging factory machines (MQTT / Modbus TCP) to the Operon cloud (HTTPS). Runs on a Raspberry Pi / industrial gateway.",
   "scripts": {
     "test": "node --test",
     "broker": "node broker.mjs",

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { LogOut, Package, MessageSquare, ShieldCheck, BarChart3, ShoppingCart, Boxes, Factory, HardHat } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
+import { PRODUCT } from "@/lib/branding";
 import { useBreadcrumb } from "@/components/BreadcrumbContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import type { NotificationVM } from "@/lib/types";
@@ -68,15 +69,15 @@ export function PortalNav({ name, company, isAdmin, notifications, unreadCount }
             />
           </div>
           <Image
-            src="/jolucor-logo.png"
-            alt="Jolucor"
-            width={132}
+            src={PRODUCT.logo}
+            alt={PRODUCT.name}
+            width={140}
             height={38}
             className="object-contain"
             priority
           />
           <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide leading-none">
-            {isAdmin ? "Administração" : "Portal do Cliente"}
+            {isAdmin ? "Core" : "Portal"}
           </p>
         </div>
 
@@ -123,15 +124,15 @@ export function PortalNav({ name, company, isAdmin, notifications, unreadCount }
           <div className="flex items-center gap-2 min-w-0">
             <div className="bg-white rounded-md p-1 flex-shrink-0">
               <Image
-                src="/jolucor-logo.png"
-                alt="Jolucor"
-                width={72}
+                src={PRODUCT.logo}
+                alt={PRODUCT.name}
+                width={90}
                 height={21}
                 className="object-contain"
               />
             </div>
             <span className="font-bold text-sm truncate">
-              {breadcrumb ?? "Jolucor"}
+              {breadcrumb ?? PRODUCT.name}
             </span>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">

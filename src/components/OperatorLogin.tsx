@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Factory, Delete } from "lucide-react";
 import { operatorLogin } from "@/actions/production";
+import { PRODUCT } from "@/lib/branding";
 
 interface Props {
   operators: { id: string; name: string }[];
@@ -40,7 +41,7 @@ export function OperatorLogin({ operators }: Props) {
         <div className="w-12 h-12 rounded-xl bg-amber-500 flex items-center justify-center mb-3">
           <Factory size={22} className="text-slate-900" />
         </div>
-        <h1 className="font-bold text-lg">Terminal de Produção</h1>
+        <h1 className="font-bold text-lg">{PRODUCT.modules.station}</h1>
         <p className="text-sm text-slate-400">Identifique-se para começar</p>
       </div>
 
