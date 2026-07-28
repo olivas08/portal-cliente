@@ -1,4 +1,14 @@
 {
-  "PRENSA-01": { "token": "prensa01-demo-token" },
-  "CNC-02": { "token": "cnc02-demo-token" }
+  "PRENSA-01": {
+    "token": "prensa01-demo-token",
+    "mqtt": { "username": "prensa01", "password": "prensa01-mqtt-pw" },
+    "counterMax": 65535,
+    "modbus": { "host": "127.0.0.1", "port": 5021, "unitId": 1, "goodReg": 0, "scrapReg": 1, "stateReg": 2 }
+  },
+  "CNC-02": {
+    "token": "cnc02-demo-token",
+    "mqtt": { "username": "cnc02", "password": "cnc02-mqtt-pw" },
+    "counterMax": 65535,
+    "modbus": { "host": "127.0.0.1", "port": 5022, "unitId": 1, "goodReg": 0, "scrapReg": 1, "stateReg": 2 }
+  }
 }
