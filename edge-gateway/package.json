@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Operon Link — edge gateway bridging factory machines (MQTT / Modbus TCP) to the Operon cloud (HTTPS). Runs on a Raspberry Pi / industrial gateway.",
+  "description": "Operon Link — edge gateway bridging factory machines (MQTT / Modbus TCP / OPC-UA) to the Operon cloud (HTTPS). Runs on a Raspberry Pi / industrial gateway.",
   "scripts": {
     "test": "node --test",
     "broker": "node broker.mjs",
@@ -11,12 +11,16 @@
     "simulator": "node simulator.mjs",
     "modbus-sim": "node modbus-machine-sim.mjs",
     "modbus-adapter": "node modbus-adapter.mjs",
+    "opcua-sim": "node opcua-machine-sim.mjs",
+    "opcua-adapter": "node opcua-adapter.mjs",
     "demo": "node demo.mjs",
-    "demo:modbus": "node demo-modbus.mjs"
+    "demo:modbus": "node demo-modbus.mjs",
+    "demo:opcua": "node demo-opcua.mjs"
   },
   "dependencies": {
     "aedes": "^0.51.3",
     "modbus-serial": "^8.0.17",
-    "mqtt": "^5.10.1"
+    "mqtt": "^5.10.1",
+    "node-opcua": "^2.175.2"
   }
 }

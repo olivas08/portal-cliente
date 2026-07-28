@@ -91,8 +91,8 @@ Deixa esta janela a correr.
 
 ## 3. Correr os simuladores das máquinas
 
-Tens **duas opções**. Começa pela A (mais simples); a B prova o protocolo
-industrial real.
+Tens **três opções**. Começa pela A (mais simples); a B e a C provam os
+protocolos industriais reais (PLC e CNC).
 
 > ⚠️ **Sintaxe de variáveis de ambiente no PowerShell** é diferente do Linux/Mac.
 > Usa `$env:NOME="valor";` **antes** do comando, na mesma linha.
@@ -123,6 +123,22 @@ $env:CLOUD_URL="http://localhost:3000"; npm run demo:modbus
 
 Arranca o broker + gateway + 2 **PLCs simulados em Modbus TCP**, cada um com o
 seu **adapter** Modbus→MQTT.
+
+### Opção C — Caminho CNC (OPC-UA)
+
+Prova o percurso de uma CNC / controlador moderno:
+**CNC (OPC-UA) → adapter → MQTT → gateway → HTTPS → cloud**.
+
+Na **janela 2**:
+
+```powershell
+cd edge-gateway
+$env:CLOUD_URL="http://localhost:3000"; npm run demo:opcua
+```
+
+Arranca o broker + gateway + 2 **CNC simuladas em OPC-UA** (servidor com nós
+`Good`/`Scrap`/`State`), cada uma com o seu **adapter** OPC-UA→MQTT. O arranque
+do servidor OPC-UA demora uns segundos a mais que o Modbus — é normal.
 
 Em qualquer das opções, vais ver no terminal linhas como:
 
@@ -219,6 +235,19 @@ cd edge-gateway; $env:CLOUD_URL="http://localhost:3000"; npm run gateway
 cd edge-gateway; npm run modbus-sim PRENSA-01 1500
 # janela D — adapter Modbus -> MQTT
 cd edge-gateway; npm run modbus-adapter PRENSA-01 1000
+```
+
+**Caminho OPC-UA (CNC)** — 4 janelas:
+
+```powershell
+# janela A — broker
+cd edge-gateway; npm run broker
+# janela B — gateway
+cd edge-gateway; $env:CLOUD_URL="http://localhost:3000"; npm run gateway
+# janela C — CNC simulada (servidor OPC-UA)
+cd edge-gateway; npm run opcua-sim CNC-02 1500
+# janela D — adapter OPC-UA -> MQTT
+cd edge-gateway; npm run opcua-adapter CNC-02 1000
 ```
 
 ---

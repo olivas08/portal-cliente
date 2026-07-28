@@ -5,8 +5,8 @@ e sucata) come **directly from the machine** instead of being typed by the
 operator — eliminating manual error and tampering.
 
 ```
-[Máquina] --Modbus TCP--> [Adapter] --MQTT--> [Edge Gateway] --HTTPS--> [Portal Cloud]
- PLC/sensor               factory/<CODE>/*     store-and-forward        /api/machine/ingest
+[Máquina] --Modbus TCP / OPC-UA--> [Adapter] --MQTT--> [Edge Gateway] --HTTPS--> [Portal Cloud]
+ PLC/CNC/sensor                     factory/<CODE>/*     store-and-forward        /api/machine/ingest
 ```
 
 The portal runs on serverless (Vercel), which cannot hold a permanent MQTT
@@ -23,9 +23,12 @@ forwards to the cloud over **HTTPS** with a durable buffer.
 | `simulator.mjs` | Fake machine over MQTT: cumulative counter + state + last-will. |
 | `modbus-machine-sim.mjs` | Fake **PLC speaking Modbus TCP** (holding registers: good/scrap/state). |
 | `modbus-adapter.mjs` | **Real protocol adapter** — polls a PLC over Modbus TCP and republishes as MQTT. |
+| `opcua-machine-sim.mjs` | Fake **CNC speaking OPC-UA** (server with Good/Scrap/State nodes). |
+| `opcua-adapter.mjs` | **Real protocol adapter** — reads a controller over OPC-UA and republishes as MQTT. |
 | `demo.mjs` | One-process MQTT demo (broker + gateway + 2 machines). |
 | `demo-modbus.mjs` | One-process **full industrial demo** (broker + gateway + 2 PLCs + adapters). |
-| `machines.json` | Per machine: cloud `token`, MQTT credentials, `counterMax`, Modbus mapping. |
+| `demo-opcua.mjs` | One-process **CNC demo** (broker + gateway + 2 OPC-UA controllers + adapters). |
+| `machines.json` | Per machine: cloud `token`, MQTT credentials, `counterMax`, Modbus & OPC-UA mapping. |
 
 ## Quick demo (for the pitch)
 
@@ -44,6 +47,8 @@ forwards to the cloud over **HTTPS** with a durable buffer.
    CLOUD_URL=https://portal-cliente-rosy.vercel.app npm run demo
    # …or the full industrial path (PLC over Modbus TCP -> adapter -> MQTT):
    CLOUD_URL=https://portal-cliente-rosy.vercel.app npm run demo:modbus
+   # …or the CNC path (controller over OPC-UA -> adapter -> MQTT):
+   CLOUD_URL=https://portal-cliente-rosy.vercel.app npm run demo:opcua
    ```
 
 4. Watch **Produção → Máquinas** in the portal: the counts climb on their own,
@@ -74,6 +79,14 @@ npm run modbus-sim PRENSA-01 1500     # terminal 3 — a PLC (Modbus TCP server)
 npm run modbus-adapter PRENSA-01 1000 # terminal 4 — Modbus->MQTT adapter
 ```
 
+OPC-UA (CNC) machine:
+```bash
+npm run broker                        # terminal 1
+CLOUD_URL=https://... npm run gateway  # terminal 2
+npm run opcua-sim CNC-02 1500         # terminal 3 — a CNC (OPC-UA server)
+npm run opcua-adapter CNC-02 1000     # terminal 4 — OPC-UA->MQTT adapter
+```
+
 ## Tests
 
 ```bash
@@ -82,15 +95,21 @@ npm test    # node --test — counter delta (reset/overflow) + window aggregatio
 
 ## Going to real hardware
 
-The Modbus adapter is a working template. Choose the path by machine type:
+The Modbus **and** OPC-UA adapters are working templates. Choose the path by
+machine type:
 
 - **PLC-controlled (most industrial machines):** point `modbus-adapter.mjs` at the
   real PLC IP/port in `machines.json` and map the counter/state registers. Done.
+- **CNC / modern controllers:** point `opcua-adapter.mjs` at the controller's
+  OPC-UA endpoint in `machines.json` and map the Good/Scrap/State node ids.
+  Real controllers add security (certificates + user auth) — set the matching
+  `securityMode`/`securityPolicy` and credentials on the client. Done.
 - **Dumb/old machines:** wire an inductive/photoelectric sensor to a Raspberry Pi
   **GPIO**, count pulses (one pulse = one part), publish `factory/<CODE>/counter`
   with the running total.
-- **CNC / injection moulding:** use **OPC-UA**, **MTConnect**, Fanuc **FOCAS** or
-  **Euromap 63/77**; write an adapter that publishes the same MQTT messages.
+- **Other CNC protocols:** **MTConnect** (HTTP/XML), Fanuc **FOCAS** or injection
+  **Euromap 63/77**; write an adapter that publishes the same MQTT messages — the
+  gateway and cloud stay unchanged.
 
 Recommended hardware for the shop floor (dust/heat/24 V): an industrial gateway
 such as **Revolution Pi**, Moxa or Advantech instead of a bare Raspberry Pi.
