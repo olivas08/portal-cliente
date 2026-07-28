@@ -15,6 +15,8 @@ import {
   canReworkStep,
   rollUpWorkOrderStatus,
   deriveOrderStatusFromProduction,
+  downtimeOnResume,
+  type MachineState,
 } from "@/services/production-status";
 import type { OperatorActor } from "@/lib/operator-session";
 
@@ -91,6 +93,14 @@ export const machineIngestSchema = z.object({
   producedAt: z.string().datetime().optional(),
 });
 export type MachineIngestInput = z.infer<typeof machineIngestSchema>;
+
+export const machineStatusSchema = z.object({
+  machineCode: z.string().trim().min(1),
+  token: z.string().min(1),
+  state: z.enum(["run", "idle", "down", "offline"]),
+  at: z.string().datetime().optional(),
+});
+export type MachineStatusInput = z.infer<typeof machineStatusSchema>;
 
 export const generateWorkOrdersSchema = z.object({
   orderId: z.string().trim().min(1, "Encomenda obrigatória."),
@@ -273,23 +283,15 @@ export interface MachineIngestResult {
 export async function recordMachineProduction(
   input: MachineIngestInput,
 ): Promise<MachineIngestResult> {
-  const machine = await prisma.machine.findUnique({
-    where: { code: input.machineCode },
-  });
-  if (!machine || !machine.active) {
-    throw new UnauthorizedError("Máquina não autorizada.");
-  }
-  const valid = await bcrypt.compare(input.token, machine.tokenHash);
-  if (!valid) throw new UnauthorizedError("Token inválido.");
+  const machine = await authenticateMachine(input.machineCode, input.token);
 
   const now = new Date();
   const producedAt = input.producedAt ? new Date(input.producedAt) : now;
 
   return prisma.$transaction(async (tx) => {
-    await tx.machine.update({
-      where: { id: machine.id },
-      data: { lastSeenAt: now },
-    });
+    // A production pulse implies the machine is running; bank any downtime that
+    // accrued while it was idle/down onto the active step (feeds OEE).
+    await applyMachineState(tx, machine, "run", now);
 
     const existing = await tx.machineReading.findUnique({
       where: {
@@ -343,6 +345,126 @@ export async function recordMachineProduction(
       scrapQty: updated.scrapQty,
       stepId: updated.id,
     };
+  });
+}
+
+async function authenticateMachine(code: string, token: string) {
+  const machine = await prisma.machine.findUnique({ where: { code } });
+  if (!machine || !machine.active) {
+    throw new UnauthorizedError("Máquina não autorizada.");
+  }
+  const valid = await bcrypt.compare(token, machine.tokenHash);
+  if (!valid) throw new UnauthorizedError("Token inválido.");
+  return machine;
+}
+
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * Updates a machine's live state and, when it resumes running after being
+ * idle/down, banks the elapsed non-productive time onto the active step so OEE
+ * availability reflects real machine stoppages (not just operator pauses).
+ */
+async function applyMachineState(
+  tx: TxClient,
+  machine: { id: string; state: string; stateSince: Date | null; workstationId: string | null },
+  newState: MachineState,
+  now: Date,
+): Promise<void> {
+  if (newState === "run" && machine.workstationId) {
+    const downtime = downtimeOnResume(
+      machine.state as MachineState,
+      machine.stateSince,
+      now,
+    );
+    if (downtime > 0) {
+      const step = await tx.workOrderStep.findFirst({
+        where: { workstationId: machine.workstationId, status: "in_progress" },
+        orderBy: { startedAt: "asc" },
+        select: { id: true, downtimeMinutes: true },
+      });
+      if (step) {
+        await tx.workOrderStep.update({
+          where: { id: step.id },
+          data: { downtimeMinutes: step.downtimeMinutes + downtime },
+        });
+      }
+    }
+  }
+  const stateChanged = machine.state !== newState;
+  await tx.machine.update({
+    where: { id: machine.id },
+    data: {
+      lastSeenAt: now,
+      state: newState,
+      stateSince: stateChanged ? now : machine.stateSince ?? now,
+    },
+  });
+}
+
+/** Records a machine live-state transition (RUN/IDLE/DOWN/offline). */
+export async function recordMachineStatus(
+  input: MachineStatusInput,
+): Promise<{ state: string }> {
+  const machine = await authenticateMachine(input.machineCode, input.token);
+  const now = input.at ? new Date(input.at) : new Date();
+  await prisma.$transaction((tx) =>
+    applyMachineState(tx, machine, input.state, now),
+  );
+  return { state: input.state };
+}
+
+/**
+ * Binds recent orphan machine readings (pulses with no step, produced before
+ * the operator started work) for a workstation onto the freshly started step,
+ * adding their counts so machine-captured production is never dropped.
+ */
+async function reconcileOrphanReadings(
+  tx: TxClient,
+  stepId: string,
+  workstationId: string,
+  now: Date,
+  windowMinutes = 30,
+): Promise<void> {
+  const machines = await tx.machine.findMany({
+    where: { workstationId },
+    select: { id: true },
+  });
+  if (machines.length === 0) return;
+  const machineIds = machines.map((m) => m.id);
+  const windowStart = new Date(now.getTime() - windowMinutes * 60 * 1000);
+
+  const orphans = await tx.machineReading.findMany({
+    where: {
+      machineId: { in: machineIds },
+      workOrderStepId: null,
+      receivedAt: { gte: windowStart },
+    },
+    select: { id: true, goodDelta: true, scrapDelta: true, machineId: true },
+  });
+  if (orphans.length === 0) return;
+
+  const good = orphans.reduce((s, r) => s + r.goodDelta, 0);
+  const scrap = orphans.reduce((s, r) => s + r.scrapDelta, 0);
+
+  await tx.machineReading.updateMany({
+    where: { id: { in: orphans.map((o) => o.id) } },
+    data: { workOrderStepId: stepId },
+  });
+
+  const step = await tx.workOrderStep.findUnique({
+    where: { id: stepId },
+    select: { quantityDone: true, scrapQty: true },
+  });
+  if (!step) return;
+  await tx.workOrderStep.update({
+    where: { id: stepId },
+    data: {
+      quantityDone: step.quantityDone + good,
+      scrapQty: step.scrapQty + scrap,
+      machineVerified: true,
+      machineId: orphans[0].machineId,
+    },
   });
 }
 
@@ -670,6 +792,10 @@ export async function startStep(
         operatorId: operator.id,
       },
     });
+
+    // Bind any machine pulses that arrived before the operator started the
+    // step (produced during setup) so those counts are not lost.
+    await reconcileOrphanReadings(tx, stepId, step.workstationId, now);
 
     const nextSteps = wo.steps.map((s) =>
       s.id === stepId ? { ...s, status: "in_progress" as const } : s,

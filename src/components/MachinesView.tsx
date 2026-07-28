@@ -7,8 +7,6 @@ import {
   ArrowLeft,
   Cpu,
   Plus,
-  Wifi,
-  WifiOff,
   KeyRound,
   ShieldAlert,
   ShieldCheck,
@@ -19,6 +17,7 @@ import type {
   DiscrepancyVM,
   WorkstationOptionVM,
 } from "@/lib/types";
+import { MACHINE_STATE_LABELS } from "@/lib/types";
 import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
 import {
   createMachine,
@@ -42,6 +41,20 @@ function timeAgo(iso: string | null): string {
   const h = Math.floor(mins / 60);
   return `há ${h}h`;
 }
+
+const STATE_STYLE: Record<MachineVM["state"], string> = {
+  run: "bg-emerald-50 text-emerald-700",
+  idle: "bg-amber-50 text-amber-700",
+  down: "bg-red-50 text-red-700",
+  offline: "bg-slate-100 text-slate-500",
+};
+
+const STATE_DOT: Record<MachineVM["state"], string> = {
+  run: "bg-emerald-500",
+  idle: "bg-amber-500",
+  down: "bg-red-500",
+  offline: "bg-slate-400",
+};
 
 export function MachinesView({ machines, discrepancies, stations }: Props) {
   const router = useRouter();
@@ -230,14 +243,12 @@ export function MachinesView({ machines, discrepancies, stations }: Props) {
                 <div className="flex items-center gap-2">
                   <h2 className="font-semibold text-slate-800">{m.name}</h2>
                   <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                      m.online
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-slate-100 text-slate-500"
-                    }`}
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${STATE_STYLE[m.state]}`}
                   >
-                    {m.online ? <Wifi size={11} /> : <WifiOff size={11} />}
-                    {m.online ? "Online" : "Offline"}
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${STATE_DOT[m.state]} ${m.state === "run" ? "animate-pulse" : ""}`}
+                    />
+                    {MACHINE_STATE_LABELS[m.state]}
                   </span>
                 </div>
                 <p className="mt-0.5 text-xs text-slate-400 font-mono">

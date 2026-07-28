@@ -224,6 +224,7 @@ export interface MachineVM {
   name: string;
   active: boolean;
   online: boolean;
+  state: "run" | "idle" | "down" | "offline";
   lastSeenAt: string | null;
   stationName: string | null;
   stationId: string | null;
@@ -231,6 +232,13 @@ export interface MachineVM {
   currentQty: number;
   currentScrap: number;
 }
+
+export const MACHINE_STATE_LABELS: Record<MachineVM["state"], string> = {
+  run: "Em produção",
+  idle: "Parada",
+  down: "Avaria",
+  offline: "Offline",
+};
 
 /** A machine-verified step comparing operator-declared vs machine-counted qty. */
 export interface DiscrepancyVM {

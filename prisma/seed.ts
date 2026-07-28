@@ -101,8 +101,8 @@ async function main() {
 
   console.log("🤖 A registar máquinas (edge devices)...");
   const machineDefs = [
-    { code: "PRENSA-01", name: "Prensa Hidráulica 01", station: "CORTE", token: "prensa01-demo-token" },
-    { code: "CNC-02", name: "Centro CNC 02", station: "CNC", token: "cnc02-demo-token" },
+    { code: "PRENSA-01", name: "Prensa Hidráulica 01", station: "CORTE", token: "prensa01-demo-token", state: "idle" },
+    { code: "CNC-02", name: "Centro CNC 02", station: "CNC", token: "cnc02-demo-token", state: "run" },
   ];
   const machines: Record<string, string> = {};
   for (const def of machineDefs) {
@@ -112,6 +112,9 @@ async function main() {
         name: def.name,
         workstationId: stations[def.station],
         tokenHash: hash(def.token),
+        state: def.state,
+        stateSince: new Date(),
+        lastSeenAt: new Date(),
       },
     });
     machines[def.code] = m.id;

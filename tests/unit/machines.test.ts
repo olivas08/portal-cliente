@@ -112,3 +112,58 @@ describe("createMachineSchema", () => {
     ).toBe(false);
   });
 });
+
+import { downtimeOnResume, isDownState } from "@/services/production-status";
+import { machineStatusSchema } from "@/services/production.service";
+
+describe("downtimeOnResume", () => {
+  const now = new Date("2026-07-28T10:10:00Z");
+  it("banks elapsed idle time on resume", () => {
+    expect(
+      downtimeOnResume("idle", new Date("2026-07-28T10:00:00Z"), now),
+    ).toBeCloseTo(10, 5);
+  });
+  it("banks elapsed down time on resume", () => {
+    expect(
+      downtimeOnResume("down", new Date("2026-07-28T10:05:00Z"), now),
+    ).toBeCloseTo(5, 5);
+  });
+  it("banks nothing when previously running", () => {
+    expect(
+      downtimeOnResume("run", new Date("2026-07-28T10:00:00Z"), now),
+    ).toBe(0);
+  });
+  it("banks nothing without a stateSince", () => {
+    expect(downtimeOnResume("idle", null, now)).toBe(0);
+  });
+});
+
+describe("isDownState", () => {
+  it("classifies idle/down as non-productive", () => {
+    expect(isDownState("idle")).toBe(true);
+    expect(isDownState("down")).toBe(true);
+    expect(isDownState("run")).toBe(false);
+    expect(isDownState("offline")).toBe(false);
+  });
+});
+
+describe("machineStatusSchema", () => {
+  it("accepts a valid state", () => {
+    expect(
+      machineStatusSchema.safeParse({
+        machineCode: "CNC-02",
+        token: "t",
+        state: "down",
+      }).success,
+    ).toBe(true);
+  });
+  it("rejects an unknown state", () => {
+    expect(
+      machineStatusSchema.safeParse({
+        machineCode: "CNC-02",
+        token: "t",
+        state: "explode",
+      }).success,
+    ).toBe(false);
+  });
+});

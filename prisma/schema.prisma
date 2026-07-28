@@ -276,6 +276,8 @@ model Machine {
   workstation    Workstation?     @relation(fields: [workstationId], references: [id], onDelete: SetNull)
   tokenHash      String
   active         Boolean          @default(true)
+  state          String           @default("offline")
+  stateSince     DateTime?
   lastSeenAt     DateTime?
   steps          WorkOrderStep[]
   readings       MachineReading[]

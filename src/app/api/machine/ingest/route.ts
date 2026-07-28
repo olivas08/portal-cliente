@@ -2,17 +2,20 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import {
   machineIngestSchema,
+  machineStatusSchema,
   recordMachineProduction,
+  recordMachineStatus,
 } from "@/services/production.service";
 import { UnauthorizedError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Machine-to-cloud ingestion endpoint. The edge gateway POSTs aggregated
- * production pulses here (device token auth, idempotent per eventId). Kept as
- * an HTTP endpoint because the app runs on serverless — no persistent MQTT
- * connection is held in the cloud; MQTT lives inside the factory edge network.
+ * Machine-to-cloud ingestion endpoint. The edge gateway POSTs here:
+ *  - production pulses (goodDelta/scrapDelta, idempotent per eventId), or
+ *  - state transitions ({ state: "run"|"idle"|"down"|"offline" }).
+ * Kept as HTTP because the app is serverless — MQTT lives inside the factory
+ * edge network, the edge forwards over HTTPS with per-device token auth.
  */
 export async function POST(request: Request) {
   let body: unknown;
@@ -22,7 +25,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "JSON inválido." }, { status: 400 });
   }
 
+  const isStatus =
+    typeof body === "object" && body !== null && "state" in body;
+
   try {
+    if (isStatus) {
+      const input = machineStatusSchema.parse(body);
+      const result = await recordMachineStatus(input);
+      return NextResponse.json({ ok: true, ...result });
+    }
     const input = machineIngestSchema.parse(body);
     const result = await recordMachineProduction(input);
     return NextResponse.json({ ok: true, ...result });

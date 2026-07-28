@@ -240,3 +240,26 @@ export function isMachineOnline(
   if (!lastSeenAt) return false;
   return now.getTime() - lastSeenAt.getTime() <= windowSeconds * 1000;
 }
+
+export type MachineState = "run" | "idle" | "down" | "offline";
+
+/**
+ * Minutes of downtime to bank onto the active step when a machine resumes
+ * running. Downtime accrues only while the machine was idle/down with a job
+ * open, measured from when that non-running state began.
+ */
+export function downtimeOnResume(
+  prevState: MachineState,
+  stateSince: Date | null,
+  now: Date,
+): number {
+  if ((prevState === "idle" || prevState === "down") && stateSince) {
+    return elapsedMinutes(stateSince, now);
+  }
+  return 0;
+}
+
+/** True when a machine state string represents a non-productive condition. */
+export function isDownState(state: MachineState): boolean {
+  return state === "idle" || state === "down";
+}
