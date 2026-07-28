@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { actionError } from "@/lib/action-result";
 import Link from "next/link";
-import { Factory, Rocket, Plus, AlertCircle, CircleDot, CheckCircle2, Circle, PauseCircle, Ban, Trash2, Flame, Undo2, Route, Gauge, ShieldAlert, Activity, Cpu } from "lucide-react";
+import { Factory, Rocket, Plus, AlertCircle, CircleDot, CheckCircle2, Circle, PauseCircle, Ban, Trash2, Flame, Undo2, Route, Gauge, ShieldAlert, Activity, Cpu, PackageX } from "lucide-react";
 import type { WorkOrderVM, WorkOrderStatus, StepStatus } from "@/lib/types";
 import { WORK_ORDER_STATUS_LABELS } from "@/lib/types";
 import {
@@ -251,15 +251,43 @@ export function AdminProductionBoard({ workOrders, unplanned }: Props) {
 
                   {wo.status !== "done" && (
                     <div className="mt-3 flex items-center gap-2">
-                      {wo.status === "planned" && (
-                        <button
-                          onClick={() => run(() => releaseWorkOrder(wo.id))}
-                          disabled={pending}
-                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-sky-600 text-white text-xs font-semibold px-3 py-2 hover:bg-sky-500 disabled:opacity-60"
-                        >
-                          <Rocket size={14} /> Lançar
-                        </button>
-                      )}
+                      {wo.status === "planned" &&
+                        (() => {
+                          const blocked =
+                            wo.materialStatus.hasBom &&
+                            !wo.materialStatus.canRelease;
+                          const tip = blocked
+                            ? "Stock insuficiente: " +
+                              wo.materialStatus.shortfalls
+                                .map(
+                                  (s) =>
+                                    `${s.reference} (faltam ${s.missingQty} ${s.unit})`,
+                                )
+                                .join(", ")
+                            : undefined;
+                          return (
+                            <button
+                              onClick={() => run(() => releaseWorkOrder(wo.id))}
+                              disabled={pending || blocked}
+                              title={tip}
+                              className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold px-3 py-2 disabled:opacity-60 ${
+                                blocked
+                                  ? "bg-red-50 text-red-600 border border-red-200 cursor-not-allowed"
+                                  : "bg-sky-600 text-white hover:bg-sky-500"
+                              }`}
+                            >
+                              {blocked ? (
+                                <>
+                                  <PackageX size={14} /> Sem stock
+                                </>
+                              ) : (
+                                <>
+                                  <Rocket size={14} /> Lançar
+                                </>
+                              )}
+                            </button>
+                          );
+                        })()}
 
                       <button
                         onClick={() =>

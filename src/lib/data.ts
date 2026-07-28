@@ -285,6 +285,7 @@ export async function getWorkOrders(): Promise<WorkOrderVM[]> {
   const workOrders = await prisma.workOrder.findMany({
     include: {
       order: { include: { company: true } },
+      materials: { include: { material: true }, orderBy: { materialRef: "asc" } },
       steps: {
         include: { workstation: true, operator: true },
         orderBy: { sequence: "asc" },
@@ -293,22 +294,39 @@ export async function getWorkOrders(): Promise<WorkOrderVM[]> {
     orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
   });
 
-  return workOrders.map((wo) => ({
-    id: wo.id,
-    reference: wo.reference,
-    orderId: wo.orderId,
-    orderReference: wo.order.reference,
-    clientCompany: wo.order.company.name,
-    productRef: wo.productRef,
-    productName: wo.productName,
-    quantityPlanned: wo.quantityPlanned,
-    quantityDone: wo.quantityDone,
-    status: wo.status,
-    priority: wo.priority,
-    progress: workOrderProgress(wo.steps),
-    plannedEnd: wo.plannedEnd ? toIsoDate(wo.plannedEnd) : undefined,
-    steps: wo.steps.map((s) => toStepVM(s, wo.steps)),
-  }));
+  return workOrders.map((wo) => {
+    const shortfalls = wo.materials
+      .filter((m) => m.material.stockQty < m.requiredQty)
+      .map((m) => ({
+        reference: m.materialRef,
+        name: m.materialName,
+        unit: m.unit,
+        missingQty:
+          Math.round((m.requiredQty - m.material.stockQty) * 1000) / 1000,
+      }));
+
+    return {
+      id: wo.id,
+      reference: wo.reference,
+      orderId: wo.orderId,
+      orderReference: wo.order.reference,
+      clientCompany: wo.order.company.name,
+      productRef: wo.productRef,
+      productName: wo.productName,
+      quantityPlanned: wo.quantityPlanned,
+      quantityDone: wo.quantityDone,
+      status: wo.status,
+      priority: wo.priority,
+      progress: workOrderProgress(wo.steps),
+      plannedEnd: wo.plannedEnd ? toIsoDate(wo.plannedEnd) : undefined,
+      steps: wo.steps.map((s) => toStepVM(s, wo.steps)),
+      materialStatus: {
+        hasBom: wo.materials.length > 0,
+        canRelease: shortfalls.length === 0,
+        shortfalls,
+      },
+    };
+  });
 }
 
 export async function getActiveOperators(): Promise<

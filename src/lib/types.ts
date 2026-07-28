@@ -304,6 +304,20 @@ export interface WorkOrderVM {
   progress: number;
   plannedEnd?: string;
   steps: WorkOrderStepVM[];
+  /** Live material readiness, used by the release gate on the board. */
+  materialStatus: WorkOrderMaterialStatus;
+}
+
+/** Compact material readiness for a work order, driving the release button. */
+export interface WorkOrderMaterialStatus {
+  hasBom: boolean;
+  canRelease: boolean;
+  shortfalls: {
+    reference: string;
+    name: string;
+    unit: string;
+    missingQty: number;
+  }[];
 }
 
 /** A step queued at a workstation, for the shop-floor terminal. */

@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: `${PRODUCT.name} · ${TENANT.name}`,
   description: `${PRODUCT.name} — plataforma de gestão e produção industrial.`,
+  icons: {
+    icon: [{ url: "/operon-icon.svg", type: "image/svg+xml" }],
+    shortcut: "/operon-icon.svg",
+    apple: "/operon-icon.svg",
+  },
 };
 
 export default function RootLayout({
