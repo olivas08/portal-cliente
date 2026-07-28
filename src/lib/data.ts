@@ -20,7 +20,12 @@ import type {
   OperatorVM,
   MachineVM,
   DiscrepancyVM,
+  MaterialVM,
+  ProductBomVM,
+  WorkOrderReadinessVM,
+  StockMovementVM,
 } from "@/lib/types";
+import { STOCK_REASON_LABELS } from "@/lib/types";
 import { toIsoDate } from "@/lib/dates";
 import {
   isStepReady,
@@ -480,8 +485,7 @@ export async function getProductsWithRouting(): Promise<ProductRoutingVM[]> {
   }));
 }
 
-export async function getWorkstationLoad(): Promise<WorkstationLoadVM[]> {
-  const workstations = await prisma.workstation.findMany({
+export async function getWorkstationLoad(): Promise<WorkstationLoadVM[]> {  const workstations = await prisma.workstation.findMany({
     where: { active: true },
     orderBy: { sequence: "asc" },
     include: {
@@ -738,4 +742,116 @@ export async function getRecentDiscrepancies(
       finishedAt: s.finishedAt ? s.finishedAt.toISOString() : null,
     };
   });
+}
+
+// ── Armazém / Stock ──────────────────────────────────────────────────────────
+
+export async function getMaterials(): Promise<MaterialVM[]> {
+  const materials = await prisma.material.findMany({
+    orderBy: [{ active: "desc" }, { name: "asc" }],
+  });
+  return materials.map((m) => ({
+    id: m.id,
+    reference: m.reference,
+    name: m.name,
+    unit: m.unit,
+    stockQty: m.stockQty,
+    minStockQty: m.minStockQty,
+    active: m.active,
+    belowMin: m.active && m.stockQty < m.minStockQty,
+  }));
+}
+
+export async function getProductsWithBom(): Promise<ProductBomVM[]> {
+  const products = await prisma.product.findMany({
+    where: { active: true },
+    orderBy: { name: "asc" },
+    include: { bom: true },
+  });
+  return products.map((p) => ({
+    id: p.id,
+    reference: p.reference,
+    name: p.name,
+    items: p.bom.map((b) => ({
+      materialId: b.materialId,
+      qtyPerUnit: b.qtyPerUnit,
+    })),
+  }));
+}
+
+/** Planned work orders with live material availability, for the release gate. */
+export async function getWorkOrdersAwaitingMaterials(): Promise<
+  WorkOrderReadinessVM[]
+> {
+  const workOrders = await prisma.workOrder.findMany({
+    where: { status: "planned" },
+    orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+    include: {
+      materials: { include: { material: true }, orderBy: { materialRef: "asc" } },
+      order: { include: { company: true } },
+    },
+  });
+
+  return workOrders.map((wo) => {
+    const materials = wo.materials.map((m) => {
+      const availableQty = m.material.stockQty;
+      const enough = availableQty >= m.requiredQty;
+      return {
+        materialId: m.materialId,
+        reference: m.materialRef,
+        name: m.materialName,
+        unit: m.unit,
+        requiredQty: m.requiredQty,
+        issuedQty: m.issuedQty,
+        availableQty,
+        enough,
+        missingQty: enough ? 0 : Math.round((m.requiredQty - availableQty) * 1000) / 1000,
+      };
+    });
+    return {
+      id: wo.id,
+      reference: wo.reference,
+      productRef: wo.productRef,
+      productName: wo.productName,
+      quantityPlanned: wo.quantityPlanned,
+      orderReference: wo.order.reference,
+      companyName: wo.order.company.name,
+      materials,
+      hasBom: materials.length > 0,
+      canRelease: materials.every((m) => m.enough),
+    };
+  });
+}
+
+export async function getRecentStockMovements(
+  limit = 30,
+): Promise<StockMovementVM[]> {
+  const movements = await prisma.stockMovement.findMany({
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    include: { material: true },
+  });
+  const woIds = Array.from(
+    new Set(movements.map((m) => m.workOrderId).filter((id): id is string => !!id)),
+  );
+  const workOrders = woIds.length
+    ? await prisma.workOrder.findMany({
+        where: { id: { in: woIds } },
+        select: { id: true, reference: true },
+      })
+    : [];
+  const woRefById = new Map(workOrders.map((w) => [w.id, w.reference]));
+
+  return movements.map((m) => ({
+    id: m.id,
+    materialRef: m.material.reference,
+    materialName: m.material.name,
+    unit: m.material.unit,
+    delta: m.delta,
+    reason: m.reason,
+    reasonLabel: STOCK_REASON_LABELS[m.reason] ?? m.reason,
+    workOrderRef: m.workOrderId ? woRefById.get(m.workOrderId) ?? null : null,
+    note: m.note,
+    createdAt: toIsoDate(m.createdAt),
+  }));
 }

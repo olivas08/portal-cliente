@@ -192,19 +192,20 @@ model RequestMessage {
 }
 
 model Product {
-  id           String         @id @default(cuid())
-  reference    String         @unique
+  id           String             @id @default(cuid())
+  reference    String             @unique
   name         String
   description  String
   unit         String
   unitPriceEur Float
   category     String?
   imageUrl     String?
-  active       Boolean        @default(true)
+  active       Boolean            @default(true)
   prices       ProductPrice[]
   routing      RoutingOperation[]
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  bom          BomItem[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
   @@index([active])
 }
@@ -254,34 +255,34 @@ enum NcStatus {
 /// customer-friendly abstraction shown in the portal (clients never see
 /// machine or operator names).
 model Workstation {
-  id               String          @id @default(cuid())
-  code             String          @unique
+  id               String             @id @default(cuid())
+  code             String             @unique
   name             String
   clientStageLabel String
-  sequence         Int             @default(0)
-  active           Boolean         @default(true)
+  sequence         Int                @default(0)
+  active           Boolean            @default(true)
   steps            WorkOrderStep[]
   routingOps       RoutingOperation[]
   machines         Machine[]
-  createdAt        DateTime        @default(now())
+  createdAt        DateTime           @default(now())
 
   @@index([active])
 }
 
 model Machine {
-  id             String           @id @default(cuid())
-  code           String           @unique
-  name           String
-  workstationId  String?
-  workstation    Workstation?     @relation(fields: [workstationId], references: [id], onDelete: SetNull)
-  tokenHash      String
-  active         Boolean          @default(true)
-  state          String           @default("offline")
-  stateSince     DateTime?
-  lastSeenAt     DateTime?
-  steps          WorkOrderStep[]
-  readings       MachineReading[]
-  createdAt      DateTime         @default(now())
+  id            String           @id @default(cuid())
+  code          String           @unique
+  name          String
+  workstationId String?
+  workstation   Workstation?     @relation(fields: [workstationId], references: [id], onDelete: SetNull)
+  tokenHash     String
+  active        Boolean          @default(true)
+  state         String           @default("offline")
+  stateSince    DateTime?
+  lastSeenAt    DateTime?
+  steps         WorkOrderStep[]
+  readings      MachineReading[]
+  createdAt     DateTime         @default(now())
 
   @@index([active])
   @@index([workstationId])
@@ -325,13 +326,13 @@ model RoutingOperation {
 /// A shop-floor operator. Authenticates on the shared terminal with a PIN
 /// (bcrypt hash) — operators are not portal session users.
 model Operator {
-  id        String          @id @default(cuid())
-  name      String
-  pinHash   String
-  active    Boolean         @default(true)
-  steps     WorkOrderStep[]
+  id              String          @id @default(cuid())
+  name            String
+  pinHash         String
+  active          Boolean         @default(true)
+  steps           WorkOrderStep[]
   nonConformities NonConformity[]
-  createdAt DateTime        @default(now())
+  createdAt       DateTime        @default(now())
 
   @@index([active])
 }
@@ -340,26 +341,27 @@ model Operator {
 /// one per order line (`orderItemId`). Product reference/name are snapshotted
 /// at creation, mirroring the OrderItem snapshot pattern.
 model WorkOrder {
-  id              String          @id @default(cuid())
-  reference       String          @unique
+  id              String              @id @default(cuid())
+  reference       String              @unique
   orderId         String
-  order           Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order           Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderItemId     String?
-  orderItem       OrderItem?      @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  orderItem       OrderItem?          @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
   productRef      String
   productName     String
   quantityPlanned Float
-  quantityDone    Float           @default(0)
-  status          WorkOrderStatus @default(planned)
-  priority        Priority        @default(normal)
+  quantityDone    Float               @default(0)
+  status          WorkOrderStatus     @default(planned)
+  priority        Priority            @default(normal)
   plannedStart    DateTime?
   plannedEnd      DateTime?
   startedAt       DateTime?
   finishedAt      DateTime?
   steps           WorkOrderStep[]
   nonConformities NonConformity[]
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  materials       WorkOrderMaterial[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 
   @@index([orderId])
   @@index([status])
@@ -371,30 +373,30 @@ model WorkOrder {
 /// `actualMinutes` across pause/resume cycles (`startedAt` marks the current
 /// running interval).
 model WorkOrderStep {
-  id             String      @id @default(cuid())
-  workOrderId    String
-  workOrder      WorkOrder   @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  sequence       Int
-  name           String
-  workstationId  String
-  workstation    Workstation @relation(fields: [workstationId], references: [id])
-  status         StepStatus  @default(pending)
-  plannedMinutes Int         @default(0)
-  actualMinutes  Float       @default(0)
-  downtimeMinutes Float      @default(0)
-  quantityDone   Float       @default(0)
-  scrapQty       Float       @default(0)
-  declaredQty    Float       @default(0)
-  machineVerified Boolean    @default(false)
-  startedAt      DateTime?
-  pausedAt       DateTime?
-  finishedAt     DateTime?
-  operatorId     String?
-  operator       Operator?   @relation(fields: [operatorId], references: [id], onDelete: SetNull)
-  machineId      String?
-  machine        Machine?    @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  id              String           @id @default(cuid())
+  workOrderId     String
+  workOrder       WorkOrder        @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  sequence        Int
+  name            String
+  workstationId   String
+  workstation     Workstation      @relation(fields: [workstationId], references: [id])
+  status          StepStatus       @default(pending)
+  plannedMinutes  Int              @default(0)
+  actualMinutes   Float            @default(0)
+  downtimeMinutes Float            @default(0)
+  quantityDone    Float            @default(0)
+  scrapQty        Float            @default(0)
+  declaredQty     Float            @default(0)
+  machineVerified Boolean          @default(false)
+  startedAt       DateTime?
+  pausedAt        DateTime?
+  finishedAt      DateTime?
+  operatorId      String?
+  operator        Operator?        @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  machineId       String?
+  machine         Machine?         @relation(fields: [machineId], references: [id], onDelete: SetNull)
   nonConformities NonConformity[]
-  readings       MachineReading[]
+  readings        MachineReading[]
 
   @@index([workOrderId])
   @@index([workstationId, status])
@@ -419,4 +421,66 @@ model NonConformity {
 
   @@index([workOrderId])
   @@index([status])
+}
+
+// ── Armazém / Stock ──────────────────────────────────────────────────────────
+
+model Material {
+  id          String              @id @default(cuid())
+  reference   String              @unique
+  name        String
+  unit        String              @default("un")
+  stockQty    Float               @default(0)
+  minStockQty Float               @default(0)
+  active      Boolean             @default(true)
+  bomItems    BomItem[]
+  woMaterials WorkOrderMaterial[]
+  movements   StockMovement[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([active])
+}
+
+model BomItem {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  qtyPerUnit Float
+  createdAt  DateTime @default(now())
+
+  @@unique([productId, materialId])
+  @@index([materialId])
+}
+
+model WorkOrderMaterial {
+  id           String    @id @default(cuid())
+  workOrderId  String
+  workOrder    WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  materialId   String
+  material     Material  @relation(fields: [materialId], references: [id], onDelete: Restrict)
+  materialRef  String
+  materialName String
+  unit         String    @default("un")
+  requiredQty  Float
+  issuedQty    Float     @default(0)
+  createdAt    DateTime  @default(now())
+
+  @@unique([workOrderId, materialId])
+  @@index([materialId])
+}
+
+model StockMovement {
+  id          String   @id @default(cuid())
+  materialId  String
+  material    Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  delta       Float
+  reason      String
+  workOrderId String?
+  note        String?
+  createdAt   DateTime @default(now())
+
+  @@index([materialId, createdAt])
 }

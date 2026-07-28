@@ -395,3 +395,79 @@ export interface ProductRoutingVM {
   name: string;
   operations: RoutingOperationVM[];
 }
+
+// ── Armazém / Stock ──────────────────────────────────────────────────────────
+
+/** A material in the warehouse with its current stock position. */
+export interface MaterialVM {
+  id: string;
+  reference: string;
+  name: string;
+  unit: string;
+  stockQty: number;
+  minStockQty: number;
+  active: boolean;
+  belowMin: boolean;
+}
+
+/** One material line of a product's bill of materials, for the BOM editor. */
+export interface BomLineVM {
+  materialId: string;
+  qtyPerUnit: number;
+}
+
+/** A product together with its current bill of materials. */
+export interface ProductBomVM {
+  id: string;
+  reference: string;
+  name: string;
+  items: BomLineVM[];
+}
+
+/** One material requirement of a work order with live availability. */
+export interface WorkOrderMaterialVM {
+  materialId: string;
+  reference: string;
+  name: string;
+  unit: string;
+  requiredQty: number;
+  issuedQty: number;
+  availableQty: number;
+  enough: boolean;
+  missingQty: number;
+}
+
+/** A planned work order with its material readiness, for the release gate. */
+export interface WorkOrderReadinessVM {
+  id: string;
+  reference: string;
+  productRef: string;
+  productName: string;
+  quantityPlanned: number;
+  orderReference: string;
+  companyName: string;
+  materials: WorkOrderMaterialVM[];
+  hasBom: boolean;
+  canRelease: boolean;
+}
+
+/** A recent stock movement, for the warehouse audit trail. */
+export interface StockMovementVM {
+  id: string;
+  materialRef: string;
+  materialName: string;
+  unit: string;
+  delta: number;
+  reason: string;
+  reasonLabel: string;
+  workOrderRef: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+export const STOCK_REASON_LABELS: Record<string, string> = {
+  receipt: "Entrada",
+  issue: "Consumo",
+  return: "Devolução",
+  adjustment: "Acerto",
+};

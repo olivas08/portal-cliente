@@ -16,6 +16,7 @@ import {
   rollUpWorkOrderStatus,
   deriveOrderStatusFromProduction,
   downtimeOnResume,
+  computeShortfalls,
   type MachineState,
 } from "@/services/production-status";
 import type { OperatorActor } from "@/lib/operator-session";
@@ -158,6 +159,11 @@ export const setProductRoutingSchema = z.object({
 export type SetProductRoutingInput = z.infer<typeof setProductRoutingSchema>;
 
 const DEFAULT_STEP_MINUTES = 30;
+
+/** Rounds to 3 decimals to avoid float noise in stock/material quantities. */
+function round3(n: number): number {
+  return Math.round(n * 1000) / 1000;
+}
 
 // ── Operator authentication ─────────────────────────────────────────────────
 
@@ -502,9 +508,13 @@ export async function generateWorkOrdersForOrder(orderId: string): Promise<numbe
   // Resolve each line to its catalogue product routing (matched by reference).
   const products = await prisma.product.findMany({
     where: { reference: { in: pending.map((i) => i.reference) } },
-    include: { routing: { orderBy: { sequence: "asc" } } },
+    include: {
+      routing: { orderBy: { sequence: "asc" } },
+      bom: { include: { material: true } },
+    },
   });
   const routingByRef = new Map(products.map((p) => [p.reference, p.routing]));
+  const bomByRef = new Map(products.map((p) => [p.reference, p.bom]));
 
   for (const item of pending) {
     const routing = routingByRef.get(item.reference);
@@ -523,6 +533,15 @@ export async function generateWorkOrdersForOrder(orderId: string): Promise<numbe
             plannedMinutes: DEFAULT_STEP_MINUTES,
           }));
 
+    const bom = bomByRef.get(item.reference) ?? [];
+    const materials = bom.map((b) => ({
+      materialId: b.materialId,
+      materialRef: b.material.reference,
+      materialName: b.material.name,
+      unit: b.material.unit,
+      requiredQty: b.qtyPerUnit * item.quantity,
+    }));
+
     await createWithReference("OF", (reference) =>
       prisma.workOrder.create({
         data: {
@@ -534,6 +553,7 @@ export async function generateWorkOrdersForOrder(orderId: string): Promise<numbe
           quantityPlanned: item.quantity,
           priority: order.priority,
           steps: { create: steps },
+          materials: materials.length > 0 ? { create: materials } : undefined,
         },
       }),
     );
@@ -642,14 +662,68 @@ export async function resolveNonConformity(id: string): Promise<void> {
 
 /** Releases a planned work order to the shop floor (steps become queueable). */
 export async function releaseWorkOrder(workOrderId: string): Promise<void> {
-  const wo = await prisma.workOrder.findUnique({ where: { id: workOrderId } });
-  if (!wo) throw new NotFoundError("Ordem de fabrico não encontrada.");
-  if (wo.status !== "planned") {
-    throw new AppError("Esta ordem de fabrico já foi lançada.");
-  }
-  await prisma.workOrder.update({
-    where: { id: workOrderId },
-    data: { status: "released" },
+  await prisma.$transaction(async (tx) => {
+    const wo = await tx.workOrder.findUnique({
+      where: { id: workOrderId },
+      include: { materials: { include: { material: true } } },
+    });
+    if (!wo) throw new NotFoundError("Ordem de fabrico não encontrada.");
+    if (wo.status !== "planned") {
+      throw new AppError("Esta ordem de fabrico já foi lançada.");
+    }
+
+    // Gate: verify every required material is in stock before releasing.
+    const shortfalls = computeShortfalls(
+      wo.materials.map((m) => ({
+        materialId: m.materialId,
+        materialRef: m.materialRef,
+        materialName: m.materialName,
+        unit: m.unit,
+        requiredQty: m.requiredQty,
+        availableQty: m.material.stockQty,
+      })),
+    );
+    if (shortfalls.length > 0) {
+      const detail = shortfalls
+        .map(
+          (s) =>
+            `${s.materialRef} (${s.materialName}): faltam ${round3(
+              s.missingQty,
+            )} ${s.unit}`,
+        )
+        .join("; ");
+      throw new AppError(
+        `Stock insuficiente para lançar esta ordem de fabrico. ${detail}.`,
+      );
+    }
+
+    // Reserve/issue the materials: decrement stock, snapshot issued qty and
+    // log a movement for the audit trail.
+    for (const m of wo.materials) {
+      if (m.requiredQty <= 0) continue;
+      await tx.material.update({
+        where: { id: m.materialId },
+        data: { stockQty: { decrement: m.requiredQty } },
+      });
+      await tx.workOrderMaterial.update({
+        where: { id: m.id },
+        data: { issuedQty: m.requiredQty },
+      });
+      await tx.stockMovement.create({
+        data: {
+          materialId: m.materialId,
+          delta: -m.requiredQty,
+          reason: "issue",
+          workOrderId: wo.id,
+          note: `Consumo OF ${wo.reference}`,
+        },
+      });
+    }
+
+    await tx.workOrder.update({
+      where: { id: workOrderId },
+      data: { status: "released" },
+    });
   });
 }
 
@@ -688,7 +762,7 @@ export async function cancelWorkOrder(workOrderId: string): Promise<void> {
   const notify = await prisma.$transaction(async (tx) => {
     const wo = await tx.workOrder.findUnique({
       where: { id: workOrderId },
-      include: { steps: true },
+      include: { steps: true, materials: true },
     });
     if (!wo) throw new NotFoundError("Ordem de fabrico não encontrada.");
     if (wo.status === "cancelled") {
@@ -696,6 +770,28 @@ export async function cancelWorkOrder(workOrderId: string): Promise<void> {
     }
     if (wo.status === "done") {
       throw new AppError("Não é possível cancelar uma ordem concluída.");
+    }
+
+    // Return any materials that were issued at release back to stock.
+    for (const m of wo.materials) {
+      if (m.issuedQty <= 0) continue;
+      await tx.material.update({
+        where: { id: m.materialId },
+        data: { stockQty: { increment: m.issuedQty } },
+      });
+      await tx.stockMovement.create({
+        data: {
+          materialId: m.materialId,
+          delta: m.issuedQty,
+          reason: "return",
+          workOrderId: wo.id,
+          note: `Devolução por cancelamento OF ${wo.reference}`,
+        },
+      });
+      await tx.workOrderMaterial.update({
+        where: { id: m.id },
+        data: { issuedQty: 0 },
+      });
     }
 
     // Bank time on any running step and freeze the steps.
@@ -730,11 +826,57 @@ export async function reopenWorkOrder(workOrderId: string): Promise<void> {
   const notify = await prisma.$transaction(async (tx) => {
     const wo = await tx.workOrder.findUnique({
       where: { id: workOrderId },
-      include: { steps: true },
+      include: { steps: true, materials: { include: { material: true } } },
     });
     if (!wo) throw new NotFoundError("Ordem de fabrico não encontrada.");
     if (wo.status !== "cancelled") {
       throw new AppError("A ordem de fabrico não está cancelada.");
+    }
+
+    // Re-issue the materials that were returned to stock on cancellation,
+    // applying the same stock gate as a fresh release.
+    const shortfalls = computeShortfalls(
+      wo.materials.map((m) => ({
+        materialId: m.materialId,
+        materialRef: m.materialRef,
+        materialName: m.materialName,
+        unit: m.unit,
+        requiredQty: m.requiredQty,
+        availableQty: m.material.stockQty,
+      })),
+    );
+    if (shortfalls.length > 0) {
+      const detail = shortfalls
+        .map(
+          (s) =>
+            `${s.materialRef} (${s.materialName}): faltam ${round3(
+              s.missingQty,
+            )} ${s.unit}`,
+        )
+        .join("; ");
+      throw new AppError(
+        `Stock insuficiente para reabrir esta ordem de fabrico. ${detail}.`,
+      );
+    }
+    for (const m of wo.materials) {
+      if (m.requiredQty <= 0) continue;
+      await tx.material.update({
+        where: { id: m.materialId },
+        data: { stockQty: { decrement: m.requiredQty } },
+      });
+      await tx.workOrderMaterial.update({
+        where: { id: m.id },
+        data: { issuedQty: m.requiredQty },
+      });
+      await tx.stockMovement.create({
+        data: {
+          materialId: m.materialId,
+          delta: -m.requiredQty,
+          reason: "issue",
+          workOrderId: wo.id,
+          note: `Reemissão por reabertura OF ${wo.reference}`,
+        },
+      });
     }
 
     const restored = rollUpWorkOrderStatus("released", wo.steps);

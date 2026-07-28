@@ -263,3 +263,47 @@ export function downtimeOnResume(
 export function isDownState(state: MachineState): boolean {
   return state === "idle" || state === "down";
 }
+
+// ── Stock / materials ────────────────────────────────────────────────────────
+
+export interface MaterialRequirement {
+  materialId: string;
+  materialRef: string;
+  materialName: string;
+  unit: string;
+  requiredQty: number;
+  availableQty: number;
+}
+
+export interface MaterialShortfall {
+  materialRef: string;
+  materialName: string;
+  unit: string;
+  requiredQty: number;
+  availableQty: number;
+  missingQty: number;
+}
+
+/**
+ * Given the material requirements of a work order (with current available
+ * stock), returns the list of materials that are short. An empty array means
+ * the work order can be released.
+ */
+export function computeShortfalls(
+  requirements: MaterialRequirement[],
+): MaterialShortfall[] {
+  const shortfalls: MaterialShortfall[] = [];
+  for (const r of requirements) {
+    if (r.availableQty < r.requiredQty) {
+      shortfalls.push({
+        materialRef: r.materialRef,
+        materialName: r.materialName,
+        unit: r.unit,
+        requiredQty: r.requiredQty,
+        availableQty: r.availableQty,
+        missingQty: Math.max(0, r.requiredQty - r.availableQty),
+      });
+    }
+  }
+  return shortfalls;
+}

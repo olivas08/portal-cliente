@@ -9,6 +9,10 @@ async function main() {
   await prisma.nonConformity.deleteMany();
   await prisma.machineReading.deleteMany();
   await prisma.machine.deleteMany();
+  await prisma.stockMovement.deleteMany();
+  await prisma.workOrderMaterial.deleteMany();
+  await prisma.bomItem.deleteMany();
+  await prisma.material.deleteMany();
   await prisma.workOrder.deleteMany();
   await prisma.routingOperation.deleteMany();
   await prisma.operator.deleteMany();
@@ -210,6 +214,39 @@ async function main() {
     ],
   });
 
+  console.log("🧱 A criar matérias-primas e fichas técnicas...");
+  const matInox = await prisma.material.create({
+    data: { reference: "MP-INOX304-2MM", name: "Bobine Inox AISI 304 2mm", unit: "m²", stockQty: 500, minStockQty: 50 },
+  });
+  const matBarra = await prisma.material.create({
+    data: { reference: "MP-INOX-L40", name: "Barra Inox L 40×40×4", unit: "m", stockQty: 300, minStockQty: 30 },
+  });
+  const matEletrodo = await prisma.material.create({
+    data: { reference: "MP-ELECTRODO-INOX", name: "Elétrodo soldadura inox 2.5mm", unit: "un", stockQty: 800, minStockQty: 100 },
+  });
+  const matArgon = await prisma.material.create({
+    data: { reference: "MP-GAS-ARGON", name: "Gás Árgon (m³)", unit: "m³", stockQty: 3, minStockQty: 5 },
+  });
+  const matDisco = await prisma.material.create({
+    data: { reference: "MP-DISCO-CORTE", name: "Disco de corte inox Ø125", unit: "un", stockQty: 40, minStockQty: 20 },
+  });
+
+  for (const m of [matInox, matBarra, matEletrodo, matArgon, matDisco]) {
+    await prisma.stockMovement.create({
+      data: { materialId: m.id, delta: m.stockQty, reason: "receipt", note: "Stock inicial" },
+    });
+  }
+
+  await prisma.bomItem.createMany({
+    data: [
+      { productId: chpProduct.id, materialId: matInox.id, qtyPerUnit: 1.05 },
+      { productId: chpProduct.id, materialId: matDisco.id, qtyPerUnit: 0.02 },
+      { productId: perfProduct.id, materialId: matBarra.id, qtyPerUnit: 1.02 },
+      { productId: perfProduct.id, materialId: matEletrodo.id, qtyPerUnit: 0.5 },
+      { productId: perfProduct.id, materialId: matArgon.id, qtyPerUnit: 0.05 },
+    ],
+  });
+
   console.log("📦 A criar encomendas...");
   const ord041 = await prisma.order.create({
     data: {
@@ -330,6 +367,26 @@ async function main() {
     },
   });
 
+  const ord070 = await prisma.order.create({
+    data: {
+      reference: "ENC-2026-070",
+      companyId: santos.id,
+      status: "pending",
+      priority: "normal",
+      batchNumber: "LT-2026-070",
+      createdDate: new Date("2026-07-01"),
+      expectedDate: new Date("2026-07-25"),
+      observations: "Aguardar confirmação de matéria-prima em armazém antes de lançar.",
+      items: {
+        create: [
+          { reference: "CHP-2MM-AISI304", description: "Chapa Inox AISI 304 2mm", quantity: 30, unit: "m²", unitPriceEur: 48.5 },
+          { reference: "PERF-L40-INOX", description: "Perfil L 40×40×4 Inox", quantity: 120, unit: "m", unitPriceEur: 12.9 },
+        ],
+      },
+    },
+    include: { items: true },
+  });
+
   console.log("🏭 A criar ordens de fabrico...");
   const now = new Date();
   const minsAgo = (m: number) => new Date(now.getTime() - m * 60_000);
@@ -409,6 +466,61 @@ async function main() {
           { sequence: 1, name: "Corte a Laser", workstationId: stations.CORTE, status: "done", plannedMinutes: 30, actualMinutes: 34, downtimeMinutes: 12, quantityDone: 492, scrapQty: 8, operatorId: operators["João Ferreira"] },
           { sequence: 2, name: "Acabamento", workstationId: stations.ACAB, status: "done", plannedMinutes: 20, actualMinutes: 18, downtimeMinutes: 4, quantityDone: 500, operatorId: operators["Carla Sousa"] },
           { sequence: 3, name: "Inspeção Final", workstationId: stations.INSP, status: "done", plannedMinutes: 15, actualMinutes: 14, downtimeMinutes: 2, quantityDone: 500, operatorId: operators["Carla Sousa"] },
+        ],
+      },
+    },
+  });
+
+  // ENC-2026-070 (confirmada) — OFs planeadas a aguardar confirmação de stock.
+  await prisma.workOrder.create({
+    data: {
+      reference: "OF-2026-004",
+      orderId: ord070.id,
+      orderItemId: ord070.items[0].id,
+      productRef: ord070.items[0].reference,
+      productName: ord070.items[0].description,
+      quantityPlanned: ord070.items[0].quantity,
+      status: "planned",
+      priority: "normal",
+      steps: {
+        create: [
+          { sequence: 1, name: "Corte a Laser", workstationId: stations.CORTE, status: "pending", plannedMinutes: 25 },
+          { sequence: 2, name: "Quinagem", workstationId: stations.CNC, status: "pending", plannedMinutes: 40 },
+          { sequence: 3, name: "Acabamento", workstationId: stations.ACAB, status: "pending", plannedMinutes: 20 },
+          { sequence: 4, name: "Inspeção Final", workstationId: stations.INSP, status: "pending", plannedMinutes: 15 },
+        ],
+      },
+      materials: {
+        create: [
+          { materialId: matInox.id, materialRef: matInox.reference, materialName: matInox.name, unit: matInox.unit, requiredQty: 1.05 * ord070.items[0].quantity },
+          { materialId: matDisco.id, materialRef: matDisco.reference, materialName: matDisco.name, unit: matDisco.unit, requiredQty: 0.02 * ord070.items[0].quantity },
+        ],
+      },
+    },
+  });
+
+  await prisma.workOrder.create({
+    data: {
+      reference: "OF-2026-005",
+      orderId: ord070.id,
+      orderItemId: ord070.items[1].id,
+      productRef: ord070.items[1].reference,
+      productName: ord070.items[1].description,
+      quantityPlanned: ord070.items[1].quantity,
+      status: "planned",
+      priority: "normal",
+      steps: {
+        create: [
+          { sequence: 1, name: "Corte", workstationId: stations.CORTE, status: "pending", plannedMinutes: 15 },
+          { sequence: 2, name: "Soldadura", workstationId: stations.SOLD, status: "pending", plannedMinutes: 35 },
+          { sequence: 3, name: "Inspeção Final", workstationId: stations.INSP, status: "pending", plannedMinutes: 10 },
+        ],
+      },
+      materials: {
+        create: [
+          { materialId: matBarra.id, materialRef: matBarra.reference, materialName: matBarra.name, unit: matBarra.unit, requiredQty: 1.02 * ord070.items[1].quantity },
+          { materialId: matEletrodo.id, materialRef: matEletrodo.reference, materialName: matEletrodo.name, unit: matEletrodo.unit, requiredQty: 0.5 * ord070.items[1].quantity },
+          { materialId: matArgon.id, materialRef: matArgon.reference, materialName: matArgon.name, unit: matArgon.unit, requiredQty: 0.05 * ord070.items[1].quantity },
         ],
       },
     },
