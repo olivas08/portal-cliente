@@ -49,6 +49,49 @@ export const setOperatorActiveSchema = z.object({
 });
 export type SetOperatorActiveInput = z.infer<typeof setOperatorActiveSchema>;
 
+const machineTokenSchema = z
+  .string()
+  .trim()
+  .min(6, "Token deve ter pelo menos 6 caracteres.")
+  .max(120);
+
+export const createMachineSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .min(2, "Código obrigatório.")
+    .max(40)
+    .regex(/^[A-Za-z0-9_-]+$/, "Use apenas letras, números, - ou _."),
+  name: z.string().trim().min(2, "Nome obrigatório.").max(80),
+  workstationId: z.string().trim().min(1).nullish(),
+  token: machineTokenSchema,
+});
+export type CreateMachineInput = z.infer<typeof createMachineSchema>;
+
+export const setMachineActiveSchema = z.object({
+  machineId: z.string().trim().min(1),
+  active: z.boolean(),
+});
+export type SetMachineActiveInput = z.infer<typeof setMachineActiveSchema>;
+
+export const regenerateMachineTokenSchema = z.object({
+  machineId: z.string().trim().min(1),
+  token: machineTokenSchema,
+});
+export type RegenerateMachineTokenInput = z.infer<
+  typeof regenerateMachineTokenSchema
+>;
+
+export const machineIngestSchema = z.object({
+  machineCode: z.string().trim().min(1),
+  token: z.string().min(1),
+  eventId: z.string().trim().min(1).max(200),
+  goodDelta: z.number().int().min(0).max(100000).default(0),
+  scrapDelta: z.number().int().min(0).max(100000).default(0),
+  producedAt: z.string().datetime().optional(),
+});
+export type MachineIngestInput = z.infer<typeof machineIngestSchema>;
+
 export const generateWorkOrdersSchema = z.object({
   orderId: z.string().trim().min(1, "Encomenda obrigatória."),
 });
@@ -168,6 +211,138 @@ export async function setOperatorActive(
   await prisma.operator.update({
     where: { id: input.operatorId },
     data: { active: input.active },
+  });
+}
+
+/** Registers a machine (edge device) with a bcrypt-hashed access token. */
+export async function createMachine(input: CreateMachineInput): Promise<void> {
+  const tokenHash = await bcrypt.hash(input.token, PIN_SALT_ROUNDS);
+  await prisma.machine.create({
+    data: {
+      code: input.code,
+      name: input.name,
+      workstationId: input.workstationId ?? null,
+      tokenHash,
+    },
+  });
+}
+
+export async function setMachineActive(
+  input: SetMachineActiveInput,
+): Promise<void> {
+  const machine = await prisma.machine.findUnique({
+    where: { id: input.machineId },
+    select: { id: true },
+  });
+  if (!machine) throw new NotFoundError("Máquina não encontrada.");
+  await prisma.machine.update({
+    where: { id: input.machineId },
+    data: { active: input.active },
+  });
+}
+
+export async function regenerateMachineToken(
+  input: RegenerateMachineTokenInput,
+): Promise<void> {
+  const machine = await prisma.machine.findUnique({
+    where: { id: input.machineId },
+    select: { id: true },
+  });
+  if (!machine) throw new NotFoundError("Máquina não encontrada.");
+  const tokenHash = await bcrypt.hash(input.token, PIN_SALT_ROUNDS);
+  await prisma.machine.update({
+    where: { id: input.machineId },
+    data: { tokenHash },
+  });
+}
+
+export interface MachineIngestResult {
+  deduped: boolean;
+  machineQty: number;
+  scrapQty: number;
+  stepId: string | null;
+}
+
+/**
+ * Records a production event coming directly from a machine (via the edge
+ * gateway). The machine's count is the source of truth: it is accumulated onto
+ * the in-progress step of the machine's workstation and marks that step as
+ * machine-verified, so an operator can no longer overwrite it. Idempotent per
+ * (machine, eventId) so retries from the edge buffer never double-count.
+ */
+export async function recordMachineProduction(
+  input: MachineIngestInput,
+): Promise<MachineIngestResult> {
+  const machine = await prisma.machine.findUnique({
+    where: { code: input.machineCode },
+  });
+  if (!machine || !machine.active) {
+    throw new UnauthorizedError("Máquina não autorizada.");
+  }
+  const valid = await bcrypt.compare(input.token, machine.tokenHash);
+  if (!valid) throw new UnauthorizedError("Token inválido.");
+
+  const now = new Date();
+  const producedAt = input.producedAt ? new Date(input.producedAt) : now;
+
+  return prisma.$transaction(async (tx) => {
+    await tx.machine.update({
+      where: { id: machine.id },
+      data: { lastSeenAt: now },
+    });
+
+    const existing = await tx.machineReading.findUnique({
+      where: {
+        machineId_eventId: { machineId: machine.id, eventId: input.eventId },
+      },
+      select: { id: true, workOrderStepId: true },
+    });
+    if (existing) {
+      return { deduped: true, machineQty: 0, scrapQty: 0, stepId: null };
+    }
+
+    const step = machine.workstationId
+      ? await tx.workOrderStep.findFirst({
+          where: {
+            workstationId: machine.workstationId,
+            status: "in_progress",
+          },
+          orderBy: { startedAt: "asc" },
+        })
+      : null;
+
+    await tx.machineReading.create({
+      data: {
+        machineId: machine.id,
+        eventId: input.eventId,
+        goodDelta: input.goodDelta,
+        scrapDelta: input.scrapDelta,
+        producedAt,
+        workOrderStepId: step?.id ?? null,
+      },
+    });
+
+    if (!step) {
+      return { deduped: false, machineQty: 0, scrapQty: 0, stepId: null };
+    }
+
+    const updated = await tx.workOrderStep.update({
+      where: { id: step.id },
+      data: {
+        quantityDone: step.quantityDone + input.goodDelta,
+        scrapQty: step.scrapQty + input.scrapDelta,
+        machineVerified: true,
+        machineId: machine.id,
+      },
+      select: { id: true, quantityDone: true, scrapQty: true },
+    });
+
+    return {
+      deduped: false,
+      machineQty: updated.quantityDone,
+      scrapQty: updated.scrapQty,
+      stepId: updated.id,
+    };
   });
 }
 
@@ -554,6 +729,9 @@ export async function completeStep(
     }
 
     const wo = step.workOrder;
+    const machineVerified = step.machineVerified;
+    const finalQty = machineVerified ? step.quantityDone : input.quantityDone;
+    const finalScrap = machineVerified ? step.scrapQty : input.scrapQty;
     await tx.workOrderStep.update({
       where: { id: input.stepId },
       data: {
@@ -561,8 +739,9 @@ export async function completeStep(
         finishedAt: now,
         startedAt: null,
         actualMinutes: step.actualMinutes + elapsedMinutes(step.startedAt, now),
-        quantityDone: input.quantityDone,
-        scrapQty: input.scrapQty,
+        quantityDone: finalQty,
+        scrapQty: finalScrap,
+        declaredQty: input.quantityDone,
         operatorId: operator.id,
       },
     });
@@ -590,7 +769,7 @@ export async function completeStep(
       data: {
         status: woStatus,
         finishedAt: woDone ? now : wo.finishedAt,
-        quantityDone: woDone ? input.quantityDone : wo.quantityDone,
+        quantityDone: woDone ? finalQty : wo.quantityDone,
       },
     });
 

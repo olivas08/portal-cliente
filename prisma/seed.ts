@@ -7,6 +7,8 @@ async function main() {
   console.log("🌱 A limpar dados existentes...");
   await prisma.workOrderStep.deleteMany();
   await prisma.nonConformity.deleteMany();
+  await prisma.machineReading.deleteMany();
+  await prisma.machine.deleteMany();
   await prisma.workOrder.deleteMany();
   await prisma.routingOperation.deleteMany();
   await prisma.operator.deleteMany();
@@ -95,6 +97,24 @@ async function main() {
       data: { name: def.name, pinHash: hash(def.pin) },
     });
     operators[def.name] = op.id;
+  }
+
+  console.log("🤖 A registar máquinas (edge devices)...");
+  const machineDefs = [
+    { code: "PRENSA-01", name: "Prensa Hidráulica 01", station: "CORTE", token: "prensa01-demo-token" },
+    { code: "CNC-02", name: "Centro CNC 02", station: "CNC", token: "cnc02-demo-token" },
+  ];
+  const machines: Record<string, string> = {};
+  for (const def of machineDefs) {
+    const m = await prisma.machine.create({
+      data: {
+        code: def.code,
+        name: def.name,
+        workstationId: stations[def.station],
+        tokenHash: hash(def.token),
+      },
+    });
+    machines[def.code] = m.id;
   }
 
   console.log("🛒 A criar catálogo de produtos...");
@@ -325,7 +345,7 @@ async function main() {
       startedAt: minsAgo(180),
       steps: {
         create: [
-          { sequence: 1, name: "Corte a Laser", workstationId: stations.CORTE, status: "done", plannedMinutes: 30, actualMinutes: 28, downtimeMinutes: 6, quantityDone: 50, finishedAt: minsAgo(150), startedAt: null, operatorId: operators["João Ferreira"] },
+          { sequence: 1, name: "Corte a Laser", workstationId: stations.CORTE, status: "done", plannedMinutes: 30, actualMinutes: 28, downtimeMinutes: 6, quantityDone: 50, declaredQty: 55, machineVerified: true, machineId: machines["PRENSA-01"], finishedAt: minsAgo(150), startedAt: null, operatorId: operators["João Ferreira"] },
           { sequence: 2, name: "Maquinação CNC", workstationId: stations.CNC, status: "in_progress", plannedMinutes: 45, startedAt: minsAgo(25), operatorId: operators["Miguel Costa"] },
           { sequence: 3, name: "Acabamento", workstationId: stations.ACAB, status: "pending", plannedMinutes: 20 },
           { sequence: 4, name: "Inspeção Final", workstationId: stations.INSP, status: "pending", plannedMinutes: 15 },

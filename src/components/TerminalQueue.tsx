@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Play, Pause, CheckCircle2, Package, AlertCircle, AlertTriangle } from "lucide-react";
+import { Play, Pause, CheckCircle2, Package, AlertCircle, AlertTriangle, Cpu } from "lucide-react";
 import type { TerminalStepVM } from "@/lib/types";
 import { STEP_STATUS_LABELS } from "@/lib/types";
 import {
@@ -21,6 +21,12 @@ export function TerminalQueue({ queue }: Props) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [completing, setCompleting] = useState<string | null>(null);
+
+  // Live refresh so machine-reported counts appear without operator action.
+  useEffect(() => {
+    const id = setInterval(() => router.refresh(), 5000);
+    return () => clearInterval(id);
+  }, [router]);
 
   const run = (fn: () => Promise<unknown>, after?: () => void) => {
     setError(null);
@@ -97,9 +103,31 @@ export function TerminalQueue({ queue }: Props) {
             </span>
           </div>
 
+          {step.machineName && (
+            <div className="mt-2 flex items-center gap-2 rounded-lg bg-slate-900/60 border border-slate-700 px-3 py-2">
+              <Cpu size={14} className="text-emerald-400 shrink-0" />
+              <span className="text-xs text-slate-300">
+                {step.machineName}
+                {step.machineVerified ? (
+                  <>
+                    {" · "}
+                    <span className="font-bold text-emerald-400 tabular-nums">
+                      {step.quantityDone}
+                    </span>{" "}
+                    registadas pela máquina
+                  </>
+                ) : (
+                  " ligada"
+                )}
+              </span>
+            </div>
+          )}
+
           {completing === step.stepId ? (
             <CompleteForm
               defaultQty={step.quantityPlanned}
+              machineVerified={step.machineVerified}
+              machineQty={step.quantityDone}
               pending={pending}
               onCancel={() => setCompleting(null)}
               onConfirm={(quantityDone, scrapQty, defect) =>
@@ -155,11 +183,15 @@ export function TerminalQueue({ queue }: Props) {
 
 function CompleteForm({
   defaultQty,
+  machineVerified,
+  machineQty,
   pending,
   onCancel,
   onConfirm,
 }: {
   defaultQty: number;
+  machineVerified: boolean;
+  machineQty: number;
   pending: boolean;
   onCancel: () => void;
   onConfirm: (
@@ -193,6 +225,16 @@ function CompleteForm({
 
   return (
     <div className="mt-3 rounded-lg bg-slate-900 border border-slate-700 p-3">
+      {machineVerified && (
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+          <Cpu size={14} className="mt-0.5 shrink-0" />
+          <span>
+            Contagem confirmada pela máquina:{" "}
+            <span className="font-bold tabular-nums">{machineQty}</span>{" "}
+            conformes. A sua contagem serve apenas de confirmação.
+          </span>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <label className="text-xs text-slate-400">
           Qtd. conforme

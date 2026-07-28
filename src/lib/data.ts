@@ -18,6 +18,8 @@ import type {
   ProductRoutingVM,
   NonConformityVM,
   OperatorVM,
+  MachineVM,
+  DiscrepancyVM,
 } from "@/lib/types";
 import { toIsoDate } from "@/lib/dates";
 import {
@@ -25,6 +27,8 @@ import {
   workOrderProgress,
   buildClientStages,
   computeOee,
+  computeDiscrepancy,
+  isMachineOnline,
 } from "@/services/production-status";
 import type {
   Order,
@@ -354,6 +358,8 @@ export async function getTerminalQueue(
       workOrder: { status: { in: ["released", "in_progress"] } },
     },
     include: {
+      machine: { select: { name: true } },
+      workstation: { select: { machines: { select: { name: true }, take: 1 } } },
       workOrder: {
         include: {
           order: { select: { reference: true } },
@@ -378,6 +384,8 @@ export async function getTerminalQueue(
       quantityDone: s.quantityDone,
       plannedMinutes: s.plannedMinutes,
       priority: s.workOrder.priority,
+      machineName: s.machine?.name ?? s.workstation.machines[0]?.name ?? null,
+      machineVerified: s.machineVerified,
     }))
     .sort((a, b) => {
       if (a.priority !== b.priority) return a.priority === "urgent" ? -1 : 1;
@@ -644,6 +652,89 @@ export async function getOperatorsWithStats(): Promise<OperatorVM[]> {
       quality: oee.quality,
       avgMinutes:
         op.steps.length > 0 ? oee.runtimeMinutes / op.steps.length : 0,
+    };
+  });
+}
+
+export async function getMachinesWithStatus(): Promise<MachineVM[]> {
+  const now = new Date();
+  const machines = await prisma.machine.findMany({
+    orderBy: [{ active: "desc" }, { name: "asc" }],
+    include: { workstation: { select: { id: true, name: true } } },
+  });
+
+  const result: MachineVM[] = [];
+  for (const m of machines) {
+    let currentProduct: string | null = null;
+    let currentQty = 0;
+    let currentScrap = 0;
+    if (m.workstationId) {
+      const step = await prisma.workOrderStep.findFirst({
+        where: { workstationId: m.workstationId, status: "in_progress" },
+        orderBy: { startedAt: "asc" },
+        select: {
+          quantityDone: true,
+          scrapQty: true,
+          workOrder: { select: { productName: true } },
+        },
+      });
+      if (step) {
+        currentProduct = step.workOrder.productName;
+        currentQty = step.quantityDone;
+        currentScrap = step.scrapQty;
+      }
+    }
+    result.push({
+      id: m.id,
+      code: m.code,
+      name: m.name,
+      active: m.active,
+      online: isMachineOnline(m.lastSeenAt, now),
+      lastSeenAt: m.lastSeenAt ? m.lastSeenAt.toISOString() : null,
+      stationName: m.workstation?.name ?? null,
+      stationId: m.workstation?.id ?? null,
+      currentProduct,
+      currentQty,
+      currentScrap,
+    });
+  }
+  return result;
+}
+
+export async function getRecentDiscrepancies(
+  limit = 20,
+): Promise<DiscrepancyVM[]> {
+  const steps = await prisma.workOrderStep.findMany({
+    where: { machineVerified: true, status: "done" },
+    orderBy: { finishedAt: "desc" },
+    take: limit,
+    include: {
+      workstation: { select: { name: true } },
+      operator: { select: { name: true } },
+      machine: { select: { name: true } },
+      workOrder: {
+        select: {
+          productName: true,
+          order: { select: { reference: true } },
+        },
+      },
+    },
+  });
+
+  return steps.map((s) => {
+    const d = computeDiscrepancy(s.declaredQty, s.quantityDone);
+    return {
+      stepId: s.id,
+      productName: s.workOrder.productName,
+      orderReference: s.workOrder.order.reference,
+      stationName: s.workstation.name,
+      operatorName: s.operator?.name ?? null,
+      machineName: s.machine?.name ?? null,
+      declaredQty: s.declaredQty,
+      machineQty: s.quantityDone,
+      delta: d.delta,
+      flagged: d.flagged,
+      finishedAt: s.finishedAt ? s.finishedAt.toISOString() : null,
     };
   });
 }

@@ -1,0 +1,17 @@
+{
+  "name": "oic-edge-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Edge gateway: bridges factory machines (MQTT) to the OIC cloud portal (HTTPS). Runs on a Raspberry Pi / industrial gateway.",
+  "scripts": {
+    "broker": "node broker.mjs",
+    "gateway": "node gateway.mjs",
+    "simulator": "node simulator.mjs",
+    "demo": "node demo.mjs"
+  },
+  "dependencies": {
+    "aedes": "^0.51.3",
+    "mqtt": "^5.10.1"
+  }
+}

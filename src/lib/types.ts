@@ -217,6 +217,36 @@ export interface OperatorVM {
   avgMinutes: number;
 }
 
+/** A machine (edge device) with live connection + production status. */
+export interface MachineVM {
+  id: string;
+  code: string;
+  name: string;
+  active: boolean;
+  online: boolean;
+  lastSeenAt: string | null;
+  stationName: string | null;
+  stationId: string | null;
+  currentProduct: string | null;
+  currentQty: number;
+  currentScrap: number;
+}
+
+/** A machine-verified step comparing operator-declared vs machine-counted qty. */
+export interface DiscrepancyVM {
+  stepId: string;
+  productName: string;
+  orderReference: string;
+  stationName: string;
+  operatorName: string | null;
+  machineName: string | null;
+  declaredQty: number;
+  machineQty: number;
+  delta: number;
+  flagged: boolean;
+  finishedAt: string | null;
+}
+
 /** An open quality non-conformity, as shown on the admin quality view. */
 export interface NonConformityVM {
   id: string;
@@ -282,6 +312,8 @@ export interface TerminalStepVM {
   quantityDone: number;
   plannedMinutes: number;
   priority: Priority;
+  machineName: string | null;
+  machineVerified: boolean;
 }
 
 /** A workstation option for the terminal station picker. */

@@ -199,3 +199,44 @@ export function computeOee(steps: OeeInput[]): Oee {
     downtimeMinutes: downtime,
   };
 }
+
+export interface Discrepancy {
+  declaredQty: number;
+  machineQty: number;
+  delta: number;
+  absDelta: number;
+  pct: number;
+  flagged: boolean;
+}
+
+/**
+ * Compares what an operator declared against what the machine actually
+ * counted. The machine value is the source of truth; a positive delta means
+ * the operator over-declared. `pct` is relative to the machine count.
+ */
+export function computeDiscrepancy(
+  declaredQty: number,
+  machineQty: number,
+): Discrepancy {
+  const delta = declaredQty - machineQty;
+  const absDelta = Math.abs(delta);
+  const pct = machineQty > 0 ? absDelta / machineQty : declaredQty > 0 ? 1 : 0;
+  return {
+    declaredQty,
+    machineQty,
+    delta,
+    absDelta,
+    pct,
+    flagged: absDelta > 0,
+  };
+}
+
+/** True when the machine has reported within the freshness window. */
+export function isMachineOnline(
+  lastSeenAt: Date | null,
+  now: Date,
+  windowSeconds = 60,
+): boolean {
+  if (!lastSeenAt) return false;
+  return now.getTime() - lastSeenAt.getTime() <= windowSeconds * 1000;
+}

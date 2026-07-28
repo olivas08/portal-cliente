@@ -262,9 +262,43 @@ model Workstation {
   active           Boolean         @default(true)
   steps            WorkOrderStep[]
   routingOps       RoutingOperation[]
+  machines         Machine[]
   createdAt        DateTime        @default(now())
 
   @@index([active])
+}
+
+model Machine {
+  id             String           @id @default(cuid())
+  code           String           @unique
+  name           String
+  workstationId  String?
+  workstation    Workstation?     @relation(fields: [workstationId], references: [id], onDelete: SetNull)
+  tokenHash      String
+  active         Boolean          @default(true)
+  lastSeenAt     DateTime?
+  steps          WorkOrderStep[]
+  readings       MachineReading[]
+  createdAt      DateTime         @default(now())
+
+  @@index([active])
+  @@index([workstationId])
+}
+
+model MachineReading {
+  id              String         @id @default(cuid())
+  machineId       String
+  machine         Machine        @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  eventId         String
+  goodDelta       Int            @default(0)
+  scrapDelta      Int            @default(0)
+  workOrderStepId String?
+  step            WorkOrderStep? @relation(fields: [workOrderStepId], references: [id], onDelete: SetNull)
+  producedAt      DateTime
+  receivedAt      DateTime       @default(now())
+
+  @@unique([machineId, eventId])
+  @@index([machineId, receivedAt])
 }
 
 /// A single operation in a product's manufacturing routing (its standard
@@ -348,12 +382,17 @@ model WorkOrderStep {
   downtimeMinutes Float      @default(0)
   quantityDone   Float       @default(0)
   scrapQty       Float       @default(0)
+  declaredQty    Float       @default(0)
+  machineVerified Boolean    @default(false)
   startedAt      DateTime?
   pausedAt       DateTime?
   finishedAt     DateTime?
   operatorId     String?
   operator       Operator?   @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  machineId      String?
+  machine        Machine?    @relation(fields: [machineId], references: [id], onDelete: SetNull)
   nonConformities NonConformity[]
+  readings       MachineReading[]
 
   @@index([workOrderId])
   @@index([workstationId, status])

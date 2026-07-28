@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Factory, Rocket, Plus, AlertCircle, CircleDot, CheckCircle2, Circle, PauseCircle, Ban, Trash2, Flame, Undo2, Route, Gauge, ShieldAlert, Activity } from "lucide-react";
+import { Factory, Rocket, Plus, AlertCircle, CircleDot, CheckCircle2, Circle, PauseCircle, Ban, Trash2, Flame, Undo2, Route, Gauge, ShieldAlert, Activity, Cpu } from "lucide-react";
 import type { WorkOrderVM, WorkOrderStatus, StepStatus } from "@/lib/types";
 import { WORK_ORDER_STATUS_LABELS } from "@/lib/types";
 import {
@@ -101,6 +101,12 @@ export function AdminProductionBoard({ workOrders, unplanned }: Props) {
           className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
         >
           <Gauge size={16} /> Capacidade
+        </Link>
+        <Link
+          href="/admin/producao/maquinas"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          <Cpu size={16} /> Máquinas
         </Link>
         <Link
           href="/admin/producao/roteiros"
