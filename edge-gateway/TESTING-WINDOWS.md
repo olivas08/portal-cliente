@@ -57,7 +57,7 @@ npm run db:seed
 
 | Perfil | Acesso |
 |--------|--------|
-| Admin | `admin@jolucor.pt` / `admin2026` |
+| Admin | `admin@fabrica-demo.pt` / `admin2026` |
 | Operador João Ferreira | PIN `1234` |
 | Operador Miguel Costa | PIN `2345` |
 | Operador Carla Sousa | PIN `3456` |

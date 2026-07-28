@@ -165,14 +165,14 @@ export function LoginForm() {
                   <ShieldCheck size={12} /> Administração (fábrica)
                 </p>
                 <button
-                  onClick={() => fillAccount("admin@jolucor.pt", "admin2026")}
+                  onClick={() => fillAccount("admin@fabrica-demo.pt", "admin2026")}
                   className="w-full text-left bg-slate-800 text-white rounded-lg px-3 py-2.5 hover:bg-slate-700 transition-colors"
                 >
                   <p className="text-xs font-semibold">
-                    Sofia Alves — Jolucor
+                    Sofia Alves — Fábrica Demo
                   </p>
                   <p className="text-xs text-slate-300 mt-0.5">
-                    admin@jolucor.pt · admin2026
+                    admin@fabrica-demo.pt · admin2026
                   </p>
                 </button>
               </div>

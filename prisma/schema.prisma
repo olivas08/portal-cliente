@@ -1,4 +1,4 @@
-// Prisma schema — Portal do Cliente (Jolucor)
+// Prisma schema — Portal do Cliente (Operon)
 // Docs: https://pris.ly/d/prisma-schema
 
 generator client {

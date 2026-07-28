@@ -1,4 +1,4 @@
-# Portal do Cliente — Jolucor
+# Portal do Cliente — Operon
 
 Aplicação real (não mock) do Portal do Cliente para PME industrial, construída com
 Next.js App Router + Server Actions, Prisma e Auth.js. Permite a clientes acompanhar
@@ -46,7 +46,7 @@ de administração gerir estados de encomendas e responder a requerimentos.
 
 | Papel   | Email                        | Palavra-passe |
 |---------|------------------------------|---------------|
-| Admin   | admin@jolucor.pt             | admin2026     |
+| Admin   | admin@fabrica-demo.pt        | admin2026     |
 | Cliente | compras@motapecas.pt         | mota2026      |
 | Cliente | geral@metalsantos.pt         | santos2026    |
 | Cliente | encomendas@plasticosnorte.pt | pn2026        |
