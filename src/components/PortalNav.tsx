@@ -75,7 +75,7 @@ export function PortalNav({ name, company, isAdmin, notifications, unreadCount }
             src={PRODUCT.logo}
             alt={PRODUCT.name}
             width={140}
-            height={38}
+            height={34}
             className="object-contain"
             priority
           />
@@ -130,7 +130,7 @@ export function PortalNav({ name, company, isAdmin, notifications, unreadCount }
                 src={PRODUCT.logo}
                 alt={PRODUCT.name}
                 width={90}
-                height={21}
+                height={22}
                 className="object-contain"
               />
             </div>

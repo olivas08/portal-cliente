@@ -56,7 +56,7 @@ export function LoginForm() {
               src={PRODUCT.logo}
               alt={PRODUCT.name}
               width={200}
-              height={58}
+              height={48}
               className="object-contain"
               priority
             />
