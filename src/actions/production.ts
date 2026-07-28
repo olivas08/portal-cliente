@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth-guard";
+import { guardAction } from "@/lib/errors";
 import {
   requireOperator,
   setOperatorCookie,
@@ -40,66 +41,77 @@ const TERMINAL = "/producao/terminal";
 // ── Admin planning ──────────────────────────────────────────────────────────
 
 export async function generateWorkOrders(orderId: string) {
-  await requireAdmin();
-  const data = generateWorkOrdersSchema.parse({ orderId });
+  return guardAction(async () => {
+    await requireAdmin();
+    const data = generateWorkOrdersSchema.parse({ orderId });
 
-  const created = await generateWorkOrdersForOrder(data.orderId);
+    await generateWorkOrdersForOrder(data.orderId);
 
-  revalidatePath(ADMIN_BOARD);
-  revalidatePath(`/admin/ordens/${orderId}`);
-  return created;
+    revalidatePath(ADMIN_BOARD);
+    revalidatePath(`/admin/ordens/${orderId}`);
+  });
 }
 
 export async function releaseWorkOrder(workOrderId: string) {
-  await requireAdmin();
-  const data = workOrderIdSchema.parse({ workOrderId });
+  return guardAction(async () => {
+    await requireAdmin();
+    const data = workOrderIdSchema.parse({ workOrderId });
 
-  await releaseWorkOrderService(data.workOrderId);
+    await releaseWorkOrderService(data.workOrderId);
 
-  revalidatePath(ADMIN_BOARD);
-  revalidatePath(TERMINAL);
+    revalidatePath(ADMIN_BOARD);
+    revalidatePath(TERMINAL);
+  });
 }
 
 export async function cancelWorkOrder(workOrderId: string) {
-  await requireAdmin();
-  const data = workOrderIdSchema.parse({ workOrderId });
+  return guardAction(async () => {
+    await requireAdmin();
+    const data = workOrderIdSchema.parse({ workOrderId });
 
-  await cancelWorkOrderService(data.workOrderId);
+    await cancelWorkOrderService(data.workOrderId);
 
-  revalidatePath(ADMIN_BOARD);
-  revalidatePath(TERMINAL);
+    revalidatePath(ADMIN_BOARD);
+    revalidatePath(TERMINAL);
+  });
 }
 
 export async function reopenWorkOrder(workOrderId: string) {
-  await requireAdmin();
-  const data = workOrderIdSchema.parse({ workOrderId });
+  return guardAction(async () => {
+    await requireAdmin();
+    const data = workOrderIdSchema.parse({ workOrderId });
 
-  await reopenWorkOrderService(data.workOrderId);
+    await reopenWorkOrderService(data.workOrderId);
 
-  revalidatePath(ADMIN_BOARD);
-  revalidatePath(TERMINAL);
+    revalidatePath(ADMIN_BOARD);
+    revalidatePath(TERMINAL);
+  });
 }
 
 export async function deleteWorkOrder(workOrderId: string) {
-  await requireAdmin();
-  const data = workOrderIdSchema.parse({ workOrderId });
+  return guardAction(async () => {
+    await requireAdmin();
+    const data = workOrderIdSchema.parse({ workOrderId });
 
-  await deleteWorkOrderService(data.workOrderId);
+    await deleteWorkOrderService(data.workOrderId);
 
-  revalidatePath(ADMIN_BOARD);
+    revalidatePath(ADMIN_BOARD);
+  });
 }
 
 export async function setWorkOrderPriority(
   workOrderId: string,
   priority: "normal" | "urgent",
 ) {
-  await requireAdmin();
-  const data = setWorkOrderPrioritySchema.parse({ workOrderId, priority });
+  return guardAction(async () => {
+    await requireAdmin();
+    const data = setWorkOrderPrioritySchema.parse({ workOrderId, priority });
 
-  await setWorkOrderPriorityService(data.workOrderId, data.priority);
+    await setWorkOrderPriorityService(data.workOrderId, data.priority);
 
-  revalidatePath(ADMIN_BOARD);
-  revalidatePath(TERMINAL);
+    revalidatePath(ADMIN_BOARD);
+    revalidatePath(TERMINAL);
+  });
 }
 
 const ADMIN_ROUTING = "/admin/producao/roteiros";

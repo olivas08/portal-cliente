@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { actionError } from "@/lib/action-result";
 import Link from "next/link";
 import {
   Route,
@@ -76,7 +77,12 @@ export function BomManager({ products, materials }: Props) {
     setSaved(false);
     startTransition(async () => {
       try {
-        await setProductBom({ productId: selected.id, items });
+        const res = await setProductBom({ productId: selected.id, items });
+        const msg = actionError(res);
+        if (msg) {
+          setError(msg);
+          return;
+        }
         setSaved(true);
         router.refresh();
       } catch (e) {

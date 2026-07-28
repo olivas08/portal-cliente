@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { actionError } from "@/lib/action-result";
 import Link from "next/link";
 import {
   Warehouse,
@@ -63,12 +64,17 @@ export function WarehouseView({ materials, awaiting, movements }: Props) {
   const [emin, setEmin] = useState(0);
   const [eactive, setEactive] = useState(true);
 
-  const run = (fn: () => Promise<void>, okMsg?: string) => {
+  const run = (fn: () => Promise<unknown>, okMsg?: string) => {
     setError(null);
     setNotice(null);
     startTransition(async () => {
       try {
-        await fn();
+        const res = await fn();
+        const msg = actionError(res);
+        if (msg) {
+          setError(msg);
+          return;
+        }
         if (okMsg) setNotice(okMsg);
         router.refresh();
       } catch (e) {

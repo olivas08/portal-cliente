@@ -11,10 +11,12 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  /* Brand system: deep navy primary + amber accent */
-  --color-brand: #0f172a;
-  --color-brand-soft: #1e293b;
-  --color-brand-line: #334155;
+  /* Brand system: Operon graphite/navy primary + amber accent.
+     brand / brand-soft match the logo tones exactly (navy #232f3f, slate
+     #3a4e59); brand-line is a lighter slate for borders/dividers. */
+  --color-brand: #232f3f;
+  --color-brand-soft: #3a4e59;
+  --color-brand-line: #4a5f6b;
   --color-accent: #f59e0b;
   --color-accent-dark: #d97706;
   --color-accent-soft: #fef3c7;

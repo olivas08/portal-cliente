@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { actionError } from "@/lib/action-result";
 import Link from "next/link";
 import { Factory, Rocket, Plus, AlertCircle, CircleDot, CheckCircle2, Circle, PauseCircle, Ban, Trash2, Flame, Undo2, Route, Gauge, ShieldAlert, Activity, Cpu } from "lucide-react";
 import type { WorkOrderVM, WorkOrderStatus, StepStatus } from "@/lib/types";
@@ -58,7 +59,12 @@ export function AdminProductionBoard({ workOrders, unplanned }: Props) {
     setError(null);
     startTransition(async () => {
       try {
-        await fn();
+        const res = await fn();
+        const msg = actionError(res);
+        if (msg) {
+          setError(msg);
+          return;
+        }
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Ocorreu um erro.");

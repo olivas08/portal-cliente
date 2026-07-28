@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth-guard";
+import { guardAction } from "@/lib/errors";
 import {
   createMaterial as createMaterialService,
   updateMaterial as updateMaterialService,
@@ -25,37 +26,47 @@ const ADMIN_BOM = "/admin/armazem/fichas-tecnicas";
 const ADMIN_BOARD = "/admin/producao";
 
 export async function createMaterial(input: CreateMaterialInput) {
-  await requireAdmin();
-  const data = createMaterialSchema.parse(input);
-  await createMaterialService(data);
-  revalidatePath(ADMIN_WAREHOUSE);
+  return guardAction(async () => {
+    await requireAdmin();
+    const data = createMaterialSchema.parse(input);
+    await createMaterialService(data);
+    revalidatePath(ADMIN_WAREHOUSE);
+  });
 }
 
 export async function updateMaterial(input: UpdateMaterialInput) {
-  await requireAdmin();
-  const data = updateMaterialSchema.parse(input);
-  await updateMaterialService(data);
-  revalidatePath(ADMIN_WAREHOUSE);
+  return guardAction(async () => {
+    await requireAdmin();
+    const data = updateMaterialSchema.parse(input);
+    await updateMaterialService(data);
+    revalidatePath(ADMIN_WAREHOUSE);
+  });
 }
 
 export async function receiveStock(input: ReceiveStockInput) {
-  await requireAdmin();
-  const data = receiveStockSchema.parse(input);
-  await receiveStockService(data);
-  revalidatePath(ADMIN_WAREHOUSE);
+  return guardAction(async () => {
+    await requireAdmin();
+    const data = receiveStockSchema.parse(input);
+    await receiveStockService(data);
+    revalidatePath(ADMIN_WAREHOUSE);
+  });
 }
 
 export async function adjustStock(input: AdjustStockInput) {
-  await requireAdmin();
-  const data = adjustStockSchema.parse(input);
-  await adjustStockService(data);
-  revalidatePath(ADMIN_WAREHOUSE);
+  return guardAction(async () => {
+    await requireAdmin();
+    const data = adjustStockSchema.parse(input);
+    await adjustStockService(data);
+    revalidatePath(ADMIN_WAREHOUSE);
+  });
 }
 
 export async function setProductBom(input: SetProductBomInput) {
-  await requireAdmin();
-  const data = setProductBomSchema.parse(input);
-  await setProductBomService(data);
-  revalidatePath(ADMIN_BOM);
-  revalidatePath(ADMIN_BOARD);
+  return guardAction(async () => {
+    await requireAdmin();
+    const data = setProductBomSchema.parse(input);
+    await setProductBomService(data);
+    revalidatePath(ADMIN_BOM);
+    revalidatePath(ADMIN_BOARD);
+  });
 }

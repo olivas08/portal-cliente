@@ -21,3 +21,23 @@ export class NotFoundError extends AppError {
     super(message);
   }
 }
+
+/**
+ * Uniform result returned by server actions. Expected domain failures
+ * (`AppError`) are returned as `{ error }` instead of thrown, because Next.js
+ * redacts thrown Server Action messages in production builds (the client would
+ * only ever see a generic "digest" error). Returning the message lets the UI
+ * surface the real reason (e.g. "Stock insuficiente…").
+ */
+export type ActionResult = { error: string } | void;
+
+export async function guardAction(
+  fn: () => Promise<void>,
+): Promise<ActionResult> {
+  try {
+    await fn();
+  } catch (e) {
+    if (e instanceof AppError) return { error: e.message };
+    throw e;
+  }
+}
