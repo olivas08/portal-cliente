@@ -91,8 +91,8 @@ Deixa esta janela a correr.
 
 ## 3. Correr os simuladores das máquinas
 
-Tens **três opções**. Começa pela A (mais simples); a B e a C provam os
-protocolos industriais reais (PLC e CNC).
+Tens **quatro opções**. Começa pela A (mais simples); a B, C e D provam os
+protocolos industriais reais (PLC, CNC-OPC-UA e máquinas-ferramenta MTConnect).
 
 > ⚠️ **Sintaxe de variáveis de ambiente no PowerShell** é diferente do Linux/Mac.
 > Usa `$env:NOME="valor";` **antes** do comando, na mesma linha.
@@ -139,6 +139,22 @@ $env:CLOUD_URL="http://localhost:3000"; npm run demo:opcua
 Arranca o broker + gateway + 2 **CNC simuladas em OPC-UA** (servidor com nós
 `Good`/`Scrap`/`State`), cada uma com o seu **adapter** OPC-UA→MQTT. O arranque
 do servidor OPC-UA demora uns segundos a mais que o Modbus — é normal.
+
+### Opção D — Caminho máquina-ferramenta (MTConnect)
+
+Prova o percurso de uma máquina-ferramenta com agente MTConnect (HTTP/XML):
+**Máquina (MTConnect) → adapter → MQTT → gateway → HTTPS → cloud**.
+
+Na **janela 2**:
+
+```powershell
+cd edge-gateway
+$env:CLOUD_URL="http://localhost:3000"; npm run demo:mtconnect
+```
+
+Arranca o broker + gateway + 2 **agentes MTConnect simulados** (servem
+`/current` com `PartCount` + `Execution`), cada um com o seu **adapter**
+MTConnect→MQTT.
 
 Em qualquer das opções, vais ver no terminal linhas como:
 
@@ -248,6 +264,19 @@ cd edge-gateway; $env:CLOUD_URL="http://localhost:3000"; npm run gateway
 cd edge-gateway; npm run opcua-sim CNC-02 1500
 # janela D — adapter OPC-UA -> MQTT
 cd edge-gateway; npm run opcua-adapter CNC-02 1000
+```
+
+**Caminho MTConnect (máquina-ferramenta)** — 4 janelas:
+
+```powershell
+# janela A — broker
+cd edge-gateway; npm run broker
+# janela B — gateway
+cd edge-gateway; $env:CLOUD_URL="http://localhost:3000"; npm run gateway
+# janela C — agente MTConnect simulado (servidor HTTP)
+cd edge-gateway; npm run mtconnect-sim PRENSA-01 1500
+# janela D — adapter MTConnect -> MQTT
+cd edge-gateway; npm run mtconnect-adapter PRENSA-01 1000
 ```
 
 ---

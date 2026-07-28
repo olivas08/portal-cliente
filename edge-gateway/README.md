@@ -5,8 +5,8 @@ e sucata) come **directly from the machine** instead of being typed by the
 operator — eliminating manual error and tampering.
 
 ```
-[Máquina] --Modbus TCP / OPC-UA--> [Adapter] --MQTT--> [Edge Gateway] --HTTPS--> [Portal Cloud]
- PLC/CNC/sensor                     factory/<CODE>/*     store-and-forward        /api/machine/ingest
+[Máquina] --Modbus TCP / OPC-UA / MTConnect--> [Adapter] --MQTT--> [Edge Gateway] --HTTPS--> [Portal Cloud]
+ PLC/CNC/sensor                                 factory/<CODE>/*     store-and-forward        /api/machine/ingest
 ```
 
 The portal runs on serverless (Vercel), which cannot hold a permanent MQTT
@@ -25,10 +25,13 @@ forwards to the cloud over **HTTPS** with a durable buffer.
 | `modbus-adapter.mjs` | **Real protocol adapter** — polls a PLC over Modbus TCP and republishes as MQTT. |
 | `opcua-machine-sim.mjs` | Fake **CNC speaking OPC-UA** (server with Good/Scrap/State nodes). |
 | `opcua-adapter.mjs` | **Real protocol adapter** — reads a controller over OPC-UA and republishes as MQTT. |
+| `mtconnect-machine-sim.mjs` | Fake **machine tool with an MTConnect agent** (HTTP/XML: PartCount + Execution). |
+| `mtconnect-adapter.mjs` | **Real protocol adapter** — polls an MTConnect agent's `/current` and republishes as MQTT. |
 | `demo.mjs` | One-process MQTT demo (broker + gateway + 2 machines). |
 | `demo-modbus.mjs` | One-process **full industrial demo** (broker + gateway + 2 PLCs + adapters). |
 | `demo-opcua.mjs` | One-process **CNC demo** (broker + gateway + 2 OPC-UA controllers + adapters). |
-| `machines.json` | Per machine: cloud `token`, MQTT credentials, `counterMax`, Modbus & OPC-UA mapping. |
+| `demo-mtconnect.mjs` | One-process **machine-tool demo** (broker + gateway + 2 MTConnect agents + adapters). |
+| `machines.json` | Per machine: cloud `token`, MQTT credentials, `counterMax`, Modbus / OPC-UA / MTConnect mapping. |
 
 ## Quick demo (for the pitch)
 
@@ -49,6 +52,8 @@ forwards to the cloud over **HTTPS** with a durable buffer.
    CLOUD_URL=https://portal-cliente-rosy.vercel.app npm run demo:modbus
    # …or the CNC path (controller over OPC-UA -> adapter -> MQTT):
    CLOUD_URL=https://portal-cliente-rosy.vercel.app npm run demo:opcua
+   # …or the machine-tool path (MTConnect agent -> adapter -> MQTT):
+   CLOUD_URL=https://portal-cliente-rosy.vercel.app npm run demo:mtconnect
    ```
 
 4. Watch **Produção → Máquinas** in the portal: the counts climb on their own,
@@ -87,6 +92,14 @@ npm run opcua-sim CNC-02 1500         # terminal 3 — a CNC (OPC-UA server)
 npm run opcua-adapter CNC-02 1000     # terminal 4 — OPC-UA->MQTT adapter
 ```
 
+MTConnect (machine tool) machine:
+```bash
+npm run broker                          # terminal 1
+CLOUD_URL=https://... npm run gateway    # terminal 2
+npm run mtconnect-sim PRENSA-01 1500    # terminal 3 — an MTConnect agent (HTTP)
+npm run mtconnect-adapter PRENSA-01 1000 # terminal 4 — MTConnect->MQTT adapter
+```
+
 ## Tests
 
 ```bash
@@ -95,8 +108,8 @@ npm test    # node --test — counter delta (reset/overflow) + window aggregatio
 
 ## Going to real hardware
 
-The Modbus **and** OPC-UA adapters are working templates. Choose the path by
-machine type:
+The Modbus, OPC-UA **and** MTConnect adapters are working templates. Choose the
+path by machine type:
 
 - **PLC-controlled (most industrial machines):** point `modbus-adapter.mjs` at the
   real PLC IP/port in `machines.json` and map the counter/state registers. Done.
@@ -107,7 +120,8 @@ machine type:
 - **Dumb/old machines:** wire an inductive/photoelectric sensor to a Raspberry Pi
   **GPIO**, count pulses (one pulse = one part), publish `factory/<CODE>/counter`
   with the running total.
-- **Other CNC protocols:** **MTConnect** (HTTP/XML), Fanuc **FOCAS** or injection
+- **CNC / injection moulding protocols:** **MTConnect** (HTTP/XML — see
+  `mtconnect-adapter.mjs`, a working template), Fanuc **FOCAS** or injection
   **Euromap 63/77**; write an adapter that publishes the same MQTT messages — the
   gateway and cloud stay unchanged.
 
