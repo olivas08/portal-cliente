@@ -17,7 +17,6 @@ export type StepStatus = $Enums.StepStatus;
 export type NcDisposition = $Enums.NcDisposition;
 export type NcStatus = $Enums.NcStatus;
 export type QuoteStatus = $Enums.QuoteStatus;
-export type QuoteOperation = $Enums.QuoteOperation;
 
 export interface NotificationVM {
   id: string;
@@ -48,14 +47,6 @@ export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
   sent: "Enviado",
   accepted: "Aceite",
   rejected: "Recusado",
-};
-
-export const QUOTE_OPERATION_LABELS: Record<QuoteOperation, string> = {
-  corte_laser: "Corte a laser",
-  quinagem: "Quinagem",
-  soldadura: "Soldadura",
-  acabamento: "Acabamento",
-  outro: "Outro",
 };
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
@@ -160,14 +151,37 @@ export interface RequestVM extends RequestBaseVM {
   messages: RequestMessageVM[];
 }
 
-/** The global costing assumptions behind every quote line calculation. */
+/** The global costing assumptions behind every quote line calculation.
+ * Per-operation rates live in `OperationTypeVM` instead (see below). */
 export interface PricingSettingsVM {
   steelPriceEurKg: number;
-  laserEurPerMinute: number;
-  bendEurPerBend: number;
-  weldingEurPerMinute: number;
-  finishingEurPerM2: number;
   defaultMarginPercent: number;
+}
+
+/** A configurable shop-floor processing step (corte a laser, quinagem,
+ * soldadura, ...), priced at `ratePerUnitEur` per `unit` (min, dobra, m²,
+ * ...). Managed by admins on `/admin/orcamentos/definicoes`. */
+export interface OperationTypeVM {
+  id: string;
+  key: string;
+  name: string;
+  unit: string;
+  ratePerUnitEur: number;
+  active: boolean;
+  sequence: number;
+}
+
+/** One operation applied to a quote line, with its name/unit/rate frozen
+ * at save time so editing/removing an `OperationTypeVM` later never
+ * changes an already-priced quote. */
+export interface QuoteLineOperationVM {
+  id: string;
+  operationTypeId: string | null;
+  name: string;
+  unit: string;
+  quantity: number;
+  ratePerUnitEur: number;
+  costEur: number;
 }
 
 /** One priced line of a quote (see `QuoteVM`). */
@@ -175,14 +189,10 @@ export interface QuoteLineVM {
   id: string;
   sequence: number;
   description: string;
-  operation: QuoteOperation;
   quantity: number;
   unit: string;
   materialWeightKg: number;
-  laserMinutes: number;
-  bendCount: number;
-  weldingMinutes: number;
-  finishingM2: number;
+  operations: QuoteLineOperationVM[];
   unitCostEur: number;
   lineTotalEur: number;
 }

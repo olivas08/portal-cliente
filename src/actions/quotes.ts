@@ -10,10 +10,15 @@ import {
   sendQuote as sendQuoteService,
   decideQuote as decideQuoteService,
   updatePricingSettings as updatePricingSettingsService,
+  createOperationType as createOperationTypeService,
+  updateOperationType as updateOperationTypeService,
+  deleteOperationType as deleteOperationTypeService,
   quoteSchema,
   pricingSettingsSchema,
+  operationTypeSchema,
   type QuoteInput,
   type PricingSettingsInput,
+  type OperationTypeInput,
 } from "@/services/quotes.service";
 
 const ADMIN_QUOTES = "/admin/orcamentos";
@@ -61,6 +66,33 @@ export async function updatePricingSettings(input: PricingSettingsInput) {
     await requireAdmin();
     const data = pricingSettingsSchema.parse(input);
     await updatePricingSettingsService(data);
+    revalidatePath(`${ADMIN_QUOTES}/definicoes`);
+  });
+}
+
+export async function createOperationType(input: OperationTypeInput) {
+  return guardAction(async () => {
+    await requireAdmin();
+    const data = operationTypeSchema.parse(input);
+    const id = await createOperationTypeService(data);
+    revalidatePath(`${ADMIN_QUOTES}/definicoes`);
+    return id;
+  });
+}
+
+export async function updateOperationType(id: string, input: OperationTypeInput) {
+  return guardAction(async () => {
+    await requireAdmin();
+    const data = operationTypeSchema.parse(input);
+    await updateOperationTypeService(id, data);
+    revalidatePath(`${ADMIN_QUOTES}/definicoes`);
+  });
+}
+
+export async function deleteOperationType(id: string) {
+  return guardAction(async () => {
+    await requireAdmin();
+    await deleteOperationTypeService(id);
     revalidatePath(`${ADMIN_QUOTES}/definicoes`);
   });
 }

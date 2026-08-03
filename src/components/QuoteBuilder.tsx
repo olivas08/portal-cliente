@@ -4,33 +4,29 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import type { PricingSettingsVM, QuoteOperation, QuoteVM } from "@/lib/types";
-import { QUOTE_OPERATION_LABELS } from "@/lib/types";
+import type { OperationTypeVM, PricingSettingsVM, QuoteVM } from "@/lib/types";
 import { createQuote, updateQuote } from "@/actions/quotes";
 import { actionError } from "@/lib/action-result";
 
+interface LineOperationForm {
+  operationTypeId: string;
+  quantity: string;
+}
+
 interface LineForm {
   description: string;
-  operation: QuoteOperation;
   quantity: string;
   unit: string;
   materialWeightKg: string;
-  laserMinutes: string;
-  bendCount: string;
-  weldingMinutes: string;
-  finishingM2: string;
+  operations: LineOperationForm[];
 }
 
 const EMPTY_LINE: LineForm = {
   description: "",
-  operation: "corte_laser",
   quantity: "1",
   unit: "un",
   materialWeightKg: "0",
-  laserMinutes: "0",
-  bendCount: "0",
-  weldingMinutes: "0",
-  finishingM2: "0",
+  operations: [],
 };
 
 function num(v: string): number {
@@ -38,14 +34,22 @@ function num(v: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function lineCost(pricing: PricingSettingsVM, l: LineForm): number {
-  return (
-    num(l.materialWeightKg) * pricing.steelPriceEurKg +
-    num(l.laserMinutes) * pricing.laserEurPerMinute +
-    num(l.bendCount) * pricing.bendEurPerBend +
-    num(l.weldingMinutes) * pricing.weldingEurPerMinute +
-    num(l.finishingM2) * pricing.finishingEurPerM2
-  );
+/** Live client-side cost preview for a line: material weight × steel price,
+ * plus each selected operation's quantity × its current rate. Mirrors
+ * `priceLines` in `quotes.service.ts` (the source of truth used on save) —
+ * if an operation type can't be resolved (e.g. deleted mid-edit) it's
+ * skipped here and the server will surface a clear error on submit instead
+ * of silently mis-pricing. */
+function lineCost(
+  pricing: PricingSettingsVM,
+  opMap: Map<string, OperationTypeVM>,
+  l: LineForm,
+): number {
+  const opsCost = l.operations.reduce((s, o) => {
+    const ot = opMap.get(o.operationTypeId);
+    return ot ? s + num(o.quantity) * ot.ratePerUnitEur : s;
+  }, 0);
+  return num(l.materialWeightKg) * pricing.steelPriceEurKg + opsCost;
 }
 
 const inputCls =
@@ -56,15 +60,23 @@ const smallInputCls =
 export function QuoteBuilder({
   companies,
   pricing,
+  operationTypes,
   quote,
 }: {
   companies: { id: string; name: string }[];
   pricing: PricingSettingsVM;
+  operationTypes: OperationTypeVM[];
   quote?: QuoteVM;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  const opMap = useMemo(
+    () => new Map(operationTypes.map((o) => [o.id, o])),
+    [operationTypes],
+  );
+  const defaultOperationTypeId = operationTypes.find((o) => o.active)?.id ?? "";
 
   const [companyId, setCompanyId] = useState(quote?.companyId ?? companies[0]?.id ?? "");
   const [subject, setSubject] = useState(quote?.subject ?? "");
@@ -77,14 +89,13 @@ export function QuoteBuilder({
     quote
       ? quote.lines.map((l) => ({
           description: l.description,
-          operation: l.operation,
           quantity: String(l.quantity),
           unit: l.unit,
           materialWeightKg: String(l.materialWeightKg),
-          laserMinutes: String(l.laserMinutes),
-          bendCount: String(l.bendCount),
-          weldingMinutes: String(l.weldingMinutes),
-          finishingM2: String(l.finishingM2),
+          operations: l.operations.map((o) => ({
+            operationTypeId: o.operationTypeId ?? "",
+            quantity: String(o.quantity),
+          })),
         }))
       : [{ ...EMPTY_LINE }],
   );
@@ -93,11 +104,11 @@ export function QuoteBuilder({
   const priced = useMemo(
     () =>
       lines.map((l) => {
-        const unitCost = lineCost(pricing, l);
+        const unitCost = lineCost(pricing, opMap, l);
         const total = unitCost * num(l.quantity) * (1 + margin / 100);
         return { unitCost, total };
       }),
-    [lines, pricing, margin],
+    [lines, pricing, opMap, margin],
   );
   const grandTotal = priced.reduce((s, p) => s + p.total, 0);
 
@@ -113,6 +124,38 @@ export function QuoteBuilder({
     setLines((ls) => (ls.length > 1 ? ls.filter((_, idx) => idx !== i) : ls));
   }
 
+  function addOperation(lineIdx: number) {
+    updateLine(lineIdx, {
+      operations: [
+        ...lines[lineIdx].operations,
+        { operationTypeId: defaultOperationTypeId, quantity: "0" },
+      ],
+    });
+  }
+
+  function updateOperation(lineIdx: number, opIdx: number, patch: Partial<LineOperationForm>) {
+    setLines((ls) =>
+      ls.map((l, idx) =>
+        idx === lineIdx
+          ? {
+              ...l,
+              operations: l.operations.map((o, oi) => (oi === opIdx ? { ...o, ...patch } : o)),
+            }
+          : l,
+      ),
+    );
+  }
+
+  function removeOperation(lineIdx: number, opIdx: number) {
+    setLines((ls) =>
+      ls.map((l, idx) =>
+        idx === lineIdx
+          ? { ...l, operations: l.operations.filter((_, oi) => oi !== opIdx) }
+          : l,
+      ),
+    );
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -125,14 +168,12 @@ export function QuoteBuilder({
       validUntil: validUntil || undefined,
       lines: lines.map((l) => ({
         description: l.description.trim(),
-        operation: l.operation,
         quantity: num(l.quantity),
         unit: l.unit.trim() || "un",
         materialWeightKg: num(l.materialWeightKg),
-        laserMinutes: num(l.laserMinutes),
-        bendCount: num(l.bendCount),
-        weldingMinutes: num(l.weldingMinutes),
-        finishingM2: num(l.finishingM2),
+        operations: l.operations
+          .filter((o) => o.operationTypeId)
+          .map((o) => ({ operationTypeId: o.operationTypeId, quantity: num(o.quantity) })),
       })),
     };
 
@@ -271,118 +312,105 @@ export function QuoteBuilder({
               </div>
               <div>
                 <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                  Operação
+                  Qtd. *
                 </label>
-                <select
+                <input
+                  required
+                  type="number"
+                  min="0.01"
+                  step="0.01"
                   className={smallInputCls}
-                  value={line.operation}
-                  onChange={(e) =>
-                    updateLine(i, { operation: e.target.value as QuoteOperation })
-                  }
-                >
-                  {(Object.keys(QUOTE_OPERATION_LABELS) as QuoteOperation[]).map(
-                    (op) => (
-                      <option key={op} value={op}>
-                        {QUOTE_OPERATION_LABELS[op]}
-                      </option>
-                    ),
-                  )}
-                </select>
+                  value={line.quantity}
+                  onChange={(e) => updateLine(i, { quantity: e.target.value })}
+                />
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                    Qtd. *
-                  </label>
-                  <input
-                    required
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    className={smallInputCls}
-                    value={line.quantity}
-                    onChange={(e) => updateLine(i, { quantity: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                    Un.
-                  </label>
-                  <input
-                    className={smallInputCls}
-                    value={line.unit}
-                    onChange={(e) => updateLine(i, { unit: e.target.value })}
-                  />
-                </div>
+              <div>
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                  Un.
+                </label>
+                <input
+                  className={smallInputCls}
+                  value={line.unit}
+                  onChange={(e) => updateLine(i, { unit: e.target.value })}
+                />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-slate-100">
-              <div>
-                <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                  Chapa (kg)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  className={smallInputCls}
-                  value={line.materialWeightKg}
-                  onChange={(e) => updateLine(i, { materialWeightKg: e.target.value })}
-                />
+            <div className="pt-2 border-t border-slate-100">
+              <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                Chapa / material (kg)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className={smallInputCls + " sm:w-40"}
+                value={line.materialWeightKg}
+                onChange={(e) => updateLine(i, { materialWeightKg: e.target.value })}
+              />
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-medium text-slate-500">
+                  Operações (processamento)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => addOperation(i)}
+                  disabled={!defaultOperationTypeId}
+                  className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800 disabled:opacity-40"
+                >
+                  <Plus size={13} /> Adicionar operação
+                </button>
               </div>
-              <div>
-                <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                  Laser (min)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  className={smallInputCls}
-                  value={line.laserMinutes}
-                  onChange={(e) => updateLine(i, { laserMinutes: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                  Quinagem (dobras)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  className={smallInputCls}
-                  value={line.bendCount}
-                  onChange={(e) => updateLine(i, { bendCount: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                  Soldadura (min)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  className={smallInputCls}
-                  value={line.weldingMinutes}
-                  onChange={(e) => updateLine(i, { weldingMinutes: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                  Acabamento (m²)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  className={smallInputCls}
-                  value={line.finishingM2}
-                  onChange={(e) => updateLine(i, { finishingM2: e.target.value })}
-                />
-              </div>
+
+              {line.operations.length === 0 && (
+                <p className="text-xs text-slate-400">
+                  Nenhuma operação — apenas custo de material, se aplicável.
+                </p>
+              )}
+
+              {line.operations.map((op, oi) => {
+                const ot = opMap.get(op.operationTypeId);
+                return (
+                  <div key={oi} className="flex items-center gap-2">
+                    <select
+                      className={smallInputCls + " flex-1"}
+                      value={op.operationTypeId}
+                      onChange={(e) =>
+                        updateOperation(i, oi, { operationTypeId: e.target.value })
+                      }
+                    >
+                      {!ot && op.operationTypeId && (
+                        <option value={op.operationTypeId}>Operação removida</option>
+                      )}
+                      {operationTypes.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                          {o.active ? "" : " (inativo)"}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      className={smallInputCls + " w-24"}
+                      value={op.quantity}
+                      onChange={(e) => updateOperation(i, oi, { quantity: e.target.value })}
+                    />
+                    <span className="text-xs text-slate-400 w-10">{ot?.unit ?? ""}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeOperation(i, oi)}
+                      className="text-slate-400 hover:text-red-500"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ))}

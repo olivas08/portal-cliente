@@ -28,6 +28,7 @@ import type {
   QuoteSummaryVM,
   QuoteLineVM,
   PricingSettingsVM,
+  OperationTypeVM,
 } from "@/lib/types";
 import { STOCK_REASON_LABELS } from "@/lib/types";
 import { toIsoDate } from "@/lib/dates";
@@ -39,7 +40,10 @@ import {
   computeDiscrepancy,
   isMachineOnline,
 } from "@/services/production-status";
-import { getPricingSettings as getPricingSettingsService } from "@/services/quotes.service";
+import {
+  getPricingSettings as getPricingSettingsService,
+  getOperationTypes as getOperationTypesService,
+} from "@/services/quotes.service";
 import type {
   Order,
   OrderItem,
@@ -49,6 +53,7 @@ import type {
   Company,
   Quote,
   QuoteLine,
+  QuoteLineOperation,
 } from "@prisma/client";
 
 type OrderSummaryWith = Order & { items: OrderItem[]; company: Company };
@@ -207,19 +212,23 @@ export async function getRequestById(id: string): Promise<RequestVM | null> {
   return request ? toRequestVM(request) : null;
 }
 
-function toQuoteLineVM(l: QuoteLine): QuoteLineVM {
+function toQuoteLineVM(l: QuoteLine & { operations: QuoteLineOperation[] }): QuoteLineVM {
   return {
     id: l.id,
     sequence: l.sequence,
     description: l.description,
-    operation: l.operation,
     quantity: l.quantity,
     unit: l.unit,
     materialWeightKg: l.materialWeightKg,
-    laserMinutes: l.laserMinutes,
-    bendCount: l.bendCount,
-    weldingMinutes: l.weldingMinutes,
-    finishingM2: l.finishingM2,
+    operations: l.operations.map((o) => ({
+      id: o.id,
+      operationTypeId: o.operationTypeId,
+      name: o.name,
+      unit: o.unit,
+      quantity: o.quantity,
+      ratePerUnitEur: o.ratePerUnitEur,
+      costEur: o.costEur,
+    })),
     unitCostEur: l.unitCostEur,
     lineTotalEur: l.lineTotalEur,
   };
@@ -264,7 +273,10 @@ export async function getAllQuotes(): Promise<QuoteSummaryVM[]> {
 export async function getQuoteById(id: string): Promise<QuoteVM | null> {
   const quote = await prisma.quote.findUnique({
     where: { id },
-    include: { company: true, lines: { orderBy: { sequence: "asc" } } },
+    include: {
+      company: true,
+      lines: { include: { operations: true }, orderBy: { sequence: "asc" } },
+    },
   });
   if (!quote) return null;
   return { ...toQuoteBase(quote), lines: quote.lines.map(toQuoteLineVM) };
@@ -274,12 +286,21 @@ export async function getPricingSettingsVM(): Promise<PricingSettingsVM> {
   const s = await getPricingSettingsService();
   return {
     steelPriceEurKg: s.steelPriceEurKg,
-    laserEurPerMinute: s.laserEurPerMinute,
-    bendEurPerBend: s.bendEurPerBend,
-    weldingEurPerMinute: s.weldingEurPerMinute,
-    finishingEurPerM2: s.finishingEurPerM2,
     defaultMarginPercent: s.defaultMarginPercent,
   };
+}
+
+export async function getOperationTypesVM(): Promise<OperationTypeVM[]> {
+  const types = await getOperationTypesService();
+  return types.map((t) => ({
+    id: t.id,
+    key: t.key,
+    name: t.name,
+    unit: t.unit,
+    ratePerUnitEur: t.ratePerUnitEur,
+    active: t.active,
+    sequence: t.sequence,
+  }));
 }
 
 export async function getCompanies() {

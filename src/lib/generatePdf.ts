@@ -311,13 +311,17 @@ export function generateQuoteProposal(quote: QuoteVM) {
   autoTable(doc, {
     startY: 72 + subjectLines.length * 5 + 6,
     head: [["#", "Descrição", "Qtd.", "Un.", "Total (€)"]],
-    body: quote.lines.map((l) => [
-      String(l.sequence),
-      l.description,
-      String(l.quantity),
-      l.unit,
-      l.lineTotalEur.toFixed(2),
-    ]),
+    body: quote.lines.map((l) => {
+      const details: string[] = [];
+      if (l.materialWeightKg > 0) details.push(`Material: ${l.materialWeightKg} kg`);
+      if (l.operations.length > 0) {
+        details.push(l.operations.map((o) => `${o.name} (${o.quantity} ${o.unit})`).join(", "));
+      }
+      const description = details.length
+        ? `${l.description}\n${details.join(" · ")}`
+        : l.description;
+      return [String(l.sequence), description, String(l.quantity), l.unit, l.lineTotalEur.toFixed(2)];
+    }),
     headStyles: { fillColor: [35, 35, 35], fontSize: 9, fontStyle: "bold" },
     bodyStyles: { fontSize: 9 },
     alternateRowStyles: { fillColor: [248, 248, 248] },

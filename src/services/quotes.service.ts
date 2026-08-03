@@ -4,30 +4,45 @@ import { NotFoundError, AppError } from "@/lib/errors";
 import { assertCompanyAccess, type SessionUser } from "@/lib/auth-guard";
 import { createWithReference } from "@/services/reference.service";
 import { notifyAdmins, notifyCompanyClients } from "@/services/notifications.service";
-import type { PricingSettings, Quote, QuoteLine } from "@prisma/client";
+import type { PricingSettings, Quote, QuoteLine, OperationType } from "@prisma/client";
 
 // ── Schemas ─────────────────────────────────────────────────────────────────
 
 export const pricingSettingsSchema = z.object({
   steelPriceEurKg: z.number().nonnegative("Não pode ser negativo."),
-  laserEurPerMinute: z.number().nonnegative("Não pode ser negativo."),
-  bendEurPerBend: z.number().nonnegative("Não pode ser negativo."),
-  weldingEurPerMinute: z.number().nonnegative("Não pode ser negativo."),
-  finishingEurPerM2: z.number().nonnegative("Não pode ser negativo."),
   defaultMarginPercent: z.number().min(0).max(500, "Margem inválida."),
 });
 export type PricingSettingsInput = z.infer<typeof pricingSettingsSchema>;
 
+/** An operation type's `key` doubles as a stable machine identifier (kept
+ * distinct from its editable display `name`) — lowercase/digits/underscore
+ * only, e.g. "jato_agua", so it reads well in exports/logs. */
+export const operationTypeSchema = z.object({
+  key: z
+    .string()
+    .trim()
+    .min(1, "Chave obrigatória.")
+    .max(40)
+    .regex(/^[a-z0-9_]+$/, "Use apenas minúsculas, números e _ (ex: jato_agua)."),
+  name: z.string().trim().min(1, "Nome obrigatório.").max(60),
+  unit: z.string().trim().min(1, "Unidade obrigatória.").max(20),
+  ratePerUnitEur: z.coerce.number().nonnegative("Não pode ser negativo."),
+  active: z.boolean().default(true),
+});
+export type OperationTypeInput = z.infer<typeof operationTypeSchema>;
+
+const quoteLineOperationSchema = z.object({
+  operationTypeId: z.string().trim().min(1, "Operação obrigatória."),
+  quantity: z.coerce.number().min(0).default(0),
+});
+export type QuoteLineOperationInput = z.infer<typeof quoteLineOperationSchema>;
+
 const quoteLineSchema = z.object({
   description: z.string().trim().min(1, "Descrição obrigatória.").max(200),
-  operation: z.enum(["corte_laser", "quinagem", "soldadura", "acabamento", "outro"]),
   quantity: z.coerce.number().positive("Quantidade deve ser maior que zero."),
   unit: z.string().trim().min(1, "Unidade obrigatória.").max(20).default("un"),
   materialWeightKg: z.coerce.number().min(0).default(0),
-  laserMinutes: z.coerce.number().min(0).default(0),
-  bendCount: z.coerce.number().min(0).default(0),
-  weldingMinutes: z.coerce.number().min(0).default(0),
-  finishingM2: z.coerce.number().min(0).default(0),
+  operations: z.array(quoteLineOperationSchema).default([]),
 });
 export type QuoteLineInput = z.infer<typeof quoteLineSchema>;
 
@@ -41,15 +56,11 @@ export const quoteSchema = z.object({
 });
 export type QuoteInput = z.infer<typeof quoteSchema>;
 
-// ── Pricing ──────────────────────────────────────────────────────────────────
+// ── Pricing settings ─────────────────────────────────────────────────────────
 
 const DEFAULT_PRICING = {
   id: "default",
   steelPriceEurKg: 4.5,
-  laserEurPerMinute: 0.9,
-  bendEurPerBend: 1.5,
-  weldingEurPerMinute: 1.2,
-  finishingEurPerM2: 8,
   defaultMarginPercent: 25,
 };
 
@@ -73,37 +84,120 @@ export async function updatePricingSettings(data: PricingSettingsInput): Promise
   });
 }
 
-/**
- * Costs a single line from the shop-floor cost drivers (material weight +
- * per-operation time) and the global rates — no margin applied yet, that's
- * layered on the whole quote total in `computeQuoteTotal`.
- */
-function computeLineUnitCost(pricing: PricingSettings, line: QuoteLineInput): number {
-  return (
-    line.materialWeightKg * pricing.steelPriceEurKg +
-    line.laserMinutes * pricing.laserEurPerMinute +
-    line.bendCount * pricing.bendEurPerBend +
-    line.weldingMinutes * pricing.weldingEurPerMinute +
-    line.finishingM2 * pricing.finishingEurPerM2
-  );
+// ── Operation types ──────────────────────────────────────────────────────────
+// Configurable shop-floor processing steps (corte a laser, quinagem, ...),
+// each with its own rate per unit (minute, bend, m², ...). Admins manage
+// these on /admin/orcamentos/definicoes so new operations can be added as
+// the business needs them, without a code change.
+
+export async function getOperationTypes(): Promise<OperationType[]> {
+  return prisma.operationType.findMany({ orderBy: [{ sequence: "asc" }, { name: "asc" }] });
 }
 
-interface PricedLine extends QuoteLineInput {
+export async function createOperationType(data: OperationTypeInput): Promise<string> {
+  try {
+    const agg = await prisma.operationType.aggregate({ _max: { sequence: true } });
+    const created = await prisma.operationType.create({
+      data: { ...data, sequence: (agg._max.sequence ?? 0) + 1 },
+    });
+    return created.id;
+  } catch (err) {
+    if (isUniqueViolation(err)) throw new AppError("Já existe uma operação com essa chave.");
+    throw err;
+  }
+}
+
+export async function updateOperationType(id: string, data: OperationTypeInput): Promise<void> {
+  const existing = await prisma.operationType.findUnique({ where: { id } });
+  if (!existing) throw new NotFoundError("Tipo de operação não encontrado.");
+  try {
+    await prisma.operationType.update({ where: { id }, data });
+  } catch (err) {
+    if (isUniqueViolation(err)) throw new AppError("Já existe uma operação com essa chave.");
+    throw err;
+  }
+}
+
+/** Hard-deletes an operation type. Safe even if past quotes reference it:
+ * `QuoteLineOperation.operationTypeId` is nullable with `onDelete: SetNull`
+ * and already carries a frozen `name`/`unit`/`ratePerUnitEur` snapshot, so
+ * historical quotes keep displaying correctly. */
+export async function deleteOperationType(id: string): Promise<void> {
+  const existing = await prisma.operationType.findUnique({ where: { id } });
+  if (!existing) throw new NotFoundError("Tipo de operação não encontrado.");
+  await prisma.operationType.delete({ where: { id } });
+}
+
+// ── Quote line pricing ───────────────────────────────────────────────────────
+
+interface PricedLineOperation {
+  operationTypeId: string;
+  name: string;
+  unit: string;
+  quantity: number;
+  ratePerUnitEur: number;
+  costEur: number;
+}
+
+interface PricedLine {
+  description: string;
+  quantity: number;
+  unit: string;
+  materialWeightKg: number;
+  operations: PricedLineOperation[];
   unitCostEur: number;
   lineTotalEur: number;
 }
 
-function priceLines(pricing: PricingSettings, marginPercent: number, lines: QuoteLineInput[]): {
-  priced: PricedLine[];
-  totalEur: number;
-} {
+/**
+ * Costs every line from the shop-floor cost drivers — material weight ×
+ * steel price, plus each selected operation's quantity × its current rate
+ * — then applies the quote-level margin to each line's total. Operation
+ * rates/names are looked up once and frozen onto the line at save time (see
+ * `QuoteLineOperation`), so a sent quote's price never silently drifts if
+ * `OperationType` rates change afterwards.
+ */
+async function priceLines(
+  pricing: PricingSettings,
+  marginPercent: number,
+  lines: QuoteLineInput[],
+): Promise<{ priced: PricedLine[]; totalEur: number }> {
+  const opIds = [...new Set(lines.flatMap((l) => l.operations.map((o) => o.operationTypeId)))];
+  const opTypes = opIds.length
+    ? await prisma.operationType.findMany({ where: { id: { in: opIds } } })
+    : [];
+  const opMap = new Map(opTypes.map((o) => [o.id, o]));
+
   const marginMultiplier = 1 + marginPercent / 100;
   let totalEur = 0;
   const priced = lines.map((line) => {
-    const unitCostEur = computeLineUnitCost(pricing, line);
+    const operations: PricedLineOperation[] = line.operations
+      .filter((o) => o.quantity > 0)
+      .map((o) => {
+        const ot = opMap.get(o.operationTypeId);
+        if (!ot) throw new NotFoundError("Tipo de operação não encontrado.");
+        return {
+          operationTypeId: ot.id,
+          name: ot.name,
+          unit: ot.unit,
+          quantity: o.quantity,
+          ratePerUnitEur: ot.ratePerUnitEur,
+          costEur: o.quantity * ot.ratePerUnitEur,
+        };
+      });
+    const opsCostEur = operations.reduce((s, o) => s + o.costEur, 0);
+    const unitCostEur = line.materialWeightKg * pricing.steelPriceEurKg + opsCostEur;
     const lineTotalEur = unitCostEur * line.quantity * marginMultiplier;
     totalEur += lineTotalEur;
-    return { ...line, unitCostEur, lineTotalEur };
+    return {
+      description: line.description,
+      quantity: line.quantity,
+      unit: line.unit,
+      materialWeightKg: line.materialWeightKg,
+      operations,
+      unitCostEur,
+      lineTotalEur,
+    };
   });
   return { priced, totalEur: Math.round(totalEur * 100) / 100 };
 }
@@ -133,7 +227,7 @@ export async function createQuote(data: QuoteInput): Promise<string> {
   if (!company) throw new NotFoundError("Cliente não encontrado.");
 
   const pricing = await getPricingSettings();
-  const { priced, totalEur } = priceLines(pricing, data.marginPercent, data.lines);
+  const { priced, totalEur } = await priceLines(pricing, data.marginPercent, data.lines);
 
   const quote = await createWithReference("ORC", (reference) =>
     prisma.quote.create({
@@ -149,16 +243,21 @@ export async function createQuote(data: QuoteInput): Promise<string> {
           create: priced.map((l, i) => ({
             sequence: i + 1,
             description: l.description,
-            operation: l.operation,
             quantity: l.quantity,
             unit: l.unit,
             materialWeightKg: l.materialWeightKg,
-            laserMinutes: l.laserMinutes,
-            bendCount: l.bendCount,
-            weldingMinutes: l.weldingMinutes,
-            finishingM2: l.finishingM2,
             unitCostEur: l.unitCostEur,
             lineTotalEur: l.lineTotalEur,
+            operations: {
+              create: l.operations.map((o) => ({
+                operationTypeId: o.operationTypeId,
+                name: o.name,
+                unit: o.unit,
+                quantity: o.quantity,
+                ratePerUnitEur: o.ratePerUnitEur,
+                costEur: o.costEur,
+              })),
+            },
           })),
         },
       },
@@ -176,40 +275,46 @@ export async function updateQuote(id: string, data: QuoteInput): Promise<void> {
   }
 
   const pricing = await getPricingSettings();
-  const { priced, totalEur } = priceLines(pricing, data.marginPercent, data.lines);
+  const { priced, totalEur } = await priceLines(pricing, data.marginPercent, data.lines);
 
   try {
-    await prisma.$transaction([
-      prisma.quote.update({
-        where: { id },
-        data: {
-          companyId: data.companyId,
-          subject: data.subject,
-          notes: data.notes?.trim() ? data.notes.trim() : null,
-          marginPercent: data.marginPercent,
-          totalEur,
-          validUntil: data.validUntil ? new Date(data.validUntil) : null,
+    // A single nested `update` (rather than a manual multi-statement
+    // transaction) so Prisma wraps the delete-then-recreate of lines +
+    // operations atomically; `deleteMany` here issues a DB-level DELETE that
+    // cascades to `QuoteLineOperation` via its FK's `onDelete: Cascade`.
+    await prisma.quote.update({
+      where: { id },
+      data: {
+        companyId: data.companyId,
+        subject: data.subject,
+        notes: data.notes?.trim() ? data.notes.trim() : null,
+        marginPercent: data.marginPercent,
+        totalEur,
+        validUntil: data.validUntil ? new Date(data.validUntil) : null,
+        lines: {
+          deleteMany: {},
+          create: priced.map((l, i) => ({
+            sequence: i + 1,
+            description: l.description,
+            quantity: l.quantity,
+            unit: l.unit,
+            materialWeightKg: l.materialWeightKg,
+            unitCostEur: l.unitCostEur,
+            lineTotalEur: l.lineTotalEur,
+            operations: {
+              create: l.operations.map((o) => ({
+                operationTypeId: o.operationTypeId,
+                name: o.name,
+                unit: o.unit,
+                quantity: o.quantity,
+                ratePerUnitEur: o.ratePerUnitEur,
+                costEur: o.costEur,
+              })),
+            },
+          })),
         },
-      }),
-      prisma.quoteLine.deleteMany({ where: { quoteId: id } }),
-      prisma.quoteLine.createMany({
-        data: priced.map((l, i) => ({
-          quoteId: id,
-          sequence: i + 1,
-          description: l.description,
-          operation: l.operation,
-          quantity: l.quantity,
-          unit: l.unit,
-          materialWeightKg: l.materialWeightKg,
-          laserMinutes: l.laserMinutes,
-          bendCount: l.bendCount,
-          weldingMinutes: l.weldingMinutes,
-          finishingM2: l.finishingM2,
-          unitCostEur: l.unitCostEur,
-          lineTotalEur: l.lineTotalEur,
-        })),
-      }),
-    ]);
+      },
+    });
   } catch (err) {
     if (isUniqueViolation(err)) throw new AppError("Referência de orçamento em conflito.");
     throw err;

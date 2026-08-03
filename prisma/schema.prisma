@@ -56,17 +56,6 @@ enum QuoteStatus {
   rejected
 }
 
-/// The cost driver of a quote line: chapa/material weight is always priced
-/// per kg; the operation fields price the shop-floor work (laser cutting per
-/// minute, quinagem per bend, welding per minute, finishing per m²).
-enum QuoteOperation {
-  corte_laser
-  quinagem
-  soldadura
-  acabamento
-  outro
-}
-
 model Company {
   id            String         @id @default(cuid())
   name          String
@@ -510,18 +499,37 @@ model StockMovement {
 // ── Orçamentos ───────────────────────────────────────────────────────────────
 
 /// Global (single-row) pricing assumptions used to cost quote lines: steel
-/// price per kg plus a rate per shop-floor operation. Editable by admins on
+/// price per kg, plus a default margin. Rates for shop-floor operations
+/// (laser, quinagem, soldadura, ...) live in `OperationType` instead, so
+/// admins can add/remove operation types without a code change. Editable on
 /// `/admin/orcamentos/definicoes` so costing stays realistic without a
 /// code change as real supplier/labour rates become known.
 model PricingSettings {
   id                   String   @id @default("default")
   steelPriceEurKg      Float    @default(4.5)
-  laserEurPerMinute    Float    @default(0.9)
-  bendEurPerBend       Float    @default(1.5)
-  weldingEurPerMinute  Float    @default(1.2)
-  finishingEurPerM2    Float    @default(8)
   defaultMarginPercent Float    @default(25)
   updatedAt            DateTime @updatedAt
+}
+
+/// A configurable shop-floor processing step (corte a laser, quinagem,
+/// soldadura, acabamento, jato de água, anodização, ...) priced at a rate
+/// per unit (minute, bend, m², etc). Admins manage this list on
+/// `/admin/orcamentos/definicoes` so new operations can be added as the
+/// business needs them, without a code change or migration. `active`
+/// hides an operation from new quotes without breaking historical quotes
+/// that already reference it (their `QuoteLineOperation` rows keep a
+/// frozen name/unit/rate snapshot regardless).
+model OperationType {
+  id             String               @id @default(cuid())
+  key            String               @unique
+  name           String
+  unit           String
+  ratePerUnitEur Float
+  active         Boolean              @default(true)
+  sequence       Int                  @default(0)
+  lines          QuoteLineOperation[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 }
 
 /// A custom quote (orçamento) for a client company, priced line-by-line from
@@ -554,25 +562,41 @@ model Quote {
 }
 
 /// One priced line of a quote. `unitCostEur`/`lineTotalEur` are computed and
-/// persisted at save time (from `PricingSettings` + the operation inputs
-/// below), not recomputed live, so a sent quote's price never silently
-/// drifts if the global rates are edited afterwards.
+/// persisted at save time (from `PricingSettings` + the operations below),
+/// not recomputed live, so a sent quote's price never silently drifts if
+/// the global rates are edited afterwards.
 model QuoteLine {
-  id               String         @id @default(cuid())
+  id               String               @id @default(cuid())
   quoteId          String
-  quote            Quote          @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  quote            Quote                @relation(fields: [quoteId], references: [id], onDelete: Cascade)
   sequence         Int
   description      String
-  operation        QuoteOperation
   quantity         Float
-  unit             String         @default("un")
-  materialWeightKg Float          @default(0)
-  laserMinutes     Float          @default(0)
-  bendCount        Float          @default(0)
-  weldingMinutes   Float          @default(0)
-  finishingM2      Float          @default(0)
+  unit             String               @default("un")
+  materialWeightKg Float                @default(0)
+  operations       QuoteLineOperation[]
   unitCostEur      Float
   lineTotalEur     Float
 
   @@index([quoteId])
+}
+
+/// One shop-floor operation applied to a quote line (e.g. "Corte a laser ×
+/// 10 min"). `name`/`unit`/`ratePerUnitEur` are frozen from `OperationType`
+/// at save time — like the rest of quote pricing — so editing/removing an
+/// `OperationType` later never changes an already-priced quote.
+model QuoteLineOperation {
+  id              String         @id @default(cuid())
+  quoteLineId     String
+  quoteLine       QuoteLine      @relation(fields: [quoteLineId], references: [id], onDelete: Cascade)
+  operationTypeId String?
+  operationType   OperationType? @relation(fields: [operationTypeId], references: [id], onDelete: SetNull)
+  name            String
+  unit            String
+  quantity        Float
+  ratePerUnitEur  Float
+  costEur         Float
+
+  @@index([quoteLineId])
+  @@index([operationTypeId])
 }

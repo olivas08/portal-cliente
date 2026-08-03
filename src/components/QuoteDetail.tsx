@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { ArrowLeft, Download, Send, Pencil, Check, X as XIcon } from "lucide-react";
 import type { QuoteVM } from "@/lib/types";
-import { QUOTE_OPERATION_LABELS } from "@/lib/types";
 import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
 import { QuoteStatusBadge } from "@/components/QuoteBadges";
 import { sendQuote, decideQuote } from "@/actions/quotes";
@@ -89,7 +88,7 @@ export function QuoteDetail({ quote, isAdmin }: { quote: QuoteVM; isAdmin: boole
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
             <tr>
               <th className="text-left px-4 py-2.5">Descrição</th>
-              <th className="text-left px-4 py-2.5">Operação</th>
+              <th className="text-left px-4 py-2.5">Operações</th>
               <th className="text-center px-4 py-2.5">Qtd.</th>
               <th className="text-right px-4 py-2.5">Total</th>
             </tr>
@@ -97,9 +96,20 @@ export function QuoteDetail({ quote, isAdmin }: { quote: QuoteVM; isAdmin: boole
           <tbody className="divide-y divide-slate-100">
             {quote.lines.map((l) => (
               <tr key={l.id}>
-                <td className="px-4 py-2.5 text-slate-700">{l.description}</td>
+                <td className="px-4 py-2.5 text-slate-700">
+                  {l.description}
+                  {l.materialWeightKg > 0 && (
+                    <span className="block text-xs text-slate-400">
+                      Material: {l.materialWeightKg} kg
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-2.5 text-slate-500">
-                  {QUOTE_OPERATION_LABELS[l.operation]}
+                  {l.operations.length === 0
+                    ? "—"
+                    : l.operations
+                        .map((o) => `${o.name} (${o.quantity} ${o.unit})`)
+                        .join(", ")}
                 </td>
                 <td className="px-4 py-2.5 text-center text-slate-500">
                   {l.quantity} {l.unit}

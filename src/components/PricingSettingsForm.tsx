@@ -3,20 +3,23 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import type { PricingSettingsVM } from "@/lib/types";
+import type { PricingSettingsVM, OperationTypeVM } from "@/lib/types";
 import { updatePricingSettings } from "@/actions/quotes";
 import { actionError } from "@/lib/action-result";
+import { OperationTypesManager } from "@/components/OperationTypesManager";
 
 const FIELDS: { key: keyof PricingSettingsVM; label: string; suffix: string }[] = [
   { key: "steelPriceEurKg", label: "Preço do inox", suffix: "€/kg" },
-  { key: "laserEurPerMinute", label: "Corte a laser", suffix: "€/min" },
-  { key: "bendEurPerBend", label: "Quinagem", suffix: "€/dobra" },
-  { key: "weldingEurPerMinute", label: "Soldadura", suffix: "€/min" },
-  { key: "finishingEurPerM2", label: "Acabamento", suffix: "€/m²" },
   { key: "defaultMarginPercent", label: "Margem por defeito", suffix: "%" },
 ];
 
-export function PricingSettingsForm({ pricing }: { pricing: PricingSettingsVM }) {
+export function PricingSettingsForm({
+  pricing,
+  operationTypes,
+}: {
+  pricing: PricingSettingsVM;
+  operationTypes: OperationTypeVM[];
+}) {
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState<Record<string, string>>(
     Object.fromEntries(FIELDS.map((f) => [f.key, String(pricing[f.key])])),
@@ -94,6 +97,10 @@ export function PricingSettingsForm({ pricing }: { pricing: PricingSettingsVM })
           </button>
         </div>
       </form>
+
+      <div className="mt-6">
+        <OperationTypesManager operationTypes={operationTypes} />
+      </div>
     </>
   );
 }
