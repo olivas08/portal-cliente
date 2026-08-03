@@ -376,7 +376,7 @@ export function QuoteBuilder({
                 return (
                   <div key={oi} className="flex items-center gap-2">
                     <select
-                      className={smallInputCls + " flex-1"}
+                      className={smallInputCls + " flex-1 min-w-0"}
                       value={op.operationTypeId}
                       onChange={(e) =>
                         updateOperation(i, oi, { operationTypeId: e.target.value })
@@ -396,7 +396,7 @@ export function QuoteBuilder({
                       type="number"
                       min="0"
                       step="0.5"
-                      className={smallInputCls + " w-24"}
+                      className="w-20 shrink-0 border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
                       value={op.quantity}
                       onChange={(e) => updateOperation(i, oi, { quantity: e.target.value })}
                     />
