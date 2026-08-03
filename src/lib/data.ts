@@ -386,20 +386,50 @@ function toStepVM(step: StepWith, allSteps: StepWith[]): WorkOrderStepVM {
 }
 
 export async function getWorkOrders(): Promise<WorkOrderVM[]> {
-  const workOrders = await prisma.workOrder.findMany({
-    include: {
-      order: { include: { company: true } },
-      materials: { include: { material: true }, orderBy: { materialRef: "asc" } },
-      steps: {
-        include: { workstation: true, operator: true },
-        orderBy: { sequence: "asc" },
+  // Prisma resolves each nested `include` relation as its own round trip to
+  // the DB, each wrapped in its own transaction (BEGIN/COMMIT) against the
+  // remote Supabase pooler — this used to be ~11 sequential queries. Since
+  // this function already returns *all* work orders (no filter), materials
+  // and steps for *all* work orders are fetched unconditionally alongside
+  // the work orders themselves, so all three top-level queries have no
+  // interdependency and can run fully concurrently via Promise.all instead
+  // of waiting on each other.
+  const [workOrders, materials, steps] = await Promise.all([
+    prisma.workOrder.findMany({
+      include: {
+        order: { include: { company: true } },
       },
-    },
-    orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
-  });
+      orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+    }),
+    prisma.workOrderMaterial.findMany({
+      include: { material: true },
+      orderBy: { materialRef: "asc" },
+    }),
+    prisma.workOrderStep.findMany({
+      include: { workstation: true, operator: true },
+      orderBy: { sequence: "asc" },
+    }),
+  ]);
+
+  const materialsByWorkOrder = new Map<string, typeof materials>();
+  for (const m of materials) {
+    const list = materialsByWorkOrder.get(m.workOrderId);
+    if (list) list.push(m);
+    else materialsByWorkOrder.set(m.workOrderId, [m]);
+  }
+
+  const stepsByWorkOrder = new Map<string, typeof steps>();
+  for (const s of steps) {
+    const list = stepsByWorkOrder.get(s.workOrderId);
+    if (list) list.push(s);
+    else stepsByWorkOrder.set(s.workOrderId, [s]);
+  }
 
   return workOrders.map((wo) => {
-    const shortfalls = wo.materials
+    const woMaterials = materialsByWorkOrder.get(wo.id) ?? [];
+    const woSteps = stepsByWorkOrder.get(wo.id) ?? [];
+
+    const shortfalls = woMaterials
       .filter((m) => m.material.stockQty < m.requiredQty)
       .map((m) => ({
         reference: m.materialRef,
@@ -421,11 +451,11 @@ export async function getWorkOrders(): Promise<WorkOrderVM[]> {
       quantityDone: wo.quantityDone,
       status: wo.status,
       priority: wo.priority,
-      progress: workOrderProgress(wo.steps),
+      progress: workOrderProgress(woSteps),
       plannedEnd: wo.plannedEnd ? toIsoDate(wo.plannedEnd) : undefined,
-      steps: wo.steps.map((s) => toStepVM(s, wo.steps)),
+      steps: woSteps.map((s) => toStepVM(s, woSteps)),
       materialStatus: {
-        hasBom: wo.materials.length > 0,
+        hasBom: woMaterials.length > 0,
         canRelease: shortfalls.length === 0,
         shortfalls,
       },
@@ -789,28 +819,36 @@ export async function getMachinesWithStatus(): Promise<MachineVM[]> {
     include: { workstation: { select: { id: true, name: true } } },
   });
 
-  const result: MachineVM[] = [];
-  for (const m of machines) {
-    let currentProduct: string | null = null;
-    let currentQty = 0;
-    let currentScrap = 0;
-    if (m.workstationId) {
-      const step = await prisma.workOrderStep.findFirst({
-        where: { workstationId: m.workstationId, status: "in_progress" },
+  const workstationIds = machines
+    .map((m) => m.workstationId)
+    .filter((id): id is string => id !== null);
+
+  // Single batched query instead of one findFirst per machine (avoids N+1).
+  const inProgressSteps = workstationIds.length
+    ? await prisma.workOrderStep.findMany({
+        where: { workstationId: { in: workstationIds }, status: "in_progress" },
         orderBy: { startedAt: "asc" },
         select: {
+          workstationId: true,
           quantityDone: true,
           scrapQty: true,
           workOrder: { select: { productName: true } },
         },
-      });
-      if (step) {
-        currentProduct = step.workOrder.productName;
-        currentQty = step.quantityDone;
-        currentScrap = step.scrapQty;
-      }
+      })
+    : [];
+
+  // Keep the earliest in-progress step per workstation (matches the previous
+  // findFirst + orderBy startedAt asc behaviour).
+  const stepByWorkstation = new Map<string, (typeof inProgressSteps)[number]>();
+  for (const step of inProgressSteps) {
+    if (step.workstationId && !stepByWorkstation.has(step.workstationId)) {
+      stepByWorkstation.set(step.workstationId, step);
     }
-    result.push({
+  }
+
+  return machines.map((m) => {
+    const step = m.workstationId ? stepByWorkstation.get(m.workstationId) : undefined;
+    return {
       id: m.id,
       code: m.code,
       name: m.name,
@@ -820,12 +858,11 @@ export async function getMachinesWithStatus(): Promise<MachineVM[]> {
       lastSeenAt: m.lastSeenAt ? m.lastSeenAt.toISOString() : null,
       stationName: m.workstation?.name ?? null,
       stationId: m.workstation?.id ?? null,
-      currentProduct,
-      currentQty,
-      currentScrap,
-    });
-  }
-  return result;
+      currentProduct: step ? step.workOrder.productName : null,
+      currentQty: step ? step.quantityDone : 0,
+      currentScrap: step ? step.scrapQty : 0,
+    };
+  });
 }
 
 export async function getRecentDiscrepancies(
