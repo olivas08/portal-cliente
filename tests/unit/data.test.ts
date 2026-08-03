@@ -8,6 +8,7 @@ const { prismaMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
+vi.mock("@/auth", () => ({ auth: vi.fn() }));
 
 import { getOrderById, getRequestById } from "@/lib/data";
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LogOut, Package, MessageSquare, ShieldCheck, BarChart3, ShoppingCart, Boxes, Factory, HardHat, Warehouse } from "lucide-react";
+import { LogOut, Package, MessageSquare, ShieldCheck, BarChart3, ShoppingCart, Boxes, Factory, HardHat, Warehouse, Calculator } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
 import { PRODUCT } from "@/lib/branding";
@@ -41,6 +41,7 @@ export function PortalNav({ name, company, isAdmin, notifications, unreadCount }
     ...(isAdmin
       ? [{ to: "/admin/armazem", label: "Armazém", icon: Warehouse }]
       : []),
+    { to: `${base}/orcamentos`, label: "Orçamentos", icon: Calculator },
     ...(isAdmin
       ? [{ to: "/admin/operadores", label: "Trabalhadores", icon: HardHat }]
       : []),

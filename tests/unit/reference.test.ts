@@ -5,6 +5,7 @@ const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     order: { count: vi.fn() },
     request: { count: vi.fn() },
+    quote: { count: vi.fn() },
   },
 }));
 
@@ -44,6 +45,16 @@ describe("createWithReference", () => {
 
     expect(prismaMock.request.count).toHaveBeenCalled();
     expect(create).toHaveBeenCalledWith(`REQ-${year}-014`);
+  });
+
+  it("uses the ORC prefix and quote table for quotes", async () => {
+    prismaMock.quote.count.mockResolvedValue(2);
+    const create = vi.fn().mockResolvedValue({ id: "q1" });
+
+    await createWithReference("ORC", create);
+
+    expect(prismaMock.quote.count).toHaveBeenCalled();
+    expect(create).toHaveBeenCalledWith(`ORC-${year}-003`);
   });
 
   it("retries with a fresh candidate on a unique-constraint collision", async () => {

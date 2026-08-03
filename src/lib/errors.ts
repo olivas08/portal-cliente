@@ -31,11 +31,18 @@ export class NotFoundError extends AppError {
  */
 export type ActionResult = { error: string } | void;
 
-export async function guardAction(
-  fn: () => Promise<void>,
-): Promise<ActionResult> {
+/**
+ * Generic over the wrapped action's return value so actions that must hand
+ * back data on success (e.g. a created record's id, for client-side
+ * navigation) can still use the same guard as void-returning ones — callers
+ * that don't need a value simply instantiate `T = void`, matching the
+ * original `ActionResult` shape.
+ */
+export async function guardAction<T = void>(
+  fn: () => Promise<T>,
+): Promise<T | { error: string }> {
   try {
-    await fn();
+    return await fn();
   } catch (e) {
     if (e instanceof AppError) return { error: e.message };
     throw e;

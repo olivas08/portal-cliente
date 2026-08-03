@@ -24,6 +24,10 @@ import type {
   ProductBomVM,
   WorkOrderReadinessVM,
   StockMovementVM,
+  QuoteVM,
+  QuoteSummaryVM,
+  QuoteLineVM,
+  PricingSettingsVM,
 } from "@/lib/types";
 import { STOCK_REASON_LABELS } from "@/lib/types";
 import { toIsoDate } from "@/lib/dates";
@@ -35,6 +39,7 @@ import {
   computeDiscrepancy,
   isMachineOnline,
 } from "@/services/production-status";
+import { getPricingSettings as getPricingSettingsService } from "@/services/quotes.service";
 import type {
   Order,
   OrderItem,
@@ -42,6 +47,8 @@ import type {
   Request,
   RequestMessage,
   Company,
+  Quote,
+  QuoteLine,
 } from "@prisma/client";
 
 type OrderSummaryWith = Order & { items: OrderItem[]; company: Company };
@@ -200,9 +207,85 @@ export async function getRequestById(id: string): Promise<RequestVM | null> {
   return request ? toRequestVM(request) : null;
 }
 
+function toQuoteLineVM(l: QuoteLine): QuoteLineVM {
+  return {
+    id: l.id,
+    sequence: l.sequence,
+    description: l.description,
+    operation: l.operation,
+    quantity: l.quantity,
+    unit: l.unit,
+    materialWeightKg: l.materialWeightKg,
+    laserMinutes: l.laserMinutes,
+    bendCount: l.bendCount,
+    weldingMinutes: l.weldingMinutes,
+    finishingM2: l.finishingM2,
+    unitCostEur: l.unitCostEur,
+    lineTotalEur: l.lineTotalEur,
+  };
+}
+
+function toQuoteBase(q: Quote & { company: Company }) {
+  return {
+    id: q.id,
+    reference: q.reference,
+    companyId: q.companyId,
+    clientCompany: q.company.name,
+    subject: q.subject,
+    notes: q.notes,
+    status: q.status,
+    marginPercent: q.marginPercent,
+    totalEur: q.totalEur,
+    validUntil: q.validUntil ? toIsoDate(q.validUntil) : null,
+    orderId: q.orderId,
+    createdDate: toIsoDate(q.createdDate),
+    sentAt: q.sentAt ? q.sentAt.toISOString() : null,
+    decidedAt: q.decidedAt ? q.decidedAt.toISOString() : null,
+  };
+}
+
+export async function getQuotesForCompany(companyId: string): Promise<QuoteSummaryVM[]> {
+  const quotes = await prisma.quote.findMany({
+    where: { companyId, status: { not: "draft" } },
+    include: { company: true, _count: { select: { lines: true } } },
+    orderBy: { createdDate: "desc" },
+  });
+  return quotes.map((q) => ({ ...toQuoteBase(q), lineCount: q._count.lines }));
+}
+
+export async function getAllQuotes(): Promise<QuoteSummaryVM[]> {
+  const quotes = await prisma.quote.findMany({
+    include: { company: true, _count: { select: { lines: true } } },
+    orderBy: { createdDate: "desc" },
+  });
+  return quotes.map((q) => ({ ...toQuoteBase(q), lineCount: q._count.lines }));
+}
+
+export async function getQuoteById(id: string): Promise<QuoteVM | null> {
+  const quote = await prisma.quote.findUnique({
+    where: { id },
+    include: { company: true, lines: { orderBy: { sequence: "asc" } } },
+  });
+  if (!quote) return null;
+  return { ...toQuoteBase(quote), lines: quote.lines.map(toQuoteLineVM) };
+}
+
+export async function getPricingSettingsVM(): Promise<PricingSettingsVM> {
+  const s = await getPricingSettingsService();
+  return {
+    steelPriceEurKg: s.steelPriceEurKg,
+    laserEurPerMinute: s.laserEurPerMinute,
+    bendEurPerBend: s.bendEurPerBend,
+    weldingEurPerMinute: s.weldingEurPerMinute,
+    finishingEurPerM2: s.finishingEurPerM2,
+    defaultMarginPercent: s.defaultMarginPercent,
+  };
+}
+
 export async function getCompanies() {
   return prisma.company.findMany({ orderBy: { name: "asc" } });
 }
+
 
 export async function getProducts(): Promise<ProductVM[]> {
   const products = await prisma.product.findMany({

@@ -16,6 +16,8 @@ export type WorkOrderStatus = $Enums.WorkOrderStatus;
 export type StepStatus = $Enums.StepStatus;
 export type NcDisposition = $Enums.NcDisposition;
 export type NcStatus = $Enums.NcStatus;
+export type QuoteStatus = $Enums.QuoteStatus;
+export type QuoteOperation = $Enums.QuoteOperation;
 
 export interface NotificationVM {
   id: string;
@@ -39,6 +41,21 @@ export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
   in_review: "Em Análise",
   responded: "Respondido",
   closed: "Fechado",
+};
+
+export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
+  draft: "Rascunho",
+  sent: "Enviado",
+  accepted: "Aceite",
+  rejected: "Recusado",
+};
+
+export const QUOTE_OPERATION_LABELS: Record<QuoteOperation, string> = {
+  corte_laser: "Corte a laser",
+  quinagem: "Quinagem",
+  soldadura: "Soldadura",
+  acabamento: "Acabamento",
+  outro: "Outro",
 };
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
@@ -141,6 +158,60 @@ export interface RequestSummaryVM extends RequestBaseVM {
 /** Full request, including the whole message thread, for the detail page. */
 export interface RequestVM extends RequestBaseVM {
   messages: RequestMessageVM[];
+}
+
+/** The global costing assumptions behind every quote line calculation. */
+export interface PricingSettingsVM {
+  steelPriceEurKg: number;
+  laserEurPerMinute: number;
+  bendEurPerBend: number;
+  weldingEurPerMinute: number;
+  finishingEurPerM2: number;
+  defaultMarginPercent: number;
+}
+
+/** One priced line of a quote (see `QuoteVM`). */
+export interface QuoteLineVM {
+  id: string;
+  sequence: number;
+  description: string;
+  operation: QuoteOperation;
+  quantity: number;
+  unit: string;
+  materialWeightKg: number;
+  laserMinutes: number;
+  bendCount: number;
+  weldingMinutes: number;
+  finishingM2: number;
+  unitCostEur: number;
+  lineTotalEur: number;
+}
+
+interface QuoteBaseVM {
+  id: string;
+  reference: string;
+  companyId: string;
+  clientCompany: string;
+  subject: string;
+  notes: string | null;
+  status: QuoteStatus;
+  marginPercent: number;
+  totalEur: number;
+  validUntil: string | null;
+  orderId: string | null;
+  createdDate: string;
+  sentAt: string | null;
+  decidedAt: string | null;
+}
+
+/** Summary view of a quote for list screens (no line items). */
+export interface QuoteSummaryVM extends QuoteBaseVM {
+  lineCount: number;
+}
+
+/** Full quote, including all priced lines, for the detail/PDF views. */
+export interface QuoteVM extends QuoteBaseVM {
+  lines: QuoteLineVM[];
 }
 
 /** A per-company negotiated price override for a product. */

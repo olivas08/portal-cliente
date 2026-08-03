@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import type { OrderVM } from "@/lib/types";
+import type { OrderVM, QuoteVM } from "@/lib/types";
 import { formatDatePt } from "@/lib/dates";
 import { TENANT } from "@/lib/branding";
 
@@ -272,3 +272,97 @@ export function generateProformaInvoice(order: OrderVM) {
 
   doc.save(`fatura-proforma-${invoiceNum}.pdf`);
 }
+
+export function generateQuoteProposal(quote: QuoteVM) {
+  const doc = new jsPDF();
+  addHeader(doc, "PROPOSTA / ORÇAMENTO", quote.reference);
+
+  doc.setFontSize(9);
+  doc.setTextColor(60, 60, 60);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Orçamento:", 20, 58);
+  doc.setFont("helvetica", "normal");
+  doc.text(quote.reference, 55, 58);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Data:", 120, 58);
+  doc.setFont("helvetica", "normal");
+  doc.text(formatDatePt(quote.createdDate), 140, 58);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Cliente:", 20, 65);
+  doc.setFont("helvetica", "normal");
+  doc.text(quote.clientCompany, 55, 65);
+
+  if (quote.validUntil) {
+    doc.setFont("helvetica", "bold");
+    doc.text("Válido até:", 120, 65);
+    doc.setFont("helvetica", "normal");
+    doc.text(formatDatePt(quote.validUntil), 145, 65);
+  }
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Assunto:", 20, 72);
+  doc.setFont("helvetica", "normal");
+  const subjectLines = doc.splitTextToSize(quote.subject, 150) as string[];
+  doc.text(subjectLines, 45, 72);
+
+  autoTable(doc, {
+    startY: 72 + subjectLines.length * 5 + 6,
+    head: [["#", "Descrição", "Qtd.", "Un.", "Total (€)"]],
+    body: quote.lines.map((l) => [
+      String(l.sequence),
+      l.description,
+      String(l.quantity),
+      l.unit,
+      l.lineTotalEur.toFixed(2),
+    ]),
+    headStyles: { fillColor: [35, 35, 35], fontSize: 9, fontStyle: "bold" },
+    bodyStyles: { fontSize: 9 },
+    alternateRowStyles: { fillColor: [248, 248, 248] },
+    columnStyles: {
+      0: { cellWidth: 10, halign: "center" },
+      2: { cellWidth: 18, halign: "center" },
+      3: { cellWidth: 16, halign: "center" },
+      4: { cellWidth: 30, halign: "right" },
+    },
+    margin: { left: 20, right: 20 },
+  });
+
+  const fy = lastY(doc) + 8;
+  doc.setDrawColor(200, 200, 200);
+  doc.line(130, fy, 190, fy);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(30, 30, 30);
+  doc.text("TOTAL:", 148, fy + 8, { align: "right" });
+  doc.text(`${quote.totalEur.toFixed(2)} €`, 190, fy + 8, { align: "right" });
+
+  let noteY = fy + 20;
+  if (quote.notes) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(60, 60, 60);
+    doc.text("Observações:", 20, noteY);
+    doc.setFont("helvetica", "normal");
+    noteY += 6;
+    const noteLines = doc.splitTextToSize(quote.notes, 170) as string[];
+    doc.text(noteLines, 20, noteY);
+    noteY += noteLines.length * 5 + 8;
+  }
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(130, 130, 130);
+  doc.text(
+    "Preços sujeitos a confirmação final. Valores não incluem IVA à taxa legal em vigor.",
+    20,
+    noteY + 4,
+  );
+
+  addFooter(doc);
+  doc.save(`orcamento-${quote.reference}.pdf`);
+}
+

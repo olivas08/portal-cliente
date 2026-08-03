@@ -49,6 +49,24 @@ enum MessageFrom {
   admin
 }
 
+enum QuoteStatus {
+  draft
+  sent
+  accepted
+  rejected
+}
+
+/// The cost driver of a quote line: chapa/material weight is always priced
+/// per kg; the operation fields price the shop-floor work (laser cutting per
+/// minute, quinagem per bend, welding per minute, finishing per m²).
+enum QuoteOperation {
+  corte_laser
+  quinagem
+  soldadura
+  acabamento
+  outro
+}
+
 model Company {
   id            String         @id @default(cuid())
   name          String
@@ -56,6 +74,7 @@ model Company {
   orders        Order[]
   requests      Request[]
   productPrices ProductPrice[]
+  quotes        Quote[]
   createdAt     DateTime       @default(now())
 }
 
@@ -80,6 +99,8 @@ enum NotificationType {
   REQUEST_CREATED
   REQUEST_MESSAGE
   PRODUCTION_UPDATE
+  QUOTE_SENT
+  QUOTE_DECISION
 }
 
 model Notification {
@@ -128,6 +149,7 @@ model Order {
   items         OrderItem[]
   documents     OrderDocument[]
   workOrders    WorkOrder[]
+  quote         Quote?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
@@ -483,4 +505,74 @@ model StockMovement {
   createdAt   DateTime @default(now())
 
   @@index([materialId, createdAt])
+}
+
+// ── Orçamentos ───────────────────────────────────────────────────────────────
+
+/// Global (single-row) pricing assumptions used to cost quote lines: steel
+/// price per kg plus a rate per shop-floor operation. Editable by admins on
+/// `/admin/orcamentos/definicoes` so costing stays realistic without a
+/// code change as real supplier/labour rates become known.
+model PricingSettings {
+  id                   String   @id @default("default")
+  steelPriceEurKg      Float    @default(4.5)
+  laserEurPerMinute    Float    @default(0.9)
+  bendEurPerBend       Float    @default(1.5)
+  weldingEurPerMinute  Float    @default(1.2)
+  finishingEurPerM2    Float    @default(8)
+  defaultMarginPercent Float    @default(25)
+  updatedAt            DateTime @updatedAt
+}
+
+/// A custom quote (orçamento) for a client company, priced line-by-line from
+/// material weight + operation time using `PricingSettings`. Mirrors the
+/// Order/Request lifecycle: `draft` while the admin is composing it, `sent`
+/// once the client can see and decide on it, then `accepted` (which also
+/// creates an `Order` from its lines) or `rejected`.
+model Quote {
+  id            String      @id @default(cuid())
+  reference     String      @unique
+  companyId     String
+  company       Company     @relation(fields: [companyId], references: [id])
+  subject       String
+  notes         String?
+  status        QuoteStatus @default(draft)
+  marginPercent Float
+  totalEur      Float       @default(0)
+  validUntil    DateTime?
+  orderId       String?     @unique
+  order         Order?      @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  lines         QuoteLine[]
+  createdDate   DateTime    @default(now())
+  sentAt        DateTime?
+  decidedAt     DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+}
+
+/// One priced line of a quote. `unitCostEur`/`lineTotalEur` are computed and
+/// persisted at save time (from `PricingSettings` + the operation inputs
+/// below), not recomputed live, so a sent quote's price never silently
+/// drifts if the global rates are edited afterwards.
+model QuoteLine {
+  id               String         @id @default(cuid())
+  quoteId          String
+  quote            Quote          @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  sequence         Int
+  description      String
+  operation        QuoteOperation
+  quantity         Float
+  unit             String         @default("un")
+  materialWeightKg Float          @default(0)
+  laserMinutes     Float          @default(0)
+  bendCount        Float          @default(0)
+  weldingMinutes   Float          @default(0)
+  finishingM2      Float          @default(0)
+  unitCostEur      Float
+  lineTotalEur     Float
+
+  @@index([quoteId])
 }
