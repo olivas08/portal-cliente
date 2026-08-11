@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
 import {
   ClipboardList,
   Factory,
@@ -324,11 +323,6 @@ export default function OperonLandingPage() {
           <Image src={PRODUCT.icon} alt="Operon" width={28} height={28} />
           <p>
             Operon · {FOUNDERS} · Vale de Cambra, Portugal
-          </p>
-          <p>
-            <Link href="/login" className="hover:text-brand">
-              Já são clientes? Entrar no portal →
-            </Link>
           </p>
         </div>
       </footer>
