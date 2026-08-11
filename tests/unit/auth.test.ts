@@ -185,5 +185,11 @@ describe("resetPassword", () => {
     expect(result.ok).toBe(true);
     expect(mockHash).toHaveBeenCalledWith("goodpassword", 10);
     expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    // Also (re)activates the account — this same flow completes an invited
+    // user's first sign-up, not just a forgotten-password reset.
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: "u1" },
+      data: { passwordHash: "hashed-password", active: true },
+    });
   });
 });

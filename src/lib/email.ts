@@ -104,3 +104,56 @@ export async function sendOrderStatusUpdateEmail(
     throw new Error("Não foi possível enviar a notificação de estado.");
   }
 }
+
+/**
+ * Invites a newly-created user (factory account or client company teammate)
+ * to set their own password. Same graceful console-fallback as the other
+ * templates. `roleLabel` is only used for the greeting copy (e.g. "Armazém",
+ * "Administrador da empresa").
+ */
+export async function sendInviteEmail(
+  to: string,
+  params: { name: string; roleLabel: string; setupUrl: string; inviterName: string }
+) {
+  const { name, roleLabel, setupUrl, inviterName } = params;
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM ?? `${TENANT.name} <onboarding@resend.dev>`;
+
+  if (!apiKey) {
+    console.log(
+      `[email] RESEND_API_KEY não configurada — convite para ${to}: ${setupUrl}`
+    );
+    return;
+  }
+
+  const res = await fetch(RESEND_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to,
+      subject: `Foi convidado para o ${PRODUCT.modules.portal}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color:#0f172a;">Bem-vindo(a), ${name}</h2>
+          <p>${inviterName} convidou-o(a) para uma conta de <strong>${roleLabel}</strong> no ${PRODUCT.modules.portal} da ${TENANT.name}.</p>
+          <p>
+            <a href="${setupUrl}" style="display:inline-block;background:#f59e0b;color:#0f172a;font-weight:600;padding:10px 20px;border-radius:8px;text-decoration:none;">
+              Definir a minha palavra-passe
+            </a>
+          </p>
+          <p style="color:#64748b;font-size:13px;">Este link é válido durante 1 hora. Se não esperava este convite, ignore este email.</p>
+        </div>
+      `,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    console.error("[email] Falha ao enviar convite via Resend:", res.status, body);
+    throw new Error("Não foi possível enviar o email de convite.");
+  }
+}

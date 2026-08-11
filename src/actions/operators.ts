@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth-guard";
+import { requireAdminArea } from "@/lib/auth-guard";
 import {
   createOperator as createOperatorService,
   resetOperatorPin as resetOperatorPinService,
@@ -17,7 +17,7 @@ const ADMIN_OPERATORS = "/admin/operadores";
 const TERMINAL = "/producao/terminal";
 
 export async function createOperator(input: CreateOperatorInput) {
-  await requireAdmin();
+  await requireAdminArea("producao");
   const data = createOperatorSchema.parse(input);
 
   await createOperatorService(data);
@@ -27,7 +27,7 @@ export async function createOperator(input: CreateOperatorInput) {
 }
 
 export async function resetOperatorPin(input: ResetOperatorPinInput) {
-  await requireAdmin();
+  await requireAdminArea("producao");
   const data = resetOperatorPinSchema.parse(input);
 
   await resetOperatorPinService(data);
@@ -36,7 +36,7 @@ export async function resetOperatorPin(input: ResetOperatorPinInput) {
 }
 
 export async function setOperatorActive(operatorId: string, active: boolean) {
-  await requireAdmin();
+  await requireAdminArea("producao");
   const data = setOperatorActiveSchema.parse({ operatorId, active });
 
   await setOperatorActiveService(data);

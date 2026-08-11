@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin, requireClient, requireUser } from "@/lib/auth-guard";
+import { requireAdminArea, requireClient, requireUser } from "@/lib/auth-guard";
 import {
   addRequestMessage as addRequestMessageService,
   createRequest as createRequestService,
@@ -39,7 +39,7 @@ export async function addRequestMessage(requestId: string, rawText: string) {
 }
 
 export async function updateRequestStatus(requestId: string, status: string) {
-  await requireAdmin();
+  await requireAdminArea("comercial");
   const parsed = requestStatusSchema.parse(status);
 
   await updateRequestStatusService(requestId, parsed);

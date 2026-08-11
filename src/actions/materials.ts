@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth-guard";
+import { requireAdminArea } from "@/lib/auth-guard";
 import { guardAction } from "@/lib/errors";
 import {
   createMaterial as createMaterialService,
@@ -27,7 +27,7 @@ const ADMIN_BOARD = "/admin/producao";
 
 export async function createMaterial(input: CreateMaterialInput) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("armazem");
     const data = createMaterialSchema.parse(input);
     await createMaterialService(data);
     revalidatePath(ADMIN_WAREHOUSE);
@@ -36,7 +36,7 @@ export async function createMaterial(input: CreateMaterialInput) {
 
 export async function updateMaterial(input: UpdateMaterialInput) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("armazem");
     const data = updateMaterialSchema.parse(input);
     await updateMaterialService(data);
     revalidatePath(ADMIN_WAREHOUSE);
@@ -45,7 +45,7 @@ export async function updateMaterial(input: UpdateMaterialInput) {
 
 export async function receiveStock(input: ReceiveStockInput) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("armazem");
     const data = receiveStockSchema.parse(input);
     await receiveStockService(data);
     revalidatePath(ADMIN_WAREHOUSE);
@@ -54,7 +54,7 @@ export async function receiveStock(input: ReceiveStockInput) {
 
 export async function adjustStock(input: AdjustStockInput) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("armazem");
     const data = adjustStockSchema.parse(input);
     await adjustStockService(data);
     revalidatePath(ADMIN_WAREHOUSE);
@@ -63,7 +63,7 @@ export async function adjustStock(input: AdjustStockInput) {
 
 export async function setProductBom(input: SetProductBomInput) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("armazem");
     const data = setProductBomSchema.parse(input);
     await setProductBomService(data);
     revalidatePath(ADMIN_BOM);

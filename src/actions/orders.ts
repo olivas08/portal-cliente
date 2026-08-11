@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin, requireClient, requireUser } from "@/lib/auth-guard";
+import { requireAdminArea, requireClient, requireUser } from "@/lib/auth-guard";
 import type { OrderStatus } from "@/lib/types";
 import {
   changeOrderStatus,
@@ -18,7 +18,7 @@ import {
 } from "@/services/orders.service";
 
 export async function updateOrderStatus(orderId: string, status: OrderStatus) {
-  await requireAdmin();
+  await requireAdminArea("producao");
   const parsed = orderStatusSchema.parse(status);
 
   await changeOrderStatus(orderId, parsed);
@@ -30,7 +30,7 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
 }
 
 export async function createOrder(input: CreateOrderInput) {
-  await requireAdmin();
+  await requireAdminArea("producao");
   const data = createOrderSchema.parse(input);
 
   const id = await createOrderService(data);
@@ -64,7 +64,7 @@ export async function cancelOrder(orderId: string, reason: string) {
 }
 
 export async function reactivateOrder(orderId: string) {
-  await requireAdmin();
+  await requireAdminArea("producao");
 
   await reactivateOrderService(orderId);
 

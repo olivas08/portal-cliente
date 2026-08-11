@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin, requireClient } from "@/lib/auth-guard";
+import { requireAdminArea, requireClient } from "@/lib/auth-guard";
 import { guardAction } from "@/lib/errors";
 import {
   createQuote as createQuoteService,
@@ -26,7 +26,7 @@ const CLIENT_QUOTES = "/dashboard/orcamentos";
 
 export async function createQuote(input: QuoteInput) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("comercial");
     const data = quoteSchema.parse(input);
     const id = await createQuoteService(data);
     revalidatePath(ADMIN_QUOTES);
@@ -36,7 +36,7 @@ export async function createQuote(input: QuoteInput) {
 
 export async function updateQuote(id: string, input: QuoteInput) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("comercial");
     const data = quoteSchema.parse(input);
     await updateQuoteService(id, data);
     revalidatePath(ADMIN_QUOTES);
@@ -46,7 +46,7 @@ export async function updateQuote(id: string, input: QuoteInput) {
 
 export async function deleteQuote(id: string) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("comercial");
     await deleteQuoteService(id);
     revalidatePath(ADMIN_QUOTES);
   });
@@ -54,7 +54,7 @@ export async function deleteQuote(id: string) {
 
 export async function sendQuote(id: string) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("comercial");
     await sendQuoteService(id);
     revalidatePath(ADMIN_QUOTES);
     revalidatePath(`${ADMIN_QUOTES}/${id}`);
@@ -63,7 +63,7 @@ export async function sendQuote(id: string) {
 
 export async function updatePricingSettings(input: PricingSettingsInput) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("comercial");
     const data = pricingSettingsSchema.parse(input);
     await updatePricingSettingsService(data);
     revalidatePath(`${ADMIN_QUOTES}/definicoes`);
@@ -72,7 +72,7 @@ export async function updatePricingSettings(input: PricingSettingsInput) {
 
 export async function createOperationType(input: OperationTypeInput) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("comercial");
     const data = operationTypeSchema.parse(input);
     const id = await createOperationTypeService(data);
     revalidatePath(`${ADMIN_QUOTES}/definicoes`);
@@ -82,7 +82,7 @@ export async function createOperationType(input: OperationTypeInput) {
 
 export async function updateOperationType(id: string, input: OperationTypeInput) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("comercial");
     const data = operationTypeSchema.parse(input);
     await updateOperationTypeService(id, data);
     revalidatePath(`${ADMIN_QUOTES}/definicoes`);
@@ -91,7 +91,7 @@ export async function updateOperationType(id: string, input: OperationTypeInput)
 
 export async function deleteOperationType(id: string) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("comercial");
     await deleteOperationTypeService(id);
     revalidatePath(`${ADMIN_QUOTES}/definicoes`);
   });

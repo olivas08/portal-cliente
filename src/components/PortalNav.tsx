@@ -3,18 +3,20 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LogOut, Package, MessageSquare, ShieldCheck, BarChart3, ShoppingCart, Boxes, Factory, HardHat, Warehouse, Calculator } from "lucide-react";
+import { LogOut, Package, MessageSquare, ShieldCheck, BarChart3, ShoppingCart, Boxes, Factory, HardHat, Warehouse, Calculator, ClipboardCheck, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
 import { PRODUCT } from "@/lib/branding";
 import { useBreadcrumb } from "@/components/BreadcrumbContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import type { NotificationVM } from "@/lib/types";
+import { isAdminRole, roleHasArea, type AdminArea, type Role } from "@/lib/roles";
 
 interface Props {
   name: string;
   company: string;
   isAdmin: boolean;
+  role: Role;
   notifications: NotificationVM[];
   unreadCount: number;
 }
@@ -25,29 +27,44 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-export function PortalNav({ name, company, isAdmin, notifications, unreadCount }: Props) {
+export function PortalNav({ name, company, isAdmin, role, notifications, unreadCount }: Props) {
   const pathname = usePathname();
   const breadcrumb = useBreadcrumb();
   const base = isAdmin ? "/admin" : "/dashboard";
+  const hasArea = (area: AdminArea) => isAdmin && isAdminRole(role) && roleHasArea(role, area);
 
   const navLinks: NavItem[] = [
-    { to: base, label: "Encomendas", icon: Package },
+    ...(!isAdmin || hasArea("producao")
+      ? [{ to: base, label: "Encomendas", icon: Package }]
+      : []),
     ...(isAdmin
-      ? [{ to: "/admin/produtos", label: "Produtos", icon: Boxes }]
+      ? hasArea("armazem") ? [{ to: "/admin/produtos", label: "Produtos", icon: Boxes }] : []
       : [{ to: "/dashboard/catalogo", label: "Catálogo", icon: ShoppingCart }]),
-    ...(isAdmin
+    ...(hasArea("producao")
       ? [{ to: "/admin/producao", label: "Produção", icon: Factory }]
       : []),
-    ...(isAdmin
+    ...(hasArea("armazem")
       ? [{ to: "/admin/armazem", label: "Armazém", icon: Warehouse }]
       : []),
-    { to: `${base}/orcamentos`, label: "Orçamentos", icon: Calculator },
-    ...(isAdmin
+    ...(!isAdmin || hasArea("comercial")
+      ? [{ to: `${base}/orcamentos`, label: "Orçamentos", icon: Calculator }]
+      : []),
+    ...(hasArea("qualidade")
+      ? [{ to: "/admin/producao/qualidade", label: "Qualidade", icon: ClipboardCheck }]
+      : []),
+    ...(hasArea("producao")
       ? [{ to: "/admin/operadores", label: "Trabalhadores", icon: HardHat }]
       : []),
-    { to: `${base}/requerimentos`, label: "Requerimentos", icon: MessageSquare },
+    ...(!isAdmin || hasArea("comercial")
+      ? [{ to: `${base}/requerimentos`, label: "Requerimentos", icon: MessageSquare }]
+      : []),
     ...(isAdmin
       ? [{ to: "/admin/kpis", label: "Desempenho", icon: BarChart3 }]
+      : []),
+    // User management: factory super-admin manages all factory accounts;
+    // a client company-admin manages their own company's accounts.
+    ...(role === "ADMIN" || role === "CLIENT"
+      ? [{ to: `${base}/utilizadores`, label: "Utilizadores", icon: Users }]
       : []),
   ];
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { assertCompanyAccess, requireUser } from "@/lib/auth-guard";
+import { isAdminRole } from "@/lib/roles";
 import { NotFoundError, UnauthorizedError } from "@/lib/errors";
 import {
   uploadDocumentFile,
@@ -88,7 +89,7 @@ export async function uploadOrderDocument(orderId: string, formData: FormData) {
       sizeBytes: file.size,
       uploadedById: user.id,
       uploadedByName:
-        user.name ?? (user.role === "ADMIN" ? "Administração" : "Cliente"),
+        user.name ?? (isAdminRole(user.role) ? "Administração" : "Cliente"),
     },
   });
 
@@ -105,7 +106,7 @@ export async function deleteOrderDocument(documentId: string) {
   });
   if (!doc) throw new NotFoundError("Documento não encontrado.");
 
-  const isAdmin = user.role === "ADMIN";
+  const isAdmin = isAdminRole(user.role);
   const isOwner = doc.uploadedById === user.id;
   if (!isAdmin && (!isOwner || doc.order.companyId !== user.companyId)) {
     throw new UnauthorizedError();

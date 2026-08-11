@@ -1,6 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
-
-type Role = "ADMIN" | "CLIENT";
+import type { Role } from "@/lib/roles";
+import { isAdminRole } from "@/lib/roles";
 
 // Edge-safe config shared with middleware. No Prisma / bcrypt here.
 export const authConfig = {
@@ -32,11 +32,16 @@ export const authConfig = {
 
       if (!isLoggedIn) return false;
 
+      const isAdminSide = role ? isAdminRole(role) : false;
+
       // Logged in but wrong area for role → send to their own area.
-      if (pathname.startsWith("/admin") && role !== "ADMIN") {
+      // Fine-grained per-section access (e.g. a Warehouse manager hitting
+      // /admin/orcamentos) is enforced closer to the data, in each
+      // page/action via requireAdminArea(), not here.
+      if (pathname.startsWith("/admin") && !isAdminSide) {
         return Response.redirect(new URL("/dashboard", request.nextUrl));
       }
-      if (pathname.startsWith("/dashboard") && role === "ADMIN") {
+      if (pathname.startsWith("/dashboard") && isAdminSide) {
         return Response.redirect(new URL("/admin", request.nextUrl));
       }
 

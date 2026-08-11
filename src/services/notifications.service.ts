@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { NotificationType, NotificationVM } from "@/lib/types";
+import { ADMIN_ROLES, CLIENT_ROLES } from "@/lib/roles";
 
 interface NotificationInput {
   type: NotificationType;
@@ -11,7 +12,10 @@ interface NotificationInput {
 /** Users who should receive "factory-side" notifications. */
 async function adminUserIds(excludeUserId?: string): Promise<string[]> {
   const users = await prisma.user.findMany({
-    where: { role: "ADMIN", id: excludeUserId ? { not: excludeUserId } : undefined },
+    where: {
+      role: { in: [...ADMIN_ROLES] },
+      id: excludeUserId ? { not: excludeUserId } : undefined,
+    },
     select: { id: true },
   });
   return users.map((u) => u.id);
@@ -25,7 +29,7 @@ async function companyClientUserIds(
   const users = await prisma.user.findMany({
     where: {
       companyId,
-      role: "CLIENT",
+      role: { in: [...CLIENT_ROLES] },
       id: excludeUserId ? { not: excludeUserId } : undefined,
     },
     select: { id: true },
