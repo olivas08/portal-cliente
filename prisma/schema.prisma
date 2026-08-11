@@ -11,9 +11,20 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ADMIN = super-admin (full factory access + manages all factory accounts).
+// PRODUCTION_MANAGER / WAREHOUSE_MANAGER / SALES_MANAGER / QUALITY_MANAGER are
+// factory-side accounts scoped to one area of the admin app (see
+// src/lib/auth-guard.ts for the area map).
+// CLIENT = company admin (can invite/manage other users of their own company).
+// CLIENT_USER = regular company employee, no user-management rights.
 enum Role {
   ADMIN
+  PRODUCTION_MANAGER
+  WAREHOUSE_MANAGER
+  SALES_MANAGER
+  QUALITY_MANAGER
   CLIENT
+  CLIENT_USER
 }
 
 enum OrderStatus {
@@ -75,6 +86,9 @@ model User {
   role                Role                 @default(CLIENT)
   companyId           String?
   company             Company?             @relation(fields: [companyId], references: [id])
+  // False while an invited user hasn't finished setting their password yet,
+  // or after an admin deactivates the account (login is blocked either way).
+  active              Boolean              @default(true)
   createdAt           DateTime             @default(now())
   passwordResetTokens PasswordResetToken[]
   notifications       Notification[]

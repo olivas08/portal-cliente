@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { assertCompanyAccess, type ClientUser, type SessionUser } from "@/lib/auth-guard";
+import { isAdminRole } from "@/lib/roles";
 import { createWithReference } from "@/services/reference.service";
 import { notifyAdmins, notifyCompanyClients } from "@/services/notifications.service";
 import type { MessageFrom, RequestStatus } from "@/lib/types";
@@ -84,7 +85,7 @@ export async function addRequestMessage(
     throw new AppError("Requerimento fechado.");
   }
 
-  const isAdmin = actor.role === "ADMIN";
+  const isAdmin = isAdminRole(actor.role);
   const from: MessageFrom = isAdmin ? "admin" : "client";
   const newStatus = nextRequestStatusAfterMessage(from, request.status);
 

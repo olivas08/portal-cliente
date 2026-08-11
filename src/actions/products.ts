@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin, requireClient } from "@/lib/auth-guard";
+import { requireAdminArea, requireClient } from "@/lib/auth-guard";
 import {
   createProduct as createProductService,
   updateProduct as updateProductService,
@@ -14,7 +14,7 @@ import {
 } from "@/services/products.service";
 
 export async function createProduct(input: ProductInput) {
-  await requireAdmin();
+  await requireAdminArea("armazem");
   const data = productSchema.parse(input);
 
   const id = await createProductService(data);
@@ -25,7 +25,7 @@ export async function createProduct(input: ProductInput) {
 }
 
 export async function updateProduct(id: string, input: ProductInput) {
-  await requireAdmin();
+  await requireAdminArea("armazem");
   const data = productSchema.parse(input);
 
   await updateProductService(id, data);
@@ -35,7 +35,7 @@ export async function updateProduct(id: string, input: ProductInput) {
 }
 
 export async function setProductActive(id: string, active: boolean) {
-  await requireAdmin();
+  await requireAdminArea("armazem");
 
   await setProductActiveService(id, active);
 

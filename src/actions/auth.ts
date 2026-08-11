@@ -1,6 +1,5 @@
 "use server";
 
-import { createHash, randomBytes } from "node:crypto";
 import { AuthError } from "next-auth";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -9,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { getBaseUrl } from "@/lib/url";
+import { createResetToken, hashToken } from "@/lib/reset-token";
 
 export type LoginResult = "ok" | "invalid" | "error";
 
@@ -85,12 +85,6 @@ export async function registerAction(input: {
   return { ok: true };
 }
 
-const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
-
-function hashToken(token: string) {
-  return createHash("sha256").update(token).digest("hex");
-}
-
 export async function requestPasswordReset(rawEmail: string): Promise<void> {
   const email = z.string().trim().toLowerCase().email().safeParse(rawEmail);
   if (!email.success) return;
@@ -100,16 +94,7 @@ export async function requestPasswordReset(rawEmail: string): Promise<void> {
   // to avoid leaking which emails are registered.
   if (!user) return;
 
-  const token = randomBytes(32).toString("hex");
-  const tokenHash = hashToken(token);
-
-  await prisma.passwordResetToken.create({
-    data: {
-      userId: user.id,
-      tokenHash,
-      expiresAt: new Date(Date.now() + TOKEN_TTL_MS),
-    },
-  });
+  const token = await createResetToken(user.id);
 
   const baseUrl = await getBaseUrl();
   const resetUrl = `${baseUrl}/reset-password?token=${token}`;
@@ -148,8 +133,10 @@ export async function resetPassword(
 
   await prisma.$transaction([
     prisma.user.update({
+      // Also (re)activates the account — this same flow completes an
+      // invited user's very first sign-up, not just password resets.
       where: { id: record.userId },
-      data: { passwordHash },
+      data: { passwordHash, active: true },
     }),
     prisma.passwordResetToken.update({
       where: { id: record.id },

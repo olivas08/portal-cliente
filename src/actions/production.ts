@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth-guard";
+import { requireAdminArea } from "@/lib/auth-guard";
 import { guardAction } from "@/lib/errors";
 import {
   requireOperator,
@@ -42,7 +42,7 @@ const TERMINAL = "/producao/terminal";
 
 export async function generateWorkOrders(orderId: string) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("producao");
     const data = generateWorkOrdersSchema.parse({ orderId });
 
     await generateWorkOrdersForOrder(data.orderId);
@@ -54,7 +54,7 @@ export async function generateWorkOrders(orderId: string) {
 
 export async function releaseWorkOrder(workOrderId: string) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("producao");
     const data = workOrderIdSchema.parse({ workOrderId });
 
     await releaseWorkOrderService(data.workOrderId);
@@ -66,7 +66,7 @@ export async function releaseWorkOrder(workOrderId: string) {
 
 export async function cancelWorkOrder(workOrderId: string) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("producao");
     const data = workOrderIdSchema.parse({ workOrderId });
 
     await cancelWorkOrderService(data.workOrderId);
@@ -78,7 +78,7 @@ export async function cancelWorkOrder(workOrderId: string) {
 
 export async function reopenWorkOrder(workOrderId: string) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("producao");
     const data = workOrderIdSchema.parse({ workOrderId });
 
     await reopenWorkOrderService(data.workOrderId);
@@ -90,7 +90,7 @@ export async function reopenWorkOrder(workOrderId: string) {
 
 export async function deleteWorkOrder(workOrderId: string) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("producao");
     const data = workOrderIdSchema.parse({ workOrderId });
 
     await deleteWorkOrderService(data.workOrderId);
@@ -104,7 +104,7 @@ export async function setWorkOrderPriority(
   priority: "normal" | "urgent",
 ) {
   return guardAction(async () => {
-    await requireAdmin();
+    await requireAdminArea("producao");
     const data = setWorkOrderPrioritySchema.parse({ workOrderId, priority });
 
     await setWorkOrderPriorityService(data.workOrderId, data.priority);
@@ -117,7 +117,7 @@ export async function setWorkOrderPriority(
 const ADMIN_ROUTING = "/admin/producao/roteiros";
 
 export async function setProductRouting(input: SetProductRoutingInput) {
-  await requireAdmin();
+  await requireAdminArea("producao");
   const data = setProductRoutingSchema.parse(input);
 
   await setProductRoutingService(data);
@@ -129,7 +129,7 @@ export async function setProductRouting(input: SetProductRoutingInput) {
 const ADMIN_QUALITY = "/admin/producao/qualidade";
 
 export async function reworkStep(stepId: string) {
-  await requireAdmin();
+  await requireAdminArea("qualidade");
   const data = stepIdSchema.parse({ stepId });
 
   await reworkStepService(data.stepId);
@@ -140,7 +140,7 @@ export async function reworkStep(stepId: string) {
 }
 
 export async function resolveNonConformity(id: string) {
-  await requireAdmin();
+  await requireAdminArea("qualidade");
   const data = nonConformityIdSchema.parse({ id });
 
   await resolveNonConformityService(data.id);

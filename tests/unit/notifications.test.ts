@@ -40,7 +40,12 @@ describe("notifyAdmins", () => {
   it("creates one notification per admin user", async () => {
     await notifyAdmins(sample);
     expect(prismaMock.user.findMany).toHaveBeenCalledWith({
-      where: { role: "ADMIN", id: undefined },
+      where: {
+        role: {
+          in: ["ADMIN", "PRODUCTION_MANAGER", "WAREHOUSE_MANAGER", "SALES_MANAGER", "QUALITY_MANAGER"],
+        },
+        id: undefined,
+      },
       select: { id: true },
     });
     const arg = prismaMock.notification.createMany.mock.calls[0][0];
@@ -53,7 +58,12 @@ describe("notifyAdmins", () => {
   it("excludes the actor when excludeUserId is given", async () => {
     await notifyAdmins(sample, "u1");
     expect(prismaMock.user.findMany).toHaveBeenCalledWith({
-      where: { role: "ADMIN", id: { not: "u1" } },
+      where: {
+        role: {
+          in: ["ADMIN", "PRODUCTION_MANAGER", "WAREHOUSE_MANAGER", "SALES_MANAGER", "QUALITY_MANAGER"],
+        },
+        id: { not: "u1" },
+      },
       select: { id: true },
     });
   });
@@ -74,7 +84,7 @@ describe("notifyCompanyClients", () => {
   it("targets CLIENT users of the company, excluding the actor", async () => {
     await notifyCompanyClients("c1", sample, "u2");
     expect(prismaMock.user.findMany).toHaveBeenCalledWith({
-      where: { companyId: "c1", role: "CLIENT", id: { not: "u2" } },
+      where: { companyId: "c1", role: { in: ["CLIENT", "CLIENT_USER"] }, id: { not: "u2" } },
       select: { id: true },
     });
   });

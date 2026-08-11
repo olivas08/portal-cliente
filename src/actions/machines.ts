@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth-guard";
+import { requireAdminArea } from "@/lib/auth-guard";
 import {
   createMachine as createMachineService,
   setMachineActive as setMachineActiveService,
@@ -15,7 +15,7 @@ import {
 const ADMIN_MACHINES = "/admin/producao/maquinas";
 
 export async function createMachine(input: CreateMachineInput) {
-  await requireAdmin();
+  await requireAdminArea("producao");
   const data = createMachineSchema.parse(input);
 
   await createMachineService(data);
@@ -24,7 +24,7 @@ export async function createMachine(input: CreateMachineInput) {
 }
 
 export async function setMachineActive(machineId: string, active: boolean) {
-  await requireAdmin();
+  await requireAdminArea("producao");
   const data = setMachineActiveSchema.parse({ machineId, active });
 
   await setMachineActiveService(data);
@@ -33,7 +33,7 @@ export async function setMachineActive(machineId: string, active: boolean) {
 }
 
 export async function regenerateMachineToken(machineId: string, token: string) {
-  await requireAdmin();
+  await requireAdminArea("producao");
   const data = regenerateMachineTokenSchema.parse({ machineId, token });
 
   await regenerateMachineTokenService(data);

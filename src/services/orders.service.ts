@@ -5,6 +5,7 @@ import { sendOrderStatusUpdateEmail } from "@/lib/email";
 import { ORDER_STATUS_LABELS, type OrderStatus } from "@/lib/types";
 import { NotFoundError, AppError } from "@/lib/errors";
 import { assertCompanyAccess, type SessionUser } from "@/lib/auth-guard";
+import { isAdminRole } from "@/lib/roles";
 import { computeStatusDates, isCancellable } from "@/services/order-status";
 import { createWithReference } from "@/services/reference.service";
 import { notifyAdmins, notifyCompanyClients } from "@/services/notifications.service";
@@ -115,7 +116,7 @@ export async function cancelOrder(
   if (!existing) throw new NotFoundError("Encomenda não encontrada.");
   assertCompanyAccess(actor, existing.companyId);
 
-  const isClient = actor.role !== "ADMIN";
+  const isClient = !isAdminRole(actor.role);
   if (isClient && existing.status !== "pending") {
     throw new AppError(
       "Só pode anular a encomenda enquanto está pendente. Contacte a fábrica.",

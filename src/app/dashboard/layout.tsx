@@ -7,6 +7,7 @@ import {
   countUnread,
   listNotifications,
 } from "@/services/notifications.service";
+import { isClientRole } from "@/lib/roles";
 
 export default async function DashboardLayout({
   children,
@@ -16,7 +17,7 @@ export default async function DashboardLayout({
   const session = await auth();
   const user = session?.user;
   if (!user) redirect("/login");
-  if (user.role !== "CLIENT") redirect("/admin");
+  if (!isClientRole(user.role)) redirect("/admin");
 
   let company = "";
   if (user.companyId) {
@@ -39,6 +40,7 @@ export default async function DashboardLayout({
           name={user.name ?? ""}
           company={company}
           isAdmin={false}
+          role={user.role}
           notifications={notifications}
           unreadCount={unreadCount}
         />

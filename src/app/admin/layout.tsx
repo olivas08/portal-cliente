@@ -7,6 +7,7 @@ import {
   listNotifications,
 } from "@/services/notifications.service";
 import { TENANT } from "@/lib/branding";
+import { isAdminRole } from "@/lib/roles";
 
 const FACTORY_NAME = TENANT.legalName;
 
@@ -18,7 +19,7 @@ export default async function AdminLayout({
   const session = await auth();
   const user = session?.user;
   if (!user) redirect("/login");
-  if (user.role !== "ADMIN") redirect("/dashboard");
+  if (!isAdminRole(user.role)) redirect("/dashboard");
 
   const [notifications, unreadCount] = await Promise.all([
     listNotifications(user.id),
@@ -32,6 +33,7 @@ export default async function AdminLayout({
           name={user.name ?? ""}
           company={FACTORY_NAME}
           isAdmin
+          role={user.role}
           notifications={notifications}
           unreadCount={unreadCount}
         />

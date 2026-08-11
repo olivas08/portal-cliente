@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import { NotFoundError, AppError } from "@/lib/errors";
 import { assertCompanyAccess, type SessionUser } from "@/lib/auth-guard";
+import { isClientRole } from "@/lib/roles";
 import { createWithReference } from "@/services/reference.service";
 import { notifyAdmins } from "@/services/notifications.service";
 
@@ -140,7 +141,7 @@ export async function orderFromCatalog(
   actor: SessionUser,
   data: CatalogOrderInput,
 ): Promise<string> {
-  if (actor.role !== "CLIENT" || !actor.companyId) {
+  if (!isClientRole(actor.role) || !actor.companyId) {
     throw new AppError("Apenas clientes podem encomendar a partir do catálogo.");
   }
   const companyId = actor.companyId;
