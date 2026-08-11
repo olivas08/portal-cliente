@@ -1,4 +1,6 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import type {
   OrderVM,
   OrderSummaryVM,
@@ -282,74 +284,91 @@ export async function getQuoteById(id: string): Promise<QuoteVM | null> {
   return { ...toQuoteBase(quote), lines: quote.lines.map(toQuoteLineVM) };
 }
 
-export async function getPricingSettingsVM(): Promise<PricingSettingsVM> {
-  const s = await getPricingSettingsService();
-  return {
-    steelPriceEurKg: s.steelPriceEurKg,
-    defaultMarginPercent: s.defaultMarginPercent,
-  };
-}
+export const getPricingSettingsVM = unstable_cache(
+  async (): Promise<PricingSettingsVM> => {
+    const s = await getPricingSettingsService();
+    return {
+      steelPriceEurKg: s.steelPriceEurKg,
+      defaultMarginPercent: s.defaultMarginPercent,
+    };
+  },
+  ["pricing-settings-vm"],
+  { tags: [CACHE_TAGS.pricingSettings], revalidate: false },
+);
 
-export async function getOperationTypesVM(): Promise<OperationTypeVM[]> {
-  const types = await getOperationTypesService();
-  return types.map((t) => ({
-    id: t.id,
-    key: t.key,
-    name: t.name,
-    unit: t.unit,
-    ratePerUnitEur: t.ratePerUnitEur,
-    active: t.active,
-    sequence: t.sequence,
-  }));
-}
+export const getOperationTypesVM = unstable_cache(
+  async (): Promise<OperationTypeVM[]> => {
+    const types = await getOperationTypesService();
+    return types.map((t) => ({
+      id: t.id,
+      key: t.key,
+      name: t.name,
+      unit: t.unit,
+      ratePerUnitEur: t.ratePerUnitEur,
+      active: t.active,
+      sequence: t.sequence,
+    }));
+  },
+  ["operation-types-vm"],
+  { tags: [CACHE_TAGS.operationTypes], revalidate: false },
+);
 
-export async function getCompanies() {
-  return prisma.company.findMany({ orderBy: { name: "asc" } });
-}
+export const getCompanies = unstable_cache(
+  async () => prisma.company.findMany({ orderBy: { name: "asc" } }),
+  ["companies"],
+  { tags: [CACHE_TAGS.companies], revalidate: false },
+);
 
 
-export async function getProducts(): Promise<ProductVM[]> {
-  const products = await prisma.product.findMany({
-    include: { prices: { include: { company: true } } },
-    orderBy: [{ active: "desc" }, { name: "asc" }],
-  });
-  return products.map((p) => ({
-    id: p.id,
-    reference: p.reference,
-    name: p.name,
-    description: p.description,
-    unit: p.unit,
-    unitPriceEur: p.unitPriceEur,
-    category: p.category,
-    imageUrl: p.imageUrl,
-    active: p.active,
-    companyPrices: p.prices.map((pr) => ({
-      companyId: pr.companyId,
-      companyName: pr.company.name,
-      unitPriceEur: pr.unitPriceEur,
-    })),
-  }));
-}
+export const getProducts = unstable_cache(
+  async (): Promise<ProductVM[]> => {
+    const products = await prisma.product.findMany({
+      include: { prices: { include: { company: true } } },
+      orderBy: [{ active: "desc" }, { name: "asc" }],
+    });
+    return products.map((p) => ({
+      id: p.id,
+      reference: p.reference,
+      name: p.name,
+      description: p.description,
+      unit: p.unit,
+      unitPriceEur: p.unitPriceEur,
+      category: p.category,
+      imageUrl: p.imageUrl,
+      active: p.active,
+      companyPrices: p.prices.map((pr) => ({
+        companyId: pr.companyId,
+        companyName: pr.company.name,
+        unitPriceEur: pr.unitPriceEur,
+      })),
+    }));
+  },
+  ["products"],
+  { tags: [CACHE_TAGS.products], revalidate: false },
+);
 
-export async function getCatalogForCompany(
-  companyId: string,
-): Promise<CatalogProductVM[]> {
-  const products = await prisma.product.findMany({
-    where: { active: true },
-    include: { prices: { where: { companyId } } },
-    orderBy: [{ category: "asc" }, { name: "asc" }],
-  });
-  return products.map((p) => ({
-    id: p.id,
-    reference: p.reference,
-    name: p.name,
-    description: p.description,
-    unit: p.unit,
-    unitPriceEur: p.prices[0]?.unitPriceEur ?? p.unitPriceEur,
-    category: p.category,
-    imageUrl: p.imageUrl,
-  }));
-}
+export const getCatalogForCompany = unstable_cache(
+  async (companyId: string): Promise<CatalogProductVM[]> => {
+    const products = await prisma.product.findMany({
+      where: { active: true },
+      include: { prices: { where: { companyId } } },
+      orderBy: [{ category: "asc" }, { name: "asc" }],
+    });
+    return products.map((p) => ({
+      id: p.id,
+      reference: p.reference,
+      name: p.name,
+      description: p.description,
+      unit: p.unit,
+      unitPriceEur: p.prices[0]?.unitPriceEur ?? p.unitPriceEur,
+      category: p.category,
+      imageUrl: p.imageUrl,
+    }));
+  },
+  ["catalog-for-company"],
+  { tags: [CACHE_TAGS.products], revalidate: false },
+);
+
 
 // ── Produção (Ordens de Fabrico) ────────────────────────────────────────────
 
@@ -385,7 +404,8 @@ function toStepVM(step: StepWith, allSteps: StepWith[]): WorkOrderStepVM {
   };
 }
 
-export async function getWorkOrders(): Promise<WorkOrderVM[]> {
+export const getWorkOrders = unstable_cache(
+  async (): Promise<WorkOrderVM[]> => {
   // Prisma resolves each nested `include` relation as its own round trip to
   // the DB, each wrapped in its own transaction (BEGIN/COMMIT) against the
   // remote Supabase pooler — this used to be ~11 sequential queries. Since
@@ -461,19 +481,25 @@ export async function getWorkOrders(): Promise<WorkOrderVM[]> {
       },
     };
   });
-}
+  },
+  ["work-orders"],
+  { tags: [CACHE_TAGS.workOrders], revalidate: false },
+);
 
-export async function getActiveOperators(): Promise<
-  { id: string; name: string }[]
-> {
-  return prisma.operator.findMany({
-    where: { active: true },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-  });
-}
+export const getActiveOperators = unstable_cache(
+  async (): Promise<{ id: string; name: string }[]> => {
+    return prisma.operator.findMany({
+      where: { active: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+  },
+  ["active-operators"],
+  { tags: [CACHE_TAGS.operators], revalidate: false },
+);
 
-export async function getWorkstationsWithQueue(): Promise<WorkstationVM[]> {
+export const getWorkstationsWithQueue = unstable_cache(
+  async (): Promise<WorkstationVM[]> => {
   const workstations = await prisma.workstation.findMany({
     where: { active: true },
     orderBy: { sequence: "asc" },
@@ -503,7 +529,10 @@ export async function getWorkstationsWithQueue(): Promise<WorkstationVM[]> {
       queueCount,
     };
   });
-}
+  },
+  ["workstations-with-queue"],
+  { tags: [CACHE_TAGS.workOrders], revalidate: false },
+);
 
 export async function getTerminalQueue(
   workstationId: string,
@@ -574,9 +603,8 @@ export async function getOrdersWithoutProduction(): Promise<
  * overall progress, with no machine or operator names. Returns null when the
  * order has no production planned yet.
  */
-export async function getOrderProduction(
-  orderId: string,
-): Promise<OrderProductionVM | null> {
+export const getOrderProduction = unstable_cache(
+  async (orderId: string): Promise<OrderProductionVM | null> => {
   const workOrders = await prisma.workOrder.findMany({
     where: { orderId, status: { notIn: ["planned", "cancelled"] } },
     include: {
@@ -608,18 +636,26 @@ export async function getOrderProduction(
     stages,
     estimatedCompletion: plannedEnds[0] ? toIsoDate(plannedEnds[0]) : undefined,
   };
-}
+  },
+  ["order-production"],
+  { tags: [CACHE_TAGS.workOrders], revalidate: false },
+);
 
-export async function getWorkstationOptions(): Promise<WorkstationOptionVM[]> {
-  const workstations = await prisma.workstation.findMany({
-    where: { active: true },
-    orderBy: { sequence: "asc" },
-    select: { id: true, name: true, clientStageLabel: true },
-  });
-  return workstations;
-}
+export const getWorkstationOptions = unstable_cache(
+  async (): Promise<WorkstationOptionVM[]> => {
+    const workstations = await prisma.workstation.findMany({
+      where: { active: true },
+      orderBy: { sequence: "asc" },
+      select: { id: true, name: true, clientStageLabel: true },
+    });
+    return workstations;
+  },
+  ["workstation-options"],
+  { tags: [CACHE_TAGS.workstations], revalidate: false },
+);
 
-export async function getProductsWithRouting(): Promise<ProductRoutingVM[]> {
+export const getProductsWithRouting = unstable_cache(
+  async (): Promise<ProductRoutingVM[]> => {
   const products = await prisma.product.findMany({
     where: { active: true },
     orderBy: { name: "asc" },
@@ -635,9 +671,15 @@ export async function getProductsWithRouting(): Promise<ProductRoutingVM[]> {
       plannedMinutes: op.plannedMinutes,
     })),
   }));
-}
+  },
+  ["products-with-routing"],
+  { tags: [CACHE_TAGS.routing, CACHE_TAGS.products], revalidate: false },
+);
 
-export async function getWorkstationLoad(): Promise<WorkstationLoadVM[]> {  const workstations = await prisma.workstation.findMany({
+
+export const getWorkstationLoad = unstable_cache(
+  async (): Promise<WorkstationLoadVM[]> => {
+  const workstations = await prisma.workstation.findMany({
     where: { active: true },
     orderBy: { sequence: "asc" },
     include: {
@@ -684,9 +726,13 @@ export async function getWorkstationLoad(): Promise<WorkstationLoadVM[]> {  cons
       readyCount,
     };
   });
-}
+  },
+  ["workstation-load"],
+  { tags: [CACHE_TAGS.workOrders], revalidate: false },
+);
 
-export async function getOpenNonConformities(): Promise<NonConformityVM[]> {
+export const getOpenNonConformities = unstable_cache(
+  async (): Promise<NonConformityVM[]> => {
   const ncs = await prisma.nonConformity.findMany({
     where: { status: "open" },
     orderBy: { createdAt: "desc" },
@@ -714,9 +760,13 @@ export async function getOpenNonConformities(): Promise<NonConformityVM[]> {
     operatorName: nc.operator?.name ?? null,
     createdAt: nc.createdAt.toISOString(),
   }));
-}
+  },
+  ["open-non-conformities"],
+  { tags: [CACHE_TAGS.nonConformities], revalidate: false },
+);
 
-export async function getWorkstationOee(): Promise<WorkstationOeeVM[]> {
+export const getWorkstationOee = unstable_cache(
+  async (): Promise<WorkstationOeeVM[]> => {
   const workstations = await prisma.workstation.findMany({
     where: { active: true },
     orderBy: { sequence: "asc" },
@@ -749,9 +799,13 @@ export async function getWorkstationOee(): Promise<WorkstationOeeVM[]> {
       downtimeMinutes: oee.downtimeMinutes,
     };
   });
-}
+  },
+  ["workstation-oee"],
+  { tags: [CACHE_TAGS.workOrders], revalidate: false },
+);
 
-export async function getFactoryOee(): Promise<WorkstationOeeVM | null> {
+export const getFactoryOee = unstable_cache(
+  async (): Promise<WorkstationOeeVM | null> => {
   const steps = await prisma.workOrderStep.findMany({
     where: { status: "done", workstation: { active: true } },
     select: {
@@ -776,9 +830,13 @@ export async function getFactoryOee(): Promise<WorkstationOeeVM | null> {
     runtimeMinutes: oee.runtimeMinutes,
     downtimeMinutes: oee.downtimeMinutes,
   };
-}
+  },
+  ["factory-oee"],
+  { tags: [CACHE_TAGS.workOrders], revalidate: false },
+);
 
-export async function getOperatorsWithStats(): Promise<OperatorVM[]> {
+export const getOperatorsWithStats = unstable_cache(
+  async (): Promise<OperatorVM[]> => {
   const operators = await prisma.operator.findMany({
     orderBy: [{ active: "desc" }, { name: "asc" }],
     include: {
@@ -810,9 +868,13 @@ export async function getOperatorsWithStats(): Promise<OperatorVM[]> {
         op.steps.length > 0 ? oee.runtimeMinutes / op.steps.length : 0,
     };
   });
-}
+  },
+  ["operators-with-stats"],
+  { tags: [CACHE_TAGS.operators, CACHE_TAGS.workOrders], revalidate: false },
+);
 
-export async function getMachinesWithStatus(): Promise<MachineVM[]> {
+export const getMachinesWithStatus = unstable_cache(
+  async (): Promise<MachineVM[]> => {
   const now = new Date();
   const machines = await prisma.machine.findMany({
     orderBy: [{ active: "desc" }, { name: "asc" }],
@@ -863,11 +925,13 @@ export async function getMachinesWithStatus(): Promise<MachineVM[]> {
       currentScrap: step ? step.scrapQty : 0,
     };
   });
-}
+  },
+  ["machines-with-status"],
+  { tags: [CACHE_TAGS.machines], revalidate: false },
+);
 
-export async function getRecentDiscrepancies(
-  limit = 20,
-): Promise<DiscrepancyVM[]> {
+export const getRecentDiscrepancies = unstable_cache(
+  async (limit = 20): Promise<DiscrepancyVM[]> => {
   const steps = await prisma.workOrderStep.findMany({
     where: { machineVerified: true, status: "done" },
     orderBy: { finishedAt: "desc" },
@@ -901,11 +965,15 @@ export async function getRecentDiscrepancies(
       finishedAt: s.finishedAt ? s.finishedAt.toISOString() : null,
     };
   });
-}
+  },
+  ["recent-discrepancies"],
+  { tags: [CACHE_TAGS.machines, CACHE_TAGS.workOrders], revalidate: false },
+);
 
 // ── Armazém / Stock ──────────────────────────────────────────────────────────
 
-export async function getMaterials(): Promise<MaterialVM[]> {
+export const getMaterials = unstable_cache(
+  async (): Promise<MaterialVM[]> => {
   const materials = await prisma.material.findMany({
     orderBy: [{ active: "desc" }, { name: "asc" }],
   });
@@ -919,9 +987,13 @@ export async function getMaterials(): Promise<MaterialVM[]> {
     active: m.active,
     belowMin: m.active && m.stockQty < m.minStockQty,
   }));
-}
+  },
+  ["materials"],
+  { tags: [CACHE_TAGS.materials], revalidate: false },
+);
 
-export async function getProductsWithBom(): Promise<ProductBomVM[]> {
+export const getProductsWithBom = unstable_cache(
+  async (): Promise<ProductBomVM[]> => {
   const products = await prisma.product.findMany({
     where: { active: true },
     orderBy: { name: "asc" },
@@ -936,12 +1008,14 @@ export async function getProductsWithBom(): Promise<ProductBomVM[]> {
       qtyPerUnit: b.qtyPerUnit,
     })),
   }));
-}
+  },
+  ["products-with-bom"],
+  { tags: [CACHE_TAGS.materials, CACHE_TAGS.products], revalidate: false },
+);
 
 /** Planned work orders with live material availability, for the release gate. */
-export async function getWorkOrdersAwaitingMaterials(): Promise<
-  WorkOrderReadinessVM[]
-> {
+export const getWorkOrdersAwaitingMaterials = unstable_cache(
+  async (): Promise<WorkOrderReadinessVM[]> => {
   const workOrders = await prisma.workOrder.findMany({
     where: { status: "planned" },
     orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
@@ -980,11 +1054,13 @@ export async function getWorkOrdersAwaitingMaterials(): Promise<
       canRelease: materials.every((m) => m.enough),
     };
   });
-}
+  },
+  ["work-orders-awaiting-materials"],
+  { tags: [CACHE_TAGS.workOrders, CACHE_TAGS.materials], revalidate: false },
+);
 
-export async function getRecentStockMovements(
-  limit = 30,
-): Promise<StockMovementVM[]> {
+export const getRecentStockMovements = unstable_cache(
+  async (limit = 30): Promise<StockMovementVM[]> => {
   const movements = await prisma.stockMovement.findMany({
     orderBy: { createdAt: "desc" },
     take: limit,
@@ -1013,4 +1089,8 @@ export async function getRecentStockMovements(
     note: m.note,
     createdAt: toIsoDate(m.createdAt),
   }));
-}
+  },
+  ["recent-stock-movements"],
+  { tags: [CACHE_TAGS.materials], revalidate: false },
+);
+

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import { NotFoundError, AppError } from "@/lib/errors";
 
 // ── Schemas ─────────────────────────────────────────────────────────────────
@@ -84,6 +85,7 @@ export async function createMaterial(input: CreateMaterialInput): Promise<void> 
       });
     }
   });
+  invalidateCache(CACHE_TAGS.materials);
 }
 
 export async function updateMaterial(input: UpdateMaterialInput): Promise<void> {
@@ -102,6 +104,7 @@ export async function updateMaterial(input: UpdateMaterialInput): Promise<void> 
       active: input.active,
     },
   });
+  invalidateCache(CACHE_TAGS.materials);
 }
 
 /** Adds stock (goods receipt) and logs the movement. */
@@ -126,6 +129,7 @@ export async function receiveStock(input: ReceiveStockInput): Promise<void> {
       },
     });
   });
+  invalidateCache(CACHE_TAGS.materials);
 }
 
 /** Corrects stock to an absolute value (inventory count) and logs the delta. */
@@ -153,6 +157,7 @@ export async function adjustStock(input: AdjustStockInput): Promise<void> {
       },
     });
   });
+  invalidateCache(CACHE_TAGS.materials);
 }
 
 // ── Bill of materials ────────────────────────────────────────────────────────
@@ -189,4 +194,5 @@ export async function setProductBom(input: SetProductBomInput): Promise<void> {
       });
     }
   });
+  invalidateCache(CACHE_TAGS.materials);
 }

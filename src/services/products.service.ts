@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import { NotFoundError, AppError } from "@/lib/errors";
 import { assertCompanyAccess, type SessionUser } from "@/lib/auth-guard";
 import { createWithReference } from "@/services/reference.service";
@@ -81,6 +82,7 @@ export async function createProduct(data: ProductInput): Promise<string> {
         prices: { create: data.companyPrices },
       },
     });
+    invalidateCache(CACHE_TAGS.products);
     return product.id;
   } catch (err) {
     if (isUniqueViolation(err)) {
@@ -108,6 +110,7 @@ export async function updateProduct(
         data: data.companyPrices.map((p) => ({ ...p, productId: id })),
       }),
     ]);
+    invalidateCache(CACHE_TAGS.products);
   } catch (err) {
     if (isUniqueViolation(err)) {
       throw new AppError("Já existe um produto com essa referência.");
@@ -123,6 +126,7 @@ export async function setProductActive(
   const existing = await prisma.product.findUnique({ where: { id } });
   if (!existing) throw new NotFoundError("Produto não encontrado.");
   await prisma.product.update({ where: { id }, data: { active } });
+  invalidateCache(CACHE_TAGS.products);
 }
 
 /**

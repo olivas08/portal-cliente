@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { getBaseUrl } from "@/lib/url";
 
@@ -72,6 +73,7 @@ export async function registerAction(input: {
       },
     });
   });
+  invalidateCache(CACHE_TAGS.companies);
 
   try {
     await signIn("credentials", { email, password, redirect: false });

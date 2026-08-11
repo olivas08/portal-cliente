@@ -1,6 +1,7 @@
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import { NotFoundError, AppError, UnauthorizedError } from "@/lib/errors";
 import { ORDER_STATUS_LABELS } from "@/lib/types";
 import { computeStatusDates } from "@/services/order-status";
@@ -194,6 +195,7 @@ export async function createOperator(input: CreateOperatorInput): Promise<void> 
   await prisma.operator.create({
     data: { name: input.name, pinHash },
   });
+  invalidateCache(CACHE_TAGS.operators);
 }
 
 /** Resets an operator's PIN (e.g. when forgotten). */
@@ -210,6 +212,7 @@ export async function resetOperatorPin(
     where: { id: input.operatorId },
     data: { pinHash },
   });
+  invalidateCache(CACHE_TAGS.operators);
 }
 
 /**
@@ -228,6 +231,7 @@ export async function setOperatorActive(
     where: { id: input.operatorId },
     data: { active: input.active },
   });
+  invalidateCache(CACHE_TAGS.operators);
 }
 
 /** Registers a machine (edge device) with a bcrypt-hashed access token. */
@@ -241,6 +245,7 @@ export async function createMachine(input: CreateMachineInput): Promise<void> {
       tokenHash,
     },
   });
+  invalidateCache(CACHE_TAGS.machines);
 }
 
 export async function setMachineActive(
@@ -255,6 +260,7 @@ export async function setMachineActive(
     where: { id: input.machineId },
     data: { active: input.active },
   });
+  invalidateCache(CACHE_TAGS.machines);
 }
 
 export async function regenerateMachineToken(
@@ -270,6 +276,7 @@ export async function regenerateMachineToken(
     where: { id: input.machineId },
     data: { tokenHash },
   });
+  invalidateCache(CACHE_TAGS.machines);
 }
 
 export interface MachineIngestResult {
@@ -351,6 +358,10 @@ export async function recordMachineProduction(
       scrapQty: updated.scrapQty,
       stepId: updated.id,
     };
+  }).then((result) => {
+    invalidateCache(CACHE_TAGS.machines);
+    invalidateCache(CACHE_TAGS.workOrders);
+    return result;
   });
 }
 
@@ -417,6 +428,8 @@ export async function recordMachineStatus(
   await prisma.$transaction((tx) =>
     applyMachineState(tx, machine, input.state, now),
   );
+  invalidateCache(CACHE_TAGS.machines);
+  invalidateCache(CACHE_TAGS.workOrders);
   return { state: input.state };
 }
 
@@ -559,6 +572,7 @@ export async function generateWorkOrdersForOrder(orderId: string): Promise<numbe
     );
   }
 
+  invalidateCache(CACHE_TAGS.workOrders);
   return pending.length;
 }
 
@@ -597,6 +611,7 @@ export async function setProductRouting(
       })),
     }),
   ]);
+  invalidateCache(CACHE_TAGS.routing);
 }
 
 // ── Quality: non-conformities & rework ───────────────────────────────────────
@@ -647,6 +662,8 @@ export async function reworkStep(stepId: string): Promise<void> {
       data: { status: "resolved", resolvedAt: now },
     });
   });
+  invalidateCache(CACHE_TAGS.workOrders);
+  invalidateCache(CACHE_TAGS.nonConformities);
 }
 
 /** Marks a non-conformity resolved (e.g. after scrapping the defective parts). */
@@ -658,6 +675,7 @@ export async function resolveNonConformity(id: string): Promise<void> {
     where: { id },
     data: { status: "resolved", resolvedAt: new Date() },
   });
+  invalidateCache(CACHE_TAGS.nonConformities);
 }
 
 /** Releases a planned work order to the shop floor (steps become queueable). */
@@ -725,6 +743,8 @@ export async function releaseWorkOrder(workOrderId: string): Promise<void> {
       data: { status: "released" },
     });
   });
+  invalidateCache(CACHE_TAGS.workOrders);
+  invalidateCache(CACHE_TAGS.materials);
 }
 
 /** Sets a work order's priority (used to bump urgent jobs up the queue). */
@@ -741,6 +761,7 @@ export async function setWorkOrderPriority(
     where: { id: workOrderId },
     data: { priority },
   });
+  invalidateCache(CACHE_TAGS.workOrders);
 }
 
 /**
@@ -754,6 +775,7 @@ export async function deleteWorkOrder(workOrderId: string): Promise<void> {
     throw new AppError("Só pode eliminar ordens ainda por lançar. Cancele-a.");
   }
   await prisma.workOrder.delete({ where: { id: workOrderId } });
+  invalidateCache(CACHE_TAGS.workOrders);
 }
 
 /** Cancels a work order, stopping any running step and rolling up the order. */
@@ -818,6 +840,8 @@ export async function cancelWorkOrder(workOrderId: string): Promise<void> {
   });
 
   await dispatchOrderNotification(notify);
+  invalidateCache(CACHE_TAGS.workOrders);
+  invalidateCache(CACHE_TAGS.materials);
 }
 
 /** Reopens a cancelled work order, restoring its status from its steps. */
@@ -890,6 +914,8 @@ export async function reopenWorkOrder(workOrderId: string): Promise<void> {
   });
 
   await dispatchOrderNotification(notify);
+  invalidateCache(CACHE_TAGS.workOrders);
+  invalidateCache(CACHE_TAGS.materials);
 }
 
 // ── Shop-floor execution ────────────────────────────────────────────────────
@@ -952,6 +978,7 @@ export async function startStep(
   });
 
   await dispatchOrderNotification(notify);
+  invalidateCache(CACHE_TAGS.workOrders);
 }
 
 /** Pauses a running step, banking the elapsed run time. */
@@ -975,6 +1002,7 @@ export async function pauseStep(
       operatorId: operator.id,
     },
   });
+  invalidateCache(CACHE_TAGS.workOrders);
 }
 
 /** Completes a step, recording good/scrap quantities and rolling up state. */
@@ -1072,6 +1100,8 @@ export async function completeStep(
 
   await dispatchOrderNotification(notify.order);
   await dispatchStageNotification(notify.stage);
+  invalidateCache(CACHE_TAGS.workOrders);
+  if (input.defect) invalidateCache(CACHE_TAGS.nonConformities);
 }
 
 // ── Internal helpers ────────────────────────────────────────────────────────

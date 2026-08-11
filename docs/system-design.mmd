@@ -1,0 +1,91 @@
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor': '#eef2ff',
+  'primaryBorderColor': '#4f46e5',
+  'primaryTextColor': '#1e1b4b',
+  'lineColor': '#64748b',
+  'fontFamily': 'Helvetica'
+}}}%%
+flowchart TB
+
+  subgraph CLIENTS["🖥️ Utilizadores"]
+    direction LR
+    ADMIN["Admin<br/>(gestor de fábrica)"]
+    CLIENT["Cliente<br/>(empresa compradora)"]
+    OPERATOR["Operador<br/>(terminal chão-de-fábrica)"]
+  end
+
+  subgraph VERCEL["☁️ Vercel — Next.js 16 (App Router, serverless)"]
+    direction TB
+
+    MW["Middleware / NextAuth v5<br/>JWT session · role guard (ADMIN/CLIENT)"]
+
+    subgraph PAGES["Server Components (RSC)"]
+      direction LR
+      ADMINPAGES["/admin/*<br/>produção · armazém · orçamentos<br/>KPIs · operadores · requerimentos"]
+      DASHPAGES["/dashboard/*<br/>catálogo · encomendas<br/>orçamentos · requerimentos"]
+      TERMINAL["/producao/terminal<br/>token próprio p/ operador"]
+    end
+
+    ACTIONS["Server Actions<br/>src/actions/*.ts<br/>(auth guard + revalidatePath)"]
+
+    SERVICES["Camada de Domínio<br/>src/services/*.service.ts<br/>lógica de negócio + validação Zod"]
+
+    PRISMA["Prisma Client (singleton)<br/>pgbouncer pool"]
+
+    API_INGEST["API Route<br/>/api/machine/ingest<br/>(token por device)"]
+  end
+
+  subgraph SUPABASE["🗄️ Supabase (eu-west-1)"]
+    direction TB
+    PG[("PostgreSQL<br/>~24 modelos:<br/>Orders · Products · WorkOrders<br/>Machines · Quotes · Materials...")]
+    STORAGE["Supabase Storage<br/>bucket order-documents<br/>(service-role key)"]
+  end
+
+  subgraph EXTERNAL["🔌 Serviços externos"]
+    RESEND["Resend<br/>emails transacionais<br/>(reset password, notificações)"]
+  end
+
+  subgraph FACTORY["🏭 Rede OT da Fábrica"]
+    direction TB
+    PLC["PLC / CNC / Máquinas"]
+    ADAPTERS["Adapters de protocolo<br/>Modbus · OPC-UA · MTConnect"]
+    BROKER["Broker MQTT local"]
+    GATEWAY["Edge Gateway (Node.js)<br/>gateway.mjs<br/>• agrega em janelas (5s)<br/>• buffer store-and-forward<br/>• contadores persistidos (idempotente)"]
+  end
+
+  %% ---- Client flows ----
+  ADMIN -->|HTTPS| MW
+  CLIENT -->|HTTPS| MW
+  OPERATOR -->|HTTPS + token| TERMINAL
+
+  MW --> ADMINPAGES
+  MW --> DASHPAGES
+  ADMINPAGES --> ACTIONS
+  DASHPAGES --> ACTIONS
+  TERMINAL --> ACTIONS
+  ADMINPAGES -.->|fetch direto RSC| SERVICES
+  DASHPAGES -.->|fetch direto RSC| SERVICES
+
+  ACTIONS --> SERVICES
+  SERVICES --> PRISMA
+  PRISMA -->|SQL / pooler 6543| PG
+
+  SERVICES -->|anexos| STORAGE
+  SERVICES -->|emails| RESEND
+
+  %% ---- Edge flow ----
+  PLC --> ADAPTERS
+  ADAPTERS -->|MQTT publish| BROKER
+  BROKER -->|MQTT subscribe| GATEWAY
+  GATEWAY -->|HTTPS POST<br/>pulse/counter/state| API_INGEST
+  API_INGEST --> SERVICES
+
+  classDef external fill:#fef3c7,stroke:#d97706,color:#78350f;
+  classDef db fill:#dcfce7,stroke:#16a34a,color:#14532d;
+  classDef factory fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+  classDef app fill:#eef2ff,stroke:#4f46e5,color:#1e1b4b;
+
+  class RESEND external;
+  class PG,STORAGE db;
+  class PLC,ADAPTERS,BROKER,GATEWAY factory;
+  class MW,ACTIONS,SERVICES,PRISMA,API_INGEST app;

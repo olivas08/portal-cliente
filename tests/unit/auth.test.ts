@@ -29,6 +29,11 @@ vi.mock("next-auth", () => ({
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/email", () => ({ sendPasswordResetEmail: mockSendEmail }));
 vi.mock("@/lib/url", () => ({ getBaseUrl: mockGetBaseUrl }));
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+  revalidateTag: vi.fn(),
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
+}));
 vi.mock("bcryptjs", () => ({
   default: { hash: mockHash, compare: vi.fn() },
 }));

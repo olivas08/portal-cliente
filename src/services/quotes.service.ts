@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import { NotFoundError, AppError } from "@/lib/errors";
 import { assertCompanyAccess, type SessionUser } from "@/lib/auth-guard";
 import { createWithReference } from "@/services/reference.service";
@@ -82,6 +83,7 @@ export async function updatePricingSettings(data: PricingSettingsInput): Promise
     create: { id: "default", ...data },
     update: data,
   });
+  invalidateCache(CACHE_TAGS.pricingSettings);
 }
 
 // ── Operation types ──────────────────────────────────────────────────────────
@@ -100,6 +102,7 @@ export async function createOperationType(data: OperationTypeInput): Promise<str
     const created = await prisma.operationType.create({
       data: { ...data, sequence: (agg._max.sequence ?? 0) + 1 },
     });
+    invalidateCache(CACHE_TAGS.operationTypes);
     return created.id;
   } catch (err) {
     if (isUniqueViolation(err)) throw new AppError("Já existe uma operação com essa chave.");
@@ -112,6 +115,7 @@ export async function updateOperationType(id: string, data: OperationTypeInput):
   if (!existing) throw new NotFoundError("Tipo de operação não encontrado.");
   try {
     await prisma.operationType.update({ where: { id }, data });
+    invalidateCache(CACHE_TAGS.operationTypes);
   } catch (err) {
     if (isUniqueViolation(err)) throw new AppError("Já existe uma operação com essa chave.");
     throw err;
@@ -126,6 +130,7 @@ export async function deleteOperationType(id: string): Promise<void> {
   const existing = await prisma.operationType.findUnique({ where: { id } });
   if (!existing) throw new NotFoundError("Tipo de operação não encontrado.");
   await prisma.operationType.delete({ where: { id } });
+  invalidateCache(CACHE_TAGS.operationTypes);
 }
 
 // ── Quote line pricing ───────────────────────────────────────────────────────
