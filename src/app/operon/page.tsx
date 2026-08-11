@@ -109,9 +109,9 @@ const SCREENSHOTS = [
     caption: "Chão de fábrica em tempo real, com máquinas e operadores",
   },
   {
-    src: "/screenshots/kpis.png",
-    alt: "Dashboard de indicadores de desempenho da fábrica",
-    caption: "Indicadores que antes não existiam, agora num só ecrã",
+    src: "/screenshots/armazem.png",
+    alt: "Painel de armazém com controlo de stock de matérias-primas",
+    caption: "Stock controlado, com alertas antes de faltar material",
   },
 ];
 
@@ -276,13 +276,20 @@ export default function OperonLandingPage() {
                 key={s.src}
                 className="overflow-hidden rounded-2xl border border-brand-line/20 shadow-sm"
               >
-                <Image
-                  src={s.src}
-                  alt={s.alt}
-                  width={1440}
-                  height={900}
-                  className="w-full"
-                />
+                <a
+                  href={s.src}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block"
+                >
+                  <Image
+                    src={s.src}
+                    alt={s.alt}
+                    width={1440}
+                    height={900}
+                    className="h-56 w-full cursor-zoom-in object-cover object-top transition-opacity hover:opacity-85"
+                  />
+                </a>
                 <figcaption className="border-t border-brand-line/20 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                   {s.caption}
                 </figcaption>
