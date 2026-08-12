@@ -73,7 +73,17 @@ export function PortalNav({ name, company, isAdmin, role, notifications, unreadC
     if (to === base) {
       return pathname === base || pathname.startsWith(`${base}/ordens`);
     }
-    return pathname === to || pathname.startsWith(`${to}/`);
+    if (!pathname.startsWith(`${to}/`)) return false;
+    // Don't treat "to" as active if a more specific sibling nav item (e.g. a
+    // sub-page like /admin/producao/qualidade nested under /admin/producao)
+    // matches the current path — otherwise both would light up together.
+    const hasMoreSpecificSibling = navLinks.some(
+      (item) =>
+        item.to !== to &&
+        item.to.startsWith(`${to}/`) &&
+        (pathname === item.to || pathname.startsWith(`${item.to}/`))
+    );
+    return !hasMoreSpecificSibling;
   };
 
   return (
