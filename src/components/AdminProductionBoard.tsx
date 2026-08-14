@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { actionError } from "@/lib/action-result";
 import Link from "next/link";
-import { Factory, Rocket, Plus, AlertCircle, CircleDot, CheckCircle2, Circle, PauseCircle, Ban, Trash2, Flame, Undo2, Route, Gauge, ShieldAlert, Activity, Cpu, PackageX } from "lucide-react";
+import { Factory, PlayCircle, Plus, AlertCircle, CircleDot, CheckCircle2, Circle, PauseCircle, Ban, Trash2, Flame, Undo2, Route, Gauge, ShieldAlert, Activity, Cpu, PackageX } from "lucide-react";
 import type { WorkOrderVM, WorkOrderStatus, StepStatus } from "@/lib/types";
 import { WORK_ORDER_STATUS_LABELS } from "@/lib/types";
 import {
@@ -282,7 +282,7 @@ export function AdminProductionBoard({ workOrders, unplanned }: Props) {
                                 </>
                               ) : (
                                 <>
-                                  <Rocket size={14} /> Lançar
+                                  <PlayCircle size={14} /> Lançar
                                 </>
                               )}
                             </button>
