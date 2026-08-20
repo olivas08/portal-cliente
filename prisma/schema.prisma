@@ -290,6 +290,17 @@ enum NcStatus {
   resolved
 }
 
+enum MaintenanceType {
+  preventive
+  corrective
+}
+
+enum MaintenanceStatus {
+  open
+  resolved
+  cancelled
+}
+
 /// A shop-floor workstation / process stage. `clientStageLabel` is the
 /// customer-friendly abstraction shown in the portal (clients never see
 /// machine or operator names).
@@ -309,19 +320,21 @@ model Workstation {
 }
 
 model Machine {
-  id            String           @id @default(cuid())
-  code          String           @unique
-  name          String
-  workstationId String?
-  workstation   Workstation?     @relation(fields: [workstationId], references: [id], onDelete: SetNull)
-  tokenHash     String
-  active        Boolean          @default(true)
-  state         String           @default("offline")
-  stateSince    DateTime?
-  lastSeenAt    DateTime?
-  steps         WorkOrderStep[]
-  readings      MachineReading[]
-  createdAt     DateTime         @default(now())
+  id               String             @id @default(cuid())
+  code             String             @unique
+  name             String
+  workstationId    String?
+  workstation      Workstation?       @relation(fields: [workstationId], references: [id], onDelete: SetNull)
+  tokenHash        String
+  active           Boolean            @default(true)
+  state            String             @default("offline")
+  stateSince       DateTime?
+  lastSeenAt       DateTime?
+  steps            WorkOrderStep[]
+  readings         MachineReading[]
+  maintenancePlans MaintenancePlan[]
+  maintenanceTasks MaintenanceTask[]
+  createdAt        DateTime           @default(now())
 
   @@index([active])
   @@index([workstationId])
@@ -680,4 +693,47 @@ model QuoteLineOperation {
 
   @@index([quoteLineId])
   @@index([operationTypeId])
+}
+
+/// A recurring preventive maintenance plan for a machine (e.g. "Lubrificação
+/// mensal"). `intervalDays` + `lastDoneAt` (or the plan's `createdAt` if it
+/// has never been done) are enough to derive the next due date and urgency
+/// on the fly — no separate "scheduled" task rows are pre-generated.
+model MaintenancePlan {
+  id           String            @id @default(cuid())
+  machineId    String
+  machine      Machine           @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  name         String
+  intervalDays Int
+  lastDoneAt   DateTime?
+  active       Boolean           @default(true)
+  tasks        MaintenanceTask[]
+  createdAt    DateTime          @default(now())
+
+  @@index([machineId])
+  @@index([active])
+}
+
+/// A single maintenance event on a machine: either a preventive check-off
+/// against a `MaintenancePlan` (created already `resolved`, stamping
+/// `lastDoneAt` on the plan) or a corrective breakdown report (created
+/// `open`, resolved later once the repair is done).
+model MaintenanceTask {
+  id          String             @id @default(cuid())
+  machineId   String
+  machine     Machine            @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  planId      String?
+  plan        MaintenancePlan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
+  type        MaintenanceType
+  status      MaintenanceStatus  @default(open)
+  title       String
+  description String?
+  reportedAt  DateTime           @default(now())
+  startedAt   DateTime?
+  resolvedAt  DateTime?
+  notes       String?
+  createdAt   DateTime           @default(now())
+
+  @@index([machineId])
+  @@index([status])
 }

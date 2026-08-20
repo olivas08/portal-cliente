@@ -24,6 +24,7 @@ export const CACHE_TAGS = {
   workstations: "workstations",
   pricingSettings: "pricing-settings",
   operationTypes: "operation-types",
+  maintenance: "maintenance",
 } as const;
 
 /**

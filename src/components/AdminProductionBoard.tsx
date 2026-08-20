@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { actionError } from "@/lib/action-result";
 import Link from "next/link";
-import { Factory, PlayCircle, Plus, AlertCircle, CircleDot, CheckCircle2, Circle, PauseCircle, Ban, Trash2, Flame, Undo2, Route, Gauge, ShieldAlert, Activity, Cpu, PackageX, CalendarRange } from "lucide-react";
+import { Factory, PlayCircle, Plus, AlertCircle, CircleDot, CheckCircle2, Circle, PauseCircle, Ban, Trash2, Flame, Undo2, Route, Gauge, ShieldAlert, Activity, Cpu, PackageX, CalendarRange, Wrench } from "lucide-react";
 import type { WorkOrderVM, WorkOrderStatus, StepStatus } from "@/lib/types";
 import { WORK_ORDER_STATUS_LABELS } from "@/lib/types";
 import {
@@ -119,6 +119,12 @@ export function AdminProductionBoard({ workOrders, unplanned }: Props) {
           className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
         >
           <Cpu size={16} /> Máquinas
+        </Link>
+        <Link
+          href="/admin/producao/manutencao"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          <Wrench size={16} /> Manutenção
         </Link>
         <Link
           href="/admin/producao/roteiros"

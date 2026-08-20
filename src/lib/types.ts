@@ -17,6 +17,8 @@ export type StepStatus = $Enums.StepStatus;
 export type NcDisposition = $Enums.NcDisposition;
 export type NcStatus = $Enums.NcStatus;
 export type QuoteStatus = $Enums.QuoteStatus;
+export type MaintenanceType = $Enums.MaintenanceType;
+export type MaintenanceStatus = $Enums.MaintenanceStatus;
 
 export interface NotificationVM {
   id: string;
@@ -335,6 +337,56 @@ export interface DiscrepancyVM {
   flagged: boolean;
   finishedAt: string | null;
 }
+
+/** A recurring preventive maintenance plan, with its next due date derived on read. */
+export interface MaintenancePlanVM {
+  id: string;
+  machineId: string;
+  machineName: string;
+  name: string;
+  intervalDays: number;
+  lastDoneAt: string | null;
+  nextDueDate: string;
+  urgency: "overdue" | "due_soon" | "ok";
+  active: boolean;
+}
+
+/** A single maintenance event (preventive check-off or corrective breakdown report). */
+export interface MaintenanceTaskVM {
+  id: string;
+  machineId: string;
+  machineName: string;
+  planId: string | null;
+  planName: string | null;
+  type: MaintenanceType;
+  status: MaintenanceStatus;
+  title: string;
+  description: string | null;
+  reportedAt: string;
+  startedAt: string | null;
+  resolvedAt: string | null;
+  notes: string | null;
+}
+
+export const MAINTENANCE_TYPE_LABELS: Record<MaintenanceType, string> = {
+  preventive: "Preventiva",
+  corrective: "Corretiva",
+};
+
+export const MAINTENANCE_STATUS_LABELS: Record<MaintenanceStatus, string> = {
+  open: "Aberta",
+  resolved: "Resolvida",
+  cancelled: "Cancelada",
+};
+
+export const MAINTENANCE_URGENCY_LABELS: Record<
+  MaintenancePlanVM["urgency"],
+  string
+> = {
+  overdue: "Atrasada",
+  due_soon: "Brevemente",
+  ok: "Em dia",
+};
 
 /** An open quality non-conformity, as shown on the admin quality view. */
 export interface NonConformityVM {

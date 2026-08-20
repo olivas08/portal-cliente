@@ -36,6 +36,8 @@ import type {
   QuoteLineVM,
   PricingSettingsVM,
   OperationTypeVM,
+  MaintenancePlanVM,
+  MaintenanceTaskVM,
 } from "@/lib/types";
 import { STOCK_REASON_LABELS } from "@/lib/types";
 import { toIsoDate } from "@/lib/dates";
@@ -53,6 +55,7 @@ import {
   computeProductionSchedule,
   type ScheduleStepInput,
 } from "@/services/production-schedule";
+import { computeNextDueDate, maintenanceUrgency } from "@/services/maintenance";
 import {
   getPricingSettings as getPricingSettingsService,
   getOperationTypes as getOperationTypesService,
@@ -1103,6 +1106,74 @@ export const getMachinesWithStatus = unstable_cache(
   },
   ["machines-with-status"],
   { tags: [CACHE_TAGS.machines], revalidate: false },
+);
+
+/**
+ * Active preventive maintenance plans with their next due date/urgency
+ * derived on read (not stored) — always fresh relative to `now`, but not
+ * cached on tag-only invalidation like the schedule projection for the same
+ * reason (see `getProductionSchedule`).
+ */
+export async function getMaintenancePlans(): Promise<MaintenancePlanVM[]> {
+  const now = new Date();
+  const plans = await prisma.maintenancePlan.findMany({
+    where: { active: true },
+    orderBy: { createdAt: "asc" },
+    include: { machine: { select: { name: true } } },
+  });
+
+  return plans
+    .map((p) => {
+      const nextDueDate = computeNextDueDate(p.lastDoneAt, p.createdAt, p.intervalDays);
+      return {
+        id: p.id,
+        machineId: p.machineId,
+        machineName: p.machine.name,
+        name: p.name,
+        intervalDays: p.intervalDays,
+        lastDoneAt: p.lastDoneAt ? p.lastDoneAt.toISOString() : null,
+        nextDueDate: nextDueDate.toISOString(),
+        urgency: maintenanceUrgency(nextDueDate, now),
+        active: p.active,
+      };
+    })
+    .sort((a, b) => a.nextDueDate.localeCompare(b.nextDueDate));
+}
+
+export const getMaintenanceTasks = unstable_cache(
+  async (limit = 30): Promise<MaintenanceTaskVM[]> => {
+  const tasks = await prisma.maintenanceTask.findMany({
+    orderBy: { reportedAt: "desc" },
+    take: limit,
+    include: {
+      machine: { select: { name: true } },
+      plan: { select: { name: true } },
+    },
+  });
+
+  // Open tasks (still actionable) surface above resolved/cancelled history,
+  // each group kept in the query's most-recent-first order.
+  const statusRank: Record<string, number> = { open: 0, resolved: 1, cancelled: 1 };
+  const sorted = [...tasks].sort((a, b) => statusRank[a.status] - statusRank[b.status]);
+
+  return sorted.map((t) => ({
+    id: t.id,
+    machineId: t.machineId,
+    machineName: t.machine.name,
+    planId: t.planId,
+    planName: t.plan?.name ?? null,
+    type: t.type,
+    status: t.status,
+    title: t.title,
+    description: t.description,
+    reportedAt: t.reportedAt.toISOString(),
+    startedAt: t.startedAt ? t.startedAt.toISOString() : null,
+    resolvedAt: t.resolvedAt ? t.resolvedAt.toISOString() : null,
+    notes: t.notes,
+  }));
+  },
+  ["maintenance-tasks"],
+  { tags: [CACHE_TAGS.maintenance], revalidate: false },
 );
 
 export const getRecentDiscrepancies = unstable_cache(
