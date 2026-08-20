@@ -39,23 +39,14 @@ function mapCsvHeaders<F extends string>(
 }
 
 /**
- * Parses a raw CSV string (auto-detects `,` or `;` delimiter, common in
- * Portuguese Excel exports) into rows validated against `schema`. Pure/no I/O
- * so it can run both in the browser (import preview) and, if ever needed, on
- * the server — it has no Prisma dependency.
+ * Result of parsing a row's raw string columns using a field→column-index
+ * mapping (manual or auto-detected) against `schema`.
  */
-function parseCsvRows<F extends string, T>(
-  text: string,
-  headerAliases: Record<F, string[]>,
-  requiredFields: F[],
+function parseCsvBody<F extends string, T>(
+  rows: string[][],
+  mapping: Partial<Record<F, number>>,
   schema: z.ZodType<T>,
-): { unmappedFields: F[]; results: CsvRowResult<T>[] } {
-  const parsed = Papa.parse<string[]>(text.trim(), { skipEmptyLines: true });
-  const rows = parsed.data;
-  const headers = rows[0] ?? [];
-  const mapping = mapCsvHeaders(headers, headerAliases);
-  const unmappedFields = requiredFields.filter((field) => mapping[field] === undefined);
-
+): CsvRowResult<T>[] {
   const results: CsvRowResult<T>[] = [];
   for (let i = 1; i < rows.length; i++) {
     const cols = rows[i];
@@ -77,8 +68,55 @@ function parseCsvRows<F extends string, T>(
       });
     }
   }
+  return results;
+}
 
-  return { unmappedFields, results };
+/**
+ * Parses a raw CSV string (auto-detects `,` or `;` delimiter, common in
+ * Portuguese Excel exports) into rows validated against `schema`. Pure/no I/O
+ * so it can run both in the browser (import preview) and, if ever needed, on
+ * the server — it has no Prisma dependency.
+ *
+ * If the column headers can't be auto-matched (`unmappedFields` non-empty),
+ * the caller can present the returned `headers`/`autoMapping` in a manual
+ * column-mapping UI and re-parse via `parseCsvRowsWithMapping` once the user
+ * has assigned each field to a column themselves.
+ */
+function parseCsvRows<F extends string, T>(
+  text: string,
+  headerAliases: Record<F, string[]>,
+  requiredFields: F[],
+  schema: z.ZodType<T>,
+): {
+  unmappedFields: F[];
+  results: CsvRowResult<T>[];
+  headers: string[];
+  autoMapping: Partial<Record<F, number>>;
+} {
+  const parsed = Papa.parse<string[]>(text.trim(), { skipEmptyLines: true });
+  const rows = parsed.data;
+  const headers = rows[0] ?? [];
+  const autoMapping = mapCsvHeaders(headers, headerAliases);
+  const unmappedFields = requiredFields.filter((field) => autoMapping[field] === undefined);
+
+  const results =
+    unmappedFields.length === 0 ? parseCsvBody(rows, autoMapping, schema) : [];
+
+  return { unmappedFields, results, headers, autoMapping };
+}
+
+/**
+ * Re-parses a CSV using a mapping the user picked by hand (e.g. because the
+ * spreadsheet's headers didn't match any known alias). Skips auto-detection
+ * entirely — the column indices come straight from the mapping UI.
+ */
+function parseCsvRowsWithMapping<F extends string, T>(
+  text: string,
+  mapping: Partial<Record<F, number>>,
+  schema: z.ZodType<T>,
+): CsvRowResult<T>[] {
+  const parsed = Papa.parse<string[]>(text.trim(), { skipEmptyLines: true });
+  return parseCsvBody(parsed.data, mapping, schema);
 }
 
 // ── Materials ────────────────────────────────────────────────────────────────
@@ -145,9 +183,24 @@ const MATERIAL_REQUIRED_FIELDS: (keyof MaterialImportRow)[] = [
   "unit",
 ];
 
+/** Field metadata for the manual column-mapping UI (label + required flag). */
+export const MATERIAL_IMPORT_FIELDS: {
+  key: keyof MaterialImportRow;
+  label: string;
+  required: boolean;
+}[] = [
+  { key: "reference", label: "Referência", required: true },
+  { key: "name", label: "Nome", required: true },
+  { key: "unit", label: "Unidade", required: true },
+  { key: "minStockQty", label: "Stock mínimo", required: false },
+  { key: "initialQty", label: "Stock inicial", required: false },
+];
+
 export function parseMaterialsCsv(text: string): {
   unmappedFields: (keyof MaterialImportRow)[];
   results: MaterialCsvRowResult[];
+  headers: string[];
+  autoMapping: Partial<Record<keyof MaterialImportRow, number>>;
 } {
   return parseCsvRows(
     text,
@@ -155,6 +208,14 @@ export function parseMaterialsCsv(text: string): {
     MATERIAL_REQUIRED_FIELDS,
     materialImportRowSchema,
   );
+}
+
+/** Re-parses using a mapping the user chose by hand (see parseCsvRowsWithMapping). */
+export function parseMaterialsCsvWithMapping(
+  text: string,
+  mapping: Partial<Record<keyof MaterialImportRow, number>>,
+): MaterialCsvRowResult[] {
+  return parseCsvRowsWithMapping(text, mapping, materialImportRowSchema);
 }
 
 // ── Products ─────────────────────────────────────────────────────────────────
@@ -212,9 +273,25 @@ const PRODUCT_REQUIRED_FIELDS: (keyof ProductImportRow)[] = [
   "unitPriceEur",
 ];
 
+/** Field metadata for the manual column-mapping UI (label + required flag). */
+export const PRODUCT_IMPORT_FIELDS: {
+  key: keyof ProductImportRow;
+  label: string;
+  required: boolean;
+}[] = [
+  { key: "reference", label: "Referência", required: true },
+  { key: "name", label: "Nome", required: true },
+  { key: "description", label: "Descrição", required: false },
+  { key: "unit", label: "Unidade", required: true },
+  { key: "unitPriceEur", label: "Preço", required: true },
+  { key: "category", label: "Categoria", required: false },
+];
+
 export function parseProductsCsv(text: string): {
   unmappedFields: (keyof ProductImportRow)[];
   results: ProductCsvRowResult[];
+  headers: string[];
+  autoMapping: Partial<Record<keyof ProductImportRow, number>>;
 } {
   return parseCsvRows(
     text,
@@ -222,4 +299,12 @@ export function parseProductsCsv(text: string): {
     PRODUCT_REQUIRED_FIELDS,
     productImportRowSchema,
   );
+}
+
+/** Re-parses using a mapping the user chose by hand (see parseCsvRowsWithMapping). */
+export function parseProductsCsvWithMapping(
+  text: string,
+  mapping: Partial<Record<keyof ProductImportRow, number>>,
+): ProductCsvRowResult[] {
+  return parseCsvRowsWithMapping(text, mapping, productImportRowSchema);
 }

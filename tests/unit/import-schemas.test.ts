@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseMaterialsCsv, parseProductsCsv } from "@/lib/import-schemas";
+import {
+  parseMaterialsCsv,
+  parseMaterialsCsvWithMapping,
+  parseProductsCsv,
+  parseProductsCsvWithMapping,
+} from "@/lib/import-schemas";
 
 describe("parseMaterialsCsv", () => {
   it("parses a well-formed CSV with Portuguese headers", () => {
@@ -71,6 +76,32 @@ describe("parseMaterialsCsv", () => {
     expect(unmappedFields).toEqual([]);
     expect(results[0]).toMatchObject({ ok: true, data: { reference: "MAT-040" } });
   });
+
+  it("exposes raw headers and the auto-detected mapping for the mapping UI", () => {
+    const csv = "codigo,descricao,un\nMAT-050,Chapa,kg\n";
+    const { headers, autoMapping, unmappedFields } = parseMaterialsCsv(csv);
+    expect(headers).toEqual(["codigo", "descricao", "un"]);
+    expect(autoMapping).toMatchObject({ reference: 0, name: 1, unit: 2 });
+    expect(unmappedFields).toEqual([]);
+  });
+
+  it("re-parses using a manually chosen column mapping when headers don't match any alias", () => {
+    // Headers here ("coluna1", "coluna2", "coluna3") don't match any known alias.
+    const csv = "coluna1,coluna2,coluna3\nMAT-060,Chapa especial,kg\n";
+    const { unmappedFields } = parseMaterialsCsv(csv);
+    expect(unmappedFields).toEqual(["reference", "name", "unit"]);
+
+    const results = parseMaterialsCsvWithMapping(csv, {
+      reference: 0,
+      name: 1,
+      unit: 2,
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      ok: true,
+      data: { reference: "MAT-060", name: "Chapa especial", unit: "kg" },
+    });
+  });
 });
 
 describe("parseProductsCsv", () => {
@@ -120,5 +151,23 @@ describe("parseProductsCsv", () => {
     const { unmappedFields, results } = parseProductsCsv(csv);
     expect(unmappedFields).toEqual([]);
     expect(results[0]).toMatchObject({ ok: true, data: { unitPriceEur: 25.5 } });
+  });
+
+  it("re-parses using a manually chosen column mapping when headers don't match any alias", () => {
+    const csv = "colA,colB,colC,colD\nPROD-050,Componente especial,un,99.9\n";
+    const { unmappedFields } = parseProductsCsv(csv);
+    expect(unmappedFields).toEqual(["reference", "name", "unit", "unitPriceEur"]);
+
+    const results = parseProductsCsvWithMapping(csv, {
+      reference: 0,
+      name: 1,
+      unit: 2,
+      unitPriceEur: 3,
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      ok: true,
+      data: { reference: "PROD-050", name: "Componente especial", unit: "un", unitPriceEur: 99.9 },
+    });
   });
 });

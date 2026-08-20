@@ -12,11 +12,15 @@ import {
 } from "lucide-react";
 import {
   parseMaterialsCsv,
+  parseMaterialsCsvWithMapping,
   MATERIAL_IMPORT_TEMPLATE_CSV,
+  MATERIAL_IMPORT_FIELDS,
+  type MaterialImportRow,
   type MaterialCsvRowResult,
 } from "@/lib/import-schemas";
 import { actionError } from "@/lib/action-result";
 import { importMaterials } from "@/actions/materials";
+import { CsvColumnMapping } from "@/components/CsvColumnMapping";
 
 /**
  * Lets an admin bulk-create/update materials from a CSV export of the
@@ -28,8 +32,12 @@ export function MaterialsImportModal() {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [fileName, setFileName] = useState<string | null>(null);
+  const [csvText, setCsvText] = useState<string | null>(null);
+  const [mappingStep, setMappingStep] = useState<{
+    headers: string[];
+    autoMapping: Partial<Record<keyof MaterialImportRow, number>>;
+  } | null>(null);
   const [parsed, setParsed] = useState<{
-    unmappedFields: string[];
     results: MaterialCsvRowResult[];
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +50,8 @@ export function MaterialsImportModal() {
 
   const reset = () => {
     setFileName(null);
+    setCsvText(null);
+    setMappingStep(null);
     setParsed(null);
     setError(null);
     setSummary(null);
@@ -57,13 +67,11 @@ export function MaterialsImportModal() {
     setSummary(null);
     setFileName(file.name);
     const text = await file.text();
+    setCsvText(text);
     try {
-      const { unmappedFields, results } = parseMaterialsCsv(text);
+      const { unmappedFields, results, headers, autoMapping } = parseMaterialsCsv(text);
       if (unmappedFields.length > 0) {
-        setError(
-          `Não foi possível identificar as colunas: ${unmappedFields.join(", ")}. ` +
-            "Confirme os cabeçalhos ou use o modelo disponibilizado.",
-        );
+        setMappingStep({ headers, autoMapping });
         setParsed(null);
         return;
       }
@@ -72,11 +80,23 @@ export function MaterialsImportModal() {
         setParsed(null);
         return;
       }
-      setParsed({ unmappedFields, results });
+      setParsed({ results });
     } catch {
       setError("Não foi possível ler este ficheiro como CSV.");
       setParsed(null);
     }
+  };
+
+  const confirmMapping = (mapping: Partial<Record<keyof MaterialImportRow, number>>) => {
+    if (!csvText) return;
+    const results = parseMaterialsCsvWithMapping(csvText, mapping);
+    if (results.length === 0) {
+      setError("O ficheiro não tem nenhuma linha de dados.");
+      setMappingStep(null);
+      return;
+    }
+    setMappingStep(null);
+    setParsed({ results });
   };
 
   const validRows = (parsed?.results.filter((r) => r.ok) ?? []) as Extract<
@@ -161,7 +181,7 @@ export function MaterialsImportModal() {
             </div>
 
             <div className="p-5 space-y-4">
-              {!summary && (
+              {!summary && !parsed && !mappingStep && (
                 <>
                   <button
                     type="button"
@@ -202,17 +222,40 @@ export function MaterialsImportModal() {
                 </div>
               )}
 
+              {mappingStep && !summary && (
+                <CsvColumnMapping
+                  headers={mappingStep.headers}
+                  fields={MATERIAL_IMPORT_FIELDS}
+                  initialMapping={mappingStep.autoMapping}
+                  onConfirm={confirmMapping}
+                  onCancel={reset}
+                />
+              )}
+
               {parsed && !summary && (
                 <>
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="inline-flex items-center gap-1.5 text-emerald-700">
-                      <CheckCircle2 size={15} /> {validRows.length} linhas válidas
-                    </span>
-                    {invalidRows.length > 0 && (
-                      <span className="inline-flex items-center gap-1.5 text-amber-700">
-                        <AlertTriangle size={15} /> {invalidRows.length} linhas com erro (serão ignoradas)
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-4">
+                      <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                        <CheckCircle2 size={15} /> {validRows.length} linhas válidas
                       </span>
-                    )}
+                      {invalidRows.length > 0 && (
+                        <span className="inline-flex items-center gap-1.5 text-amber-700">
+                          <AlertTriangle size={15} /> {invalidRows.length} linhas com erro (serão ignoradas)
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const { headers, autoMapping } = parseMaterialsCsv(csvText ?? "");
+                        setMappingStep({ headers, autoMapping });
+                        setParsed(null);
+                      }}
+                      className="text-xs font-medium text-slate-500 hover:text-slate-700 underline"
+                    >
+                      Ajustar mapeamento de colunas
+                    </button>
                   </div>
 
                   <div className="max-h-64 overflow-y-auto rounded-lg border border-slate-200">
