@@ -9,13 +9,22 @@ import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { getBaseUrl } from "@/lib/url";
 import { createResetToken, hashToken } from "@/lib/reset-token";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
-export type LoginResult = "ok" | "invalid" | "error";
+export type LoginResult = "ok" | "invalid" | "error" | "rate-limited";
 
 export async function loginAction(
   email: string,
   password: string
 ): Promise<LoginResult> {
+  const ip = await getClientIp();
+  const normalizedEmail = email.trim().toLowerCase();
+  const [emailOk, ipOk] = await Promise.all([
+    checkRateLimit(`login:email:${normalizedEmail}`, { max: 8, windowMs: 15 * 60 * 1000 }),
+    checkRateLimit(`login:ip:${ip}`, { max: 30, windowMs: 15 * 60 * 1000 }),
+  ]);
+  if (!emailOk || !ipOk) return "rate-limited";
+
   try {
     await signIn("credentials", { email, password, redirect: false });
     return "ok";
@@ -48,6 +57,12 @@ export async function registerAction(input: {
   email: string;
   password: string;
 }): Promise<RegisterResult> {
+  const ip = await getClientIp();
+  const ipOk = await checkRateLimit(`register:ip:${ip}`, { max: 5, windowMs: 60 * 60 * 1000 });
+  if (!ipOk) {
+    return { ok: false, error: "Demasiados registos a partir deste endereço. Tente novamente mais tarde." };
+  }
+
   const parsed = registerSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
@@ -89,6 +104,15 @@ export async function requestPasswordReset(rawEmail: string): Promise<void> {
   const email = z.string().trim().toLowerCase().email().safeParse(rawEmail);
   if (!email.success) return;
 
+  // Same "always behave the same way" reasoning applies to rate limiting:
+  // fail silently (no distinguishing error) so an attacker can't use this
+  // to fingerprint which emails exist or how the limiter is tuned.
+  const allowed = await checkRateLimit(`reset-request:${email.data}`, {
+    max: 3,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!allowed) return;
+
   const user = await prisma.user.findUnique({ where: { email: email.data } });
   // Always behave the same way regardless of whether the user exists,
   // to avoid leaking which emails are registered.
@@ -109,6 +133,15 @@ export async function resetPassword(
   token: string,
   newPassword: string
 ): Promise<ResetPasswordResult> {
+  const ip = await getClientIp();
+  const ipOk = await checkRateLimit(`reset-password:ip:${ip}`, {
+    max: 15,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!ipOk) {
+    return { ok: false, error: "Demasiadas tentativas. Tente novamente dentro de alguns minutos." };
+  }
+
   const password = z
     .string()
     .min(6, "A palavra-passe deve ter pelo menos 6 caracteres.")

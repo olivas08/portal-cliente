@@ -5,6 +5,7 @@ import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import { NotFoundError, UnauthorizedError } from "@/lib/errors";
 import { downtimeOnResume, type MachineState } from "@/services/production-status";
 import { PIN_SALT_ROUNDS, type TxClient } from "@/services/production/shared";
+import { assertRateLimit, getClientIp } from "@/lib/rate-limit";
 
 // ── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -193,6 +194,19 @@ export async function recordMachineProduction(
 }
 
 async function authenticateMachine(code: string, token: string) {
+  // Defense-in-depth: the token itself is a long random secret so brute
+  // force is impractical, but rate-limit anyway in case a token leaks and
+  // gets scripted against, and to blunt scanning noise on the endpoint.
+  const ip = await getClientIp();
+  await assertRateLimit(`machine-auth:code:${code}`, {
+    max: 20,
+    windowMs: 60 * 60 * 1000,
+  });
+  await assertRateLimit(`machine-auth:ip:${ip}`, {
+    max: 60,
+    windowMs: 60 * 60 * 1000,
+  });
+
   const machine = await prisma.machine.findUnique({ where: { code } });
   if (!machine || !machine.active) {
     throw new UnauthorizedError("Máquina não autorizada.");

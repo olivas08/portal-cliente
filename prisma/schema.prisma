@@ -133,6 +133,20 @@ model PasswordResetToken {
   @@index([userId])
 }
 
+// Persistent rate-limiting store. Backed by the DB (not in-memory) because
+// Vercel serverless functions don't share memory across invocations — a
+// per-process counter would silently reset on every cold start / new
+// instance. `key` identifies the bucket being throttled (e.g.
+// "login:email:foo@bar.pt" or "operator-login:ip:1.2.3.4"); each row is one
+// attempt. See src/lib/rate-limit.ts.
+model RateLimitAttempt {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}
+
 model Order {
   id            String          @id @default(cuid())
   reference     String          @unique

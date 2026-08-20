@@ -5,6 +5,7 @@ import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import { NotFoundError, UnauthorizedError } from "@/lib/errors";
 import type { OperatorActor } from "@/lib/operator-session";
 import { PIN_SALT_ROUNDS } from "@/services/production/shared";
+import { assertRateLimit, getClientIp } from "@/lib/rate-limit";
 
 // ── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,21 @@ export type SetOperatorActiveInput = z.infer<typeof setOperatorActiveSchema>;
 export async function loginOperator(
   input: OperatorLoginInput,
 ): Promise<OperatorActor> {
+  // The shop-floor terminal (/producao/terminal) is intentionally public
+  // (no account login) and lists operator names/ids in the picker, so a
+  // 4-digit PIN is only as safe as the attempt limit behind it. Rate-limit
+  // per operator (tight) and per IP (looser, since one kiosk serves many
+  // operators across a shift) before paying for the bcrypt compare.
+  const ip = await getClientIp();
+  await assertRateLimit(`operator-login:operator:${input.operatorId}`, {
+    max: 5,
+    windowMs: 5 * 60 * 1000,
+  });
+  await assertRateLimit(`operator-login:ip:${ip}`, {
+    max: 20,
+    windowMs: 5 * 60 * 1000,
+  });
+
   const operator = await prisma.operator.findUnique({
     where: { id: input.operatorId },
   });

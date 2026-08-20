@@ -35,6 +35,8 @@ export function LoginForm() {
         router.refresh();
       } else if (result === "invalid") {
         setError("Email ou palavra-passe incorretos.");
+      } else if (result === "rate-limited") {
+        setError("Demasiadas tentativas. Aguarde alguns minutos antes de tentar novamente.");
       } else {
         setError("Ocorreu um erro. Tente novamente.");
       }

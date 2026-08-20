@@ -15,6 +15,11 @@ const { mockSignIn, prismaMock, mockHash, mockSendEmail, mockGetBaseUrl } = vi.h
       findUnique: vi.fn(),
       update: vi.fn(),
     },
+    rateLimitAttempt: {
+      count: vi.fn(),
+      create: vi.fn(),
+      deleteMany: vi.fn(),
+    },
     $transaction: vi.fn(),
   },
   mockHash: vi.fn(),
@@ -29,6 +34,9 @@ vi.mock("next-auth", () => ({
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/email", () => ({ sendPasswordResetEmail: mockSendEmail }));
 vi.mock("@/lib/url", () => ({ getBaseUrl: mockGetBaseUrl }));
+vi.mock("next/headers", () => ({
+  headers: async () => new Map<string, string>(),
+}));
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
   revalidateTag: vi.fn(),
@@ -53,6 +61,7 @@ beforeEach(() => {
   mockGetBaseUrl.mockResolvedValue("https://portal.example.com");
   prismaMock.user.findUnique.mockResolvedValue(null);
   prismaMock.company.create.mockResolvedValue({ id: "c-new" });
+  prismaMock.rateLimitAttempt.count.mockResolvedValue(0);
   // $transaction receives a callback; execute it with a tx object mirroring prismaMock.
   prismaMock.$transaction.mockImplementation(async (arg) => {
     if (typeof arg === "function") {

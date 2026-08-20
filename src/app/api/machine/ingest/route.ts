@@ -6,7 +6,7 @@ import {
   recordMachineProduction,
   recordMachineStatus,
 } from "@/services/production/machines.service";
-import { UnauthorizedError } from "@/lib/errors";
+import { RateLimitedError, UnauthorizedError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +46,9 @@ export async function POST(request: Request) {
     }
     if (err instanceof UnauthorizedError) {
       return NextResponse.json({ error: err.message }, { status: 401 });
+    }
+    if (err instanceof RateLimitedError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
     }
     console.error("machine ingest error", err);
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });

@@ -22,6 +22,12 @@ export class NotFoundError extends AppError {
   }
 }
 
+export class RateLimitedError extends AppError {
+  constructor(message = "Demasiadas tentativas. Tente novamente dentro de alguns minutos.") {
+    super(message);
+  }
+}
+
 /**
  * Uniform result returned by server actions. Expected domain failures
  * (`AppError`) are returned as `{ error }` instead of thrown, because Next.js
