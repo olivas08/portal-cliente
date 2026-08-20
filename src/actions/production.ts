@@ -117,75 +117,91 @@ export async function setWorkOrderPriority(
 const ADMIN_ROUTING = "/admin/producao/roteiros";
 
 export async function setProductRouting(input: SetProductRoutingInput) {
-  await requireAdminArea("producao");
-  const data = setProductRoutingSchema.parse(input);
+  return guardAction(async () => {
+    await requireAdminArea("producao");
+    const data = setProductRoutingSchema.parse(input);
 
-  await setProductRoutingService(data);
+    await setProductRoutingService(data);
 
-  revalidatePath(ADMIN_ROUTING);
-  revalidatePath(ADMIN_BOARD);
+    revalidatePath(ADMIN_ROUTING);
+    revalidatePath(ADMIN_BOARD);
+  });
 }
 
 const ADMIN_QUALITY = "/admin/producao/qualidade";
 
 export async function reworkStep(stepId: string) {
-  await requireAdminArea("qualidade");
-  const data = stepIdSchema.parse({ stepId });
+  return guardAction(async () => {
+    await requireAdminArea("qualidade");
+    const data = stepIdSchema.parse({ stepId });
 
-  await reworkStepService(data.stepId);
+    await reworkStepService(data.stepId);
 
-  revalidatePath(ADMIN_QUALITY);
-  revalidatePath(ADMIN_BOARD);
-  revalidatePath(TERMINAL);
+    revalidatePath(ADMIN_QUALITY);
+    revalidatePath(ADMIN_BOARD);
+    revalidatePath(TERMINAL);
+  });
 }
 
 export async function resolveNonConformity(id: string) {
-  await requireAdminArea("qualidade");
-  const data = nonConformityIdSchema.parse({ id });
+  return guardAction(async () => {
+    await requireAdminArea("qualidade");
+    const data = nonConformityIdSchema.parse({ id });
 
-  await resolveNonConformityService(data.id);
+    await resolveNonConformityService(data.id);
 
-  revalidatePath(ADMIN_QUALITY);
+    revalidatePath(ADMIN_QUALITY);
+  });
 }
 
 export async function operatorLogin(input: OperatorLoginInput) {
-  const data = operatorLoginSchema.parse(input);
-  const operator = await loginOperator(data);
-  await setOperatorCookie(operator.id);
-  revalidatePath(TERMINAL);
+  return guardAction(async () => {
+    const data = operatorLoginSchema.parse(input);
+    const operator = await loginOperator(data);
+    await setOperatorCookie(operator.id);
+    revalidatePath(TERMINAL);
+  });
 }
 
 export async function operatorLogout() {
-  await clearOperatorCookie();
-  revalidatePath(TERMINAL);
+  return guardAction(async () => {
+    await clearOperatorCookie();
+    revalidatePath(TERMINAL);
+  });
 }
 
 export async function startStepAction(stepId: string) {
-  const operator = await requireOperator();
-  const data = stepIdSchema.parse({ stepId });
+  return guardAction(async () => {
+    const operator = await requireOperator();
+    const data = stepIdSchema.parse({ stepId });
 
-  await startStep(operator, data.stepId);
+    await startStep(operator, data.stepId);
 
-  revalidatePath(TERMINAL);
-  revalidatePath(ADMIN_BOARD);
+    revalidatePath(TERMINAL);
+    revalidatePath(ADMIN_BOARD);
+  });
 }
 
 export async function pauseStepAction(stepId: string) {
-  const operator = await requireOperator();
-  const data = stepIdSchema.parse({ stepId });
+  return guardAction(async () => {
+    const operator = await requireOperator();
+    const data = stepIdSchema.parse({ stepId });
 
-  await pauseStep(operator, data.stepId);
+    await pauseStep(operator, data.stepId);
 
-  revalidatePath(TERMINAL);
-  revalidatePath(ADMIN_BOARD);
+    revalidatePath(TERMINAL);
+    revalidatePath(ADMIN_BOARD);
+  });
 }
 
 export async function completeStepAction(input: CompleteStepInput) {
-  const operator = await requireOperator();
-  const data = completeStepSchema.parse(input);
+  return guardAction(async () => {
+    const operator = await requireOperator();
+    const data = completeStepSchema.parse(input);
 
-  await completeStep(operator, data);
+    await completeStep(operator, data);
 
-  revalidatePath(TERMINAL);
-  revalidatePath(ADMIN_BOARD);
+    revalidatePath(TERMINAL);
+    revalidatePath(ADMIN_BOARD);
+  });
 }

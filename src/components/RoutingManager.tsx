@@ -20,6 +20,7 @@ import type {
   WorkstationOptionVM,
 } from "@/lib/types";
 import { setProductRouting } from "@/actions/production";
+import { actionError } from "@/lib/action-result";
 import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
 
 interface Props {
@@ -88,7 +89,12 @@ export function RoutingManager({ products, workstations }: Props) {
     setSaved(false);
     startTransition(async () => {
       try {
-        await setProductRouting({ productId: selected.id, operations: ops });
+        const res = await setProductRouting({ productId: selected.id, operations: ops });
+        const msg = actionError(res);
+        if (msg) {
+          setError(msg);
+          return;
+        }
         setSaved(true);
         router.refresh();
       } catch (e) {

@@ -10,6 +10,7 @@ import {
   pauseStepAction,
   completeStepAction,
 } from "@/actions/production";
+import { actionError } from "@/lib/action-result";
 
 interface Props {
   queue: TerminalStepVM[];
@@ -32,7 +33,12 @@ export function TerminalQueue({ queue }: Props) {
     setError(null);
     startTransition(async () => {
       try {
-        await fn();
+        const res = await fn();
+        const msg = actionError(res);
+        if (msg) {
+          setError(msg);
+          return;
+        }
         after?.();
         router.refresh();
       } catch (e) {

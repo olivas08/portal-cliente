@@ -26,7 +26,7 @@ interface Props {
    * variant always invites plain "CLIENT_USER" accounts. */
   roleOptions?: AdminRole[];
   onInvite: (input: { name: string; email: string; role?: AdminRole }) => Promise<InviteResult>;
-  onToggleActive: (userId: string, active: boolean) => Promise<void>;
+  onToggleActive: (userId: string, active: boolean) => Promise<InviteResult>;
 }
 
 export function UsersManagementView({
@@ -69,12 +69,12 @@ export function UsersManagementView({
   const toggle = (userId: string, active: boolean) => {
     setError("");
     startTransition(async () => {
-      try {
-        await onToggleActive(userId, active);
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Ocorreu um erro. Tente novamente.");
+      const result = await onToggleActive(userId, active);
+      if (!result.ok) {
+        setError(result.error);
+        return;
       }
+      router.refresh();
     });
   };
 

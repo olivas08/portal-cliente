@@ -60,11 +60,24 @@ export async function inviteAdminUser(
   return { ok: true };
 }
 
-export async function setAdminUserActive(userId: string, active: boolean): Promise<void> {
+export async function setAdminUserActive(
+  userId: string,
+  active: boolean,
+): Promise<InviteAdminUserResult> {
   const actor = await requireSuperAdmin();
   if (userId === actor.id && !active) {
-    throw new AppError("Não pode desativar a sua própria conta.");
+    return { ok: false, error: "Não pode desativar a sua própria conta." };
   }
-  await setUserActive(userId, active, { companyId: null });
+
+  try {
+    await setUserActive(userId, active, { companyId: null });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
+
   revalidatePath(ADMIN_USERS_PATH);
+  return { ok: true };
 }

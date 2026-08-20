@@ -13,6 +13,7 @@ import {
 import type { NonConformityVM } from "@/lib/types";
 import { NC_DISPOSITION_LABELS } from "@/lib/types";
 import { reworkStep, resolveNonConformity } from "@/actions/production";
+import { actionError } from "@/lib/action-result";
 import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
 
 interface Props {
@@ -28,7 +29,12 @@ export function QualityView({ nonConformities }: Props) {
     setError(null);
     startTransition(async () => {
       try {
-        await fn();
+        const res = await fn();
+        const msg = actionError(res);
+        if (msg) {
+          setError(msg);
+          return;
+        }
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Ocorreu um erro.");

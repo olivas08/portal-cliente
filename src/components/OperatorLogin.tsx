@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Factory, Delete } from "lucide-react";
 import { operatorLogin } from "@/actions/production";
+import { actionError } from "@/lib/action-result";
 import { PRODUCT } from "@/lib/branding";
 
 interface Props {
@@ -24,7 +25,13 @@ export function OperatorLogin({ operators }: Props) {
     setError(null);
     startTransition(async () => {
       try {
-        await operatorLogin({ operatorId, pin });
+        const res = await operatorLogin({ operatorId, pin });
+        const msg = actionError(res);
+        if (msg) {
+          setError(msg);
+          setPin("");
+          return;
+        }
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Falha ao entrar.");

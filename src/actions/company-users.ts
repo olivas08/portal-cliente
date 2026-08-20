@@ -58,11 +58,24 @@ export async function inviteCompanyUser(
   return { ok: true };
 }
 
-export async function setCompanyUserActive(userId: string, active: boolean): Promise<void> {
+export async function setCompanyUserActive(
+  userId: string,
+  active: boolean,
+): Promise<InviteCompanyUserResult> {
   const actor = await requireCompanyAdmin();
   if (userId === actor.id && !active) {
-    throw new AppError("Não pode desativar a sua própria conta.");
+    return { ok: false, error: "Não pode desativar a sua própria conta." };
   }
-  await setUserActive(userId, active, { companyId: actor.companyId });
+
+  try {
+    await setUserActive(userId, active, { companyId: actor.companyId });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
+
   revalidatePath(DASHBOARD_USERS_PATH);
+  return { ok: true };
 }
