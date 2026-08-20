@@ -3,7 +3,7 @@ import {
   createOperatorSchema,
   resetOperatorPinSchema,
   setOperatorActiveSchema,
-} from "@/services/production.service";
+} from "@/services/production/operators.service";
 
 describe("createOperatorSchema", () => {
   it("accepts a valid name and 4-digit PIN", () => {

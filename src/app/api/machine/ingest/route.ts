@@ -5,7 +5,7 @@ import {
   machineStatusSchema,
   recordMachineProduction,
   recordMachineStatus,
-} from "@/services/production.service";
+} from "@/services/production/machines.service";
 import { UnauthorizedError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";

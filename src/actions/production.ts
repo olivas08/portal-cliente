@@ -15,25 +15,29 @@ import {
   reopenWorkOrder as reopenWorkOrderService,
   deleteWorkOrder as deleteWorkOrderService,
   setWorkOrderPriority as setWorkOrderPriorityService,
-  setProductRouting as setProductRoutingService,
-  reworkStep as reworkStepService,
-  resolveNonConformity as resolveNonConformityService,
-  loginOperator,
-  startStep,
-  pauseStep,
-  completeStep,
-  operatorLoginSchema,
   generateWorkOrdersSchema,
   workOrderIdSchema,
   setWorkOrderPrioritySchema,
+} from "@/services/production/work-orders.service";
+import {
+  setProductRouting as setProductRoutingService,
+  reworkStep as reworkStepService,
+  resolveNonConformity as resolveNonConformityService,
+  startStep,
+  pauseStep,
+  completeStep,
   setProductRoutingSchema,
   nonConformityIdSchema,
   stepIdSchema,
   completeStepSchema,
-  type OperatorLoginInput,
   type CompleteStepInput,
   type SetProductRoutingInput,
-} from "@/services/production.service";
+} from "@/services/production/routing.service";
+import {
+  loginOperator,
+  operatorLoginSchema,
+  type OperatorLoginInput,
+} from "@/services/production/operators.service";
 
 const ADMIN_BOARD = "/admin/producao";
 const TERMINAL = "/producao/terminal";

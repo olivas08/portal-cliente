@@ -11,7 +11,7 @@ import {
   setOperatorActiveSchema,
   type CreateOperatorInput,
   type ResetOperatorPinInput,
-} from "@/services/production.service";
+} from "@/services/production/operators.service";
 
 const ADMIN_OPERATORS = "/admin/operadores";
 const TERMINAL = "/producao/terminal";

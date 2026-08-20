@@ -6,7 +6,7 @@ import {
 import {
   machineIngestSchema,
   createMachineSchema,
-} from "@/services/production.service";
+} from "@/services/production/machines.service";
 
 describe("computeDiscrepancy", () => {
   it("flags when operator over-declares vs machine", () => {
@@ -114,7 +114,7 @@ describe("createMachineSchema", () => {
 });
 
 import { downtimeOnResume, isDownState } from "@/services/production-status";
-import { machineStatusSchema } from "@/services/production.service";
+import { machineStatusSchema } from "@/services/production/machines.service";
 
 describe("downtimeOnResume", () => {
   const now = new Date("2026-07-28T10:10:00Z");

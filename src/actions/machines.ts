@@ -10,7 +10,7 @@ import {
   setMachineActiveSchema,
   regenerateMachineTokenSchema,
   type CreateMachineInput,
-} from "@/services/production.service";
+} from "@/services/production/machines.service";
 
 const ADMIN_MACHINES = "/admin/producao/maquinas";
 
