@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
-import { getOrderById, getOrderProduction } from "@/lib/data";
+import { getOrderById, getOrderProduction, getOrderTraceability } from "@/lib/data";
 import { OrderDetail } from "@/components/OrderDetail";
 
 export default async function AdminOrderDetail({
@@ -15,7 +15,10 @@ export default async function AdminOrderDetail({
   const order = await getOrderById(id);
   if (!order) notFound();
 
-  const production = await getOrderProduction(id);
+  const [production, traceability] = await Promise.all([
+    getOrderProduction(id),
+    getOrderTraceability(id),
+  ]);
 
   return (
     <OrderDetail
@@ -25,6 +28,7 @@ export default async function AdminOrderDetail({
       backHref="/admin"
       backLabel="Voltar ao painel"
       production={production}
+      traceability={traceability}
     />
   );
 }

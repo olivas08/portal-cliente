@@ -10,6 +10,10 @@ import {
   applyOrderRollup,
   dispatchOrderNotification,
 } from "@/services/production/shared";
+import {
+  issueMaterialsForWorkOrder,
+  returnMaterialsForWorkOrder,
+} from "@/services/production/material-issuance";
 
 // ── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -156,27 +160,19 @@ export async function releaseWorkOrder(workOrderId: string): Promise<void> {
     }
 
     // Reserve/issue the materials: decrement stock, snapshot issued qty and
-    // log a movement for the audit trail.
-    for (const m of wo.materials) {
-      if (m.requiredQty <= 0) continue;
-      await tx.material.update({
-        where: { id: m.materialId },
-        data: { stockQty: { decrement: m.requiredQty } },
-      });
-      await tx.workOrderMaterial.update({
-        where: { id: m.id },
-        data: { issuedQty: m.requiredQty },
-      });
-      await tx.stockMovement.create({
-        data: {
-          materialId: m.materialId,
-          delta: -m.requiredQty,
-          reason: "issue",
-          workOrderId: wo.id,
-          note: `Consumo OF ${wo.reference}`,
-        },
-      });
-    }
+    // log a movement for the audit trail (per-batch when the material is
+    // batch-tracked, so this is where traceability begins).
+    await issueMaterialsForWorkOrder(
+      tx,
+      wo.id,
+      wo.materials.map((m) => ({
+        id: m.id,
+        materialId: m.materialId,
+        requiredQty: m.requiredQty,
+        material: { tracksBatches: m.material.tracksBatches },
+      })),
+      `Consumo OF ${wo.reference}`,
+    );
 
     await tx.workOrder.update({
       where: { id: workOrderId },
@@ -234,27 +230,18 @@ export async function cancelWorkOrder(workOrderId: string): Promise<void> {
       throw new AppError("Não é possível cancelar uma ordem concluída.");
     }
 
-    // Return any materials that were issued at release back to stock.
-    for (const m of wo.materials) {
-      if (m.issuedQty <= 0) continue;
-      await tx.material.update({
-        where: { id: m.materialId },
-        data: { stockQty: { increment: m.issuedQty } },
-      });
-      await tx.stockMovement.create({
-        data: {
-          materialId: m.materialId,
-          delta: m.issuedQty,
-          reason: "return",
-          workOrderId: wo.id,
-          note: `Devolução por cancelamento OF ${wo.reference}`,
-        },
-      });
-      await tx.workOrderMaterial.update({
-        where: { id: m.id },
-        data: { issuedQty: 0 },
-      });
-    }
+    // Return any materials that were issued at release back to stock (and,
+    // for batch-tracked materials, back to the exact batches they came from).
+    await returnMaterialsForWorkOrder(
+      tx,
+      wo.id,
+      wo.materials.map((m) => ({
+        id: m.id,
+        materialId: m.materialId,
+        issuedQty: m.issuedQty,
+      })),
+      `Devolução por cancelamento OF ${wo.reference}`,
+    );
 
     // Bank time on any running step and freeze the steps.
     for (const step of wo.steps) {
@@ -322,26 +309,17 @@ export async function reopenWorkOrder(workOrderId: string): Promise<void> {
         `Stock insuficiente para reabrir esta ordem de fabrico. ${detail}.`,
       );
     }
-    for (const m of wo.materials) {
-      if (m.requiredQty <= 0) continue;
-      await tx.material.update({
-        where: { id: m.materialId },
-        data: { stockQty: { decrement: m.requiredQty } },
-      });
-      await tx.workOrderMaterial.update({
-        where: { id: m.id },
-        data: { issuedQty: m.requiredQty },
-      });
-      await tx.stockMovement.create({
-        data: {
-          materialId: m.materialId,
-          delta: -m.requiredQty,
-          reason: "issue",
-          workOrderId: wo.id,
-          note: `Reemissão por reabertura OF ${wo.reference}`,
-        },
-      });
-    }
+    await issueMaterialsForWorkOrder(
+      tx,
+      wo.id,
+      wo.materials.map((m) => ({
+        id: m.id,
+        materialId: m.materialId,
+        requiredQty: m.requiredQty,
+        material: { tracksBatches: m.material.tracksBatches },
+      })),
+      `Reemissão por reabertura OF ${wo.reference}`,
+    );
 
     const restored = rollUpWorkOrderStatus("released", wo.steps);
     const woDone = restored === "done";

@@ -23,6 +23,9 @@ import type {
   MachineVM,
   DiscrepancyVM,
   MaterialVM,
+  MaterialBatchVM,
+  OrderBatchConsumptionVM,
+  RecallTraceVM,
   ProductBomVM,
   WorkOrderReadinessVM,
   StockMovementVM,
@@ -986,11 +989,129 @@ export const getMaterials = unstable_cache(
     minStockQty: m.minStockQty,
     active: m.active,
     belowMin: m.active && m.stockQty < m.minStockQty,
+    tracksBatches: m.tracksBatches,
   }));
   },
   ["materials"],
   { tags: [CACHE_TAGS.materials], revalidate: false },
 );
+
+/** Delivery history (heat/cast batches) for one `tracksBatches` material,
+ * newest first, for the warehouse material-detail expansion. */
+export const getMaterialBatches = unstable_cache(
+  async (materialId: string): Promise<MaterialBatchVM[]> => {
+  const material = await prisma.material.findUnique({
+    where: { id: materialId },
+    select: { unit: true },
+  });
+  if (!material) return [];
+
+  const batches = await prisma.materialBatch.findMany({
+    where: { materialId },
+    orderBy: { receivedAt: "desc" },
+  });
+  return batches.map((b) => ({
+    id: b.id,
+    batchCode: b.batchCode,
+    supplierName: b.supplierName,
+    certificateRef: b.certificateRef,
+    receivedQty: b.receivedQty,
+    remainingQty: b.remainingQty,
+    unit: material.unit,
+    receivedAt: toIsoDate(b.receivedAt),
+    note: b.note,
+  }));
+  },
+  ["material-batches"],
+  { tags: [CACHE_TAGS.materials], revalidate: false },
+);
+
+/** Forward traceability for an order: which raw-material batches (heat/cast
+ * numbers) were consumed by the work orders producing its items. Only
+ * `tracksBatches` materials show up here — the ledger (`WorkOrderMaterialBatch`)
+ * only has rows for those. */
+export const getOrderTraceability = unstable_cache(
+  async (orderId: string): Promise<OrderBatchConsumptionVM[]> => {
+  const workOrders = await prisma.workOrder.findMany({
+    where: { orderId },
+    include: {
+      materials: {
+        include: { batches: { include: { materialBatch: true } } },
+      },
+    },
+  });
+
+  const rows: OrderBatchConsumptionVM[] = [];
+  for (const wo of workOrders) {
+    for (const wm of wo.materials) {
+      for (const c of wm.batches) {
+        rows.push({
+          workOrderRef: wo.reference,
+          productRef: wo.productRef,
+          productName: wo.productName,
+          materialRef: wm.materialRef,
+          materialName: wm.materialName,
+          batchCode: c.materialBatch.batchCode,
+          supplierName: c.materialBatch.supplierName,
+          certificateRef: c.materialBatch.certificateRef,
+          qty: c.qty,
+          unit: wm.unit,
+        });
+      }
+    }
+  }
+  return rows;
+  },
+  ["order-traceability"],
+  { tags: [CACHE_TAGS.workOrders, CACHE_TAGS.materials], revalidate: false },
+);
+
+/** Backward (recall) traceability: given a batch/heat code, find every order
+ * it fed into, across every client. Not cached — this is an ad-hoc admin
+ * search over a potentially wide, rarely-run query, not a page render. */
+export async function findBatchTrace(batchCode: string): Promise<RecallTraceVM[]> {
+  const query = batchCode.trim();
+  if (!query) return [];
+
+  const batches = await prisma.materialBatch.findMany({
+    where: { batchCode: { contains: query, mode: "insensitive" } },
+    include: {
+      material: { select: { reference: true, name: true, unit: true } },
+      consumptions: {
+        include: {
+          workOrderMaterial: {
+            include: {
+              workOrder: { include: { order: { include: { company: true } } } },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { receivedAt: "desc" },
+    take: 20,
+  });
+
+  return batches.map((b) => ({
+    batchId: b.id,
+    batchCode: b.batchCode,
+    materialRef: b.material.reference,
+    materialName: b.material.name,
+    supplierName: b.supplierName,
+    certificateRef: b.certificateRef,
+    receivedQty: b.receivedQty,
+    remainingQty: b.remainingQty,
+    unit: b.material.unit,
+    receivedAt: toIsoDate(b.receivedAt),
+    consumedIn: b.consumptions.map((c) => ({
+      workOrderRef: c.workOrderMaterial.workOrder.reference,
+      orderReference: c.workOrderMaterial.workOrder.order.reference,
+      companyName: c.workOrderMaterial.workOrder.order.company.name,
+      productRef: c.workOrderMaterial.workOrder.productRef,
+      productName: c.workOrderMaterial.workOrder.productName,
+      qty: c.qty,
+    })),
+  }));
+}
 
 export const getProductsWithBom = unstable_cache(
   async (): Promise<ProductBomVM[]> => {

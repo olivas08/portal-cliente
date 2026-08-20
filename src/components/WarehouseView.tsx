@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { actionError } from "@/lib/action-result";
 import Link from "next/link";
@@ -15,17 +15,24 @@ import {
   ArrowRightLeft,
   Route,
   Pencil,
+  Layers,
+  ChevronDown,
+  ChevronRight,
+  Search,
 } from "lucide-react";
 import type {
   MaterialVM,
   WorkOrderReadinessVM,
   StockMovementVM,
+  MaterialBatchVM,
 } from "@/lib/types";
 import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
 import {
   createMaterial,
   updateMaterial,
   receiveStock,
+  receiveMaterialBatch,
+  getMaterialBatchesAction,
 } from "@/actions/materials";
 import { releaseWorkOrder } from "@/actions/production";
 import { MaterialsImportModal } from "@/components/MaterialsImportModal";
@@ -53,10 +60,18 @@ export function WarehouseView({ materials, awaiting, movements }: Props) {
   const [nunit, setNunit] = useState("un");
   const [nmin, setNmin] = useState(0);
   const [nqty, setNqty] = useState(0);
+  const [ntracks, setNtracks] = useState(false);
 
-  // Receive stock
+  // Receive stock (untracked materials)
   const [receiveId, setReceiveId] = useState<string | null>(null);
   const [receiveQty, setReceiveQty] = useState(0);
+
+  // Receive batch (tracksBatches materials)
+  const [batchReceiveId, setBatchReceiveId] = useState<string | null>(null);
+  const [bCode, setBCode] = useState("");
+  const [bQty, setBQty] = useState(0);
+  const [bSupplier, setBSupplier] = useState("");
+  const [bCert, setBCert] = useState("");
 
   // Edit material
   const [editId, setEditId] = useState<string | null>(null);
@@ -64,6 +79,14 @@ export function WarehouseView({ materials, awaiting, movements }: Props) {
   const [eunit, setEunit] = useState("un");
   const [emin, setEmin] = useState(0);
   const [eactive, setEactive] = useState(true);
+  const [etracks, setEtracks] = useState(false);
+
+  // Batch history (expandable per tracked material)
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [batchesByMaterial, setBatchesByMaterial] = useState<
+    Record<string, MaterialBatchVM[]>
+  >({});
+  const [loadingBatches, setLoadingBatches] = useState(false);
 
   const run = (fn: () => Promise<unknown>, okMsg?: string) => {
     setError(null);
@@ -91,7 +114,8 @@ export function WarehouseView({ materials, awaiting, movements }: Props) {
         name: nname,
         unit: nunit,
         minStockQty: nmin,
-        initialQty: nqty,
+        initialQty: ntracks ? 0 : nqty,
+        tracksBatches: ntracks,
       });
       setShowNew(false);
       setNref("");
@@ -99,6 +123,7 @@ export function WarehouseView({ materials, awaiting, movements }: Props) {
       setNunit("un");
       setNmin(0);
       setNqty(0);
+      setNtracks(false);
     }, "Material criado.");
   };
 
@@ -110,12 +135,56 @@ export function WarehouseView({ materials, awaiting, movements }: Props) {
     }, "Entrada de stock registada.");
   };
 
+  const submitBatchReceive = (id: string) => {
+    run(async () => {
+      await receiveMaterialBatch({
+        materialId: id,
+        batchCode: bCode,
+        qty: bQty,
+        supplierName: bSupplier || undefined,
+        certificateRef: bCert || undefined,
+      });
+      setBatchReceiveId(null);
+      setBCode("");
+      setBQty(0);
+      setBSupplier("");
+      setBCert("");
+      // Force a refetch of this material's batch list next time it's expanded.
+      setBatchesByMaterial((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }, "Lote recebido.");
+  };
+
+  const toggleBatches = (id: string) => {
+    if (expandedId === id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(id);
+    if (batchesByMaterial[id]) return;
+    setLoadingBatches(true);
+    startTransition(async () => {
+      try {
+        const batches = await getMaterialBatchesAction(id);
+        setBatchesByMaterial((prev) => ({ ...prev, [id]: batches }));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Ocorreu um erro.");
+      } finally {
+        setLoadingBatches(false);
+      }
+    });
+  };
+
   const openEdit = (m: MaterialVM) => {
     setEditId(m.id);
     setEname(m.name);
     setEunit(m.unit);
     setEmin(m.minStockQty);
     setEactive(m.active);
+    setEtracks(m.tracksBatches);
     setError(null);
     setNotice(null);
   };
@@ -128,6 +197,7 @@ export function WarehouseView({ materials, awaiting, movements }: Props) {
         unit: eunit,
         minStockQty: emin,
         active: eactive,
+        tracksBatches: etracks,
       });
       setEditId(null);
     }, "Material atualizado.");
@@ -157,6 +227,12 @@ export function WarehouseView({ materials, awaiting, movements }: Props) {
             produção
           </p>
         </div>
+        <Link
+          href="/admin/armazem/rastreabilidade"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          <Search size={16} /> Rastreabilidade
+        </Link>
         <Link
           href="/admin/armazem/fichas-tecnicas"
           className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -321,9 +397,10 @@ export function WarehouseView({ materials, awaiting, movements }: Props) {
               <input
                 type="number"
                 min={0}
-                value={nqty}
+                value={ntracks ? 0 : nqty}
+                disabled={ntracks}
                 onChange={(e) => setNqty(Number(e.target.value))}
-                className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 disabled:bg-slate-50 disabled:text-slate-400"
               />
             </label>
             <label className="flex flex-col gap-1 text-xs text-slate-500">
@@ -335,6 +412,14 @@ export function WarehouseView({ materials, awaiting, movements }: Props) {
                 onChange={(e) => setNmin(Number(e.target.value))}
                 className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
               />
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-slate-600 pb-2.5">
+              <input
+                type="checkbox"
+                checked={ntracks}
+                onChange={(e) => setNtracks(e.target.checked)}
+              />
+              Rastreia lotes (lote/colada)
             </label>
             <button
               type="button"
@@ -356,6 +441,7 @@ export function WarehouseView({ materials, awaiting, movements }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-400">
+                  <th className="px-4 py-3 font-medium"></th>
                   <th className="px-4 py-3 font-medium">Referência</th>
                   <th className="px-4 py-3 font-medium">Material</th>
                   <th className="px-4 py-3 font-medium text-right">Stock</th>
@@ -365,137 +451,288 @@ export function WarehouseView({ materials, awaiting, movements }: Props) {
               </thead>
               <tbody>
                 {materials.map((m) => (
-                  <tr
-                    key={m.id}
-                    className={`border-b border-slate-50 last:border-0 ${
-                      !m.active ? "opacity-50" : ""
-                    } ${m.belowMin ? "bg-amber-50/40" : ""}`}
-                  >
-                    <td className="px-4 py-3 font-medium text-slate-700">
-                      {m.reference}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {m.name}
-                      {!m.active && (
-                        <span className="ml-2 text-xs text-slate-400">
-                          (inativo)
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      <span
-                        className={
-                          m.belowMin
-                            ? "font-semibold text-amber-700"
-                            : "text-slate-700"
-                        }
-                      >
-                        {fmt(m.stockQty)}
-                      </span>{" "}
-                      <span className="text-xs text-slate-400">{m.unit}</span>
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-400">
-                      {fmt(m.minStockQty)}
-                    </td>
-                    <td className="px-4 py-3">
-                      {receiveId === m.id ? (
-                        <div className="flex items-center justify-end gap-1.5">
-                          <input
-                            type="number"
-                            min={0}
-                            autoFocus
-                            value={receiveQty}
-                            onChange={(e) =>
-                              setReceiveQty(Number(e.target.value))
-                            }
-                            className="w-24 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
-                          />
+                  <Fragment key={m.id}>
+                    <tr
+                      key={m.id}
+                      className={`border-b border-slate-50 last:border-0 ${
+                        !m.active ? "opacity-50" : ""
+                      } ${m.belowMin ? "bg-amber-50/40" : ""}`}
+                    >
+                      <td className="px-2 py-3">
+                        {m.tracksBatches && (
                           <button
                             type="button"
-                            onClick={() => submitReceive(m.id)}
-                            disabled={pending || receiveQty <= 0}
-                            className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
+                            onClick={() => toggleBatches(m.id)}
+                            aria-label="Ver lotes"
+                            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
                           >
-                            Registar
+                            {expandedId === m.id ? (
+                              <ChevronDown size={14} />
+                            ) : (
+                              <ChevronRight size={14} />
+                            )}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setReceiveId(null)}
-                            className="rounded-lg px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-100"
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-slate-700">
+                        {m.reference}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {m.name}
+                        {m.tracksBatches && (
+                          <span
+                            title="Rastreia lotes/coladas"
+                            className="ml-2 inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500"
                           >
-                            Cancelar
-                          </button>
-                        </div>
-                      ) : editId === m.id ? (
-                        <div className="flex flex-wrap items-center justify-end gap-1.5">
-                          <input
-                            value={ename}
-                            onChange={(e) => setEname(e.target.value)}
-                            className="w-40 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
-                          />
-                          <input
-                            value={eunit}
-                            onChange={(e) => setEunit(e.target.value)}
-                            className="w-16 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
-                          />
-                          <input
-                            type="number"
-                            min={0}
-                            value={emin}
-                            onChange={(e) => setEmin(Number(e.target.value))}
-                            title="Stock mínimo"
-                            className="w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
-                          />
-                          <label className="flex items-center gap-1 text-xs text-slate-500">
+                            <Layers size={10} /> lotes
+                          </span>
+                        )}
+                        {!m.active && (
+                          <span className="ml-2 text-xs text-slate-400">
+                            (inativo)
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        <span
+                          className={
+                            m.belowMin
+                              ? "font-semibold text-amber-700"
+                              : "text-slate-700"
+                          }
+                        >
+                          {fmt(m.stockQty)}
+                        </span>{" "}
+                        <span className="text-xs text-slate-400">{m.unit}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-slate-400">
+                        {fmt(m.minStockQty)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {batchReceiveId === m.id ? (
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
                             <input
-                              type="checkbox"
-                              checked={eactive}
-                              onChange={(e) => setEactive(e.target.checked)}
+                              autoFocus
+                              value={bCode}
+                              onChange={(e) => setBCode(e.target.value)}
+                              placeholder="Nº lote/colada"
+                              className="w-28 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
                             />
-                            Ativo
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => submitEdit(m.id)}
-                            disabled={pending}
-                            className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-40"
-                          >
-                            Guardar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditId(null)}
-                            className="rounded-lg px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-100"
-                          >
-                            Cancelar
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setReceiveId(m.id);
-                              setReceiveQty(0);
-                              setError(null);
-                              setNotice(null);
-                            }}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                          >
-                            <PackagePlus size={14} /> Receber
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openEdit(m)}
-                            aria-label="Editar material"
-                            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
+                            <input
+                              type="number"
+                              min={0}
+                              value={bQty}
+                              onChange={(e) => setBQty(Number(e.target.value))}
+                              placeholder="Qtd"
+                              className="w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                            />
+                            <input
+                              value={bSupplier}
+                              onChange={(e) => setBSupplier(e.target.value)}
+                              placeholder="Fornecedor"
+                              className="w-32 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                            />
+                            <input
+                              value={bCert}
+                              onChange={(e) => setBCert(e.target.value)}
+                              placeholder="Nº certificado"
+                              className="w-32 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => submitBatchReceive(m.id)}
+                              disabled={pending || !bCode.trim() || bQty <= 0}
+                              className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
+                            >
+                              Registar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setBatchReceiveId(null)}
+                              className="rounded-lg px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-100"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : receiveId === m.id ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <input
+                              type="number"
+                              min={0}
+                              autoFocus
+                              value={receiveQty}
+                              onChange={(e) =>
+                                setReceiveQty(Number(e.target.value))
+                              }
+                              className="w-24 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => submitReceive(m.id)}
+                              disabled={pending || receiveQty <= 0}
+                              className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
+                            >
+                              Registar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setReceiveId(null)}
+                              className="rounded-lg px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-100"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : editId === m.id ? (
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            <input
+                              value={ename}
+                              onChange={(e) => setEname(e.target.value)}
+                              className="w-40 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                            />
+                            <input
+                              value={eunit}
+                              onChange={(e) => setEunit(e.target.value)}
+                              className="w-16 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                            />
+                            <input
+                              type="number"
+                              min={0}
+                              value={emin}
+                              onChange={(e) => setEmin(Number(e.target.value))}
+                              title="Stock mínimo"
+                              className="w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                            />
+                            <label className="flex items-center gap-1 text-xs text-slate-500">
+                              <input
+                                type="checkbox"
+                                checked={eactive}
+                                onChange={(e) => setEactive(e.target.checked)}
+                              />
+                              Ativo
+                            </label>
+                            <label className="flex items-center gap-1 text-xs text-slate-500">
+                              <input
+                                type="checkbox"
+                                checked={etracks}
+                                onChange={(e) => setEtracks(e.target.checked)}
+                              />
+                              Rastreia lotes
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => submitEdit(m.id)}
+                              disabled={pending}
+                              className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-40"
+                            >
+                              Guardar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditId(null)}
+                              className="rounded-lg px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-100"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (m.tracksBatches) {
+                                  setBatchReceiveId(m.id);
+                                  setBCode("");
+                                  setBQty(0);
+                                  setBSupplier("");
+                                  setBCert("");
+                                } else {
+                                  setReceiveId(m.id);
+                                  setReceiveQty(0);
+                                }
+                                setError(null);
+                                setNotice(null);
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                            >
+                              <PackagePlus size={14} />{" "}
+                              {m.tracksBatches ? "Receber lote" : "Receber"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openEdit(m)}
+                              aria-label="Editar material"
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                    {expandedId === m.id && (
+                      <tr key={`${m.id}-batches`} className="bg-slate-50/60">
+                        <td></td>
+                        <td colSpan={5} className="px-4 py-3">
+                          {loadingBatches && !batchesByMaterial[m.id] ? (
+                            <p className="text-xs text-slate-400">
+                              A carregar lotes…
+                            </p>
+                          ) : !batchesByMaterial[m.id]?.length ? (
+                            <p className="text-xs text-slate-400">
+                              Ainda não há lotes recebidos.
+                            </p>
+                          ) : (
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="text-left text-slate-400">
+                                  <th className="py-1 pr-4 font-medium">Lote</th>
+                                  <th className="py-1 pr-4 font-medium">
+                                    Fornecedor
+                                  </th>
+                                  <th className="py-1 pr-4 font-medium">
+                                    Certificado
+                                  </th>
+                                  <th className="py-1 pr-4 font-medium text-right">
+                                    Recebido
+                                  </th>
+                                  <th className="py-1 pr-4 font-medium text-right">
+                                    Restante
+                                  </th>
+                                  <th className="py-1 font-medium">Data</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {batchesByMaterial[m.id].map((b) => (
+                                  <tr key={b.id} className="border-t border-slate-100">
+                                    <td className="py-1.5 pr-4 font-medium text-slate-700">
+                                      {b.batchCode}
+                                    </td>
+                                    <td className="py-1.5 pr-4 text-slate-500">
+                                      {b.supplierName ?? "—"}
+                                    </td>
+                                    <td className="py-1.5 pr-4 text-slate-500">
+                                      {b.certificateRef ?? "—"}
+                                    </td>
+                                    <td className="py-1.5 pr-4 text-right tabular-nums text-slate-600">
+                                      {fmt(b.receivedQty)} {b.unit}
+                                    </td>
+                                    <td className="py-1.5 pr-4 text-right tabular-nums text-slate-600">
+                                      {fmt(b.remainingQty)} {b.unit}
+                                    </td>
+                                    <td className="py-1.5 text-slate-400 whitespace-nowrap">
+                                      {new Date(b.receivedAt).toLocaleDateString(
+                                        "pt-PT",
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

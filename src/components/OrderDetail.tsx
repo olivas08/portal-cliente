@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { ArrowLeft, Ban } from "lucide-react";
-import type { OrderVM } from "@/lib/types";
+import { ArrowLeft, Ban, Layers } from "lucide-react";
+import type { OrderVM, OrderBatchConsumptionVM } from "@/lib/types";
 import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
 import { StatusStepper } from "@/components/StatusStepper";
@@ -21,6 +21,11 @@ interface OrderDetailProps {
   backHref: string;
   backLabel: string;
   production?: OrderProductionVM | null;
+  traceability?: OrderBatchConsumptionVM[];
+}
+
+function fmt(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(2);
 }
 
 /**
@@ -36,6 +41,7 @@ export function OrderDetail({
   backHref,
   backLabel,
   production,
+  traceability,
 }: OrderDetailProps) {
   return (
     <>
@@ -131,6 +137,53 @@ export function OrderDetail({
               <p className="text-sm text-slate-600 whitespace-pre-wrap">
                 {order.observations}
               </p>
+            </div>
+          )}
+
+          {isAdmin && traceability && traceability.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 mt-5">
+              <h2 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                <Layers size={16} className="text-slate-400" />
+                Rastreabilidade de materiais
+              </h2>
+              <div className="overflow-x-auto rounded-lg border border-slate-100">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-left text-slate-400">
+                      <th className="px-3 py-2 font-medium">Ordem de fabrico</th>
+                      <th className="px-3 py-2 font-medium">Produto</th>
+                      <th className="px-3 py-2 font-medium">Material</th>
+                      <th className="px-3 py-2 font-medium">Lote</th>
+                      <th className="px-3 py-2 font-medium">Certificado</th>
+                      <th className="px-3 py-2 font-medium text-right">Qtd.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {traceability.map((t, i) => (
+                      <tr key={i} className="border-b border-slate-50 last:border-0">
+                        <td className="px-3 py-2 font-medium text-slate-700">
+                          {t.workOrderRef}
+                        </td>
+                        <td className="px-3 py-2 text-slate-500">
+                          {t.productRef} — {t.productName}
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">
+                          {t.materialRef} — {t.materialName}
+                        </td>
+                        <td className="px-3 py-2 font-medium text-slate-700">
+                          {t.batchCode}
+                        </td>
+                        <td className="px-3 py-2 text-slate-500">
+                          {t.certificateRef ?? "—"}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-slate-600">
+                          {fmt(t.qty)} {t.unit}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

@@ -10,18 +10,25 @@ import {
 
 // ── Schemas ─────────────────────────────────────────────────────────────────
 
-export const createMaterialSchema = z.object({
-  reference: z
-    .string()
-    .trim()
-    .min(2, "Referência obrigatória.")
-    .max(40)
-    .regex(/^[A-Za-z0-9_-]+$/, "Use apenas letras, números, - ou _."),
-  name: z.string().trim().min(2, "Nome obrigatório.").max(120),
-  unit: z.string().trim().min(1, "Unidade obrigatória.").max(12),
-  minStockQty: z.number().min(0, "Não pode ser negativo.").default(0),
-  initialQty: z.number().min(0, "Não pode ser negativo.").default(0),
-});
+export const createMaterialSchema = z
+  .object({
+    reference: z
+      .string()
+      .trim()
+      .min(2, "Referência obrigatória.")
+      .max(40)
+      .regex(/^[A-Za-z0-9_-]+$/, "Use apenas letras, números, - ou _."),
+    name: z.string().trim().min(2, "Nome obrigatório.").max(120),
+    unit: z.string().trim().min(1, "Unidade obrigatória.").max(12),
+    minStockQty: z.number().min(0, "Não pode ser negativo.").default(0),
+    initialQty: z.number().min(0, "Não pode ser negativo.").default(0),
+    tracksBatches: z.boolean().default(false),
+  })
+  .refine((v) => !v.tracksBatches || v.initialQty === 0, {
+    message:
+      "Materiais rastreáveis por lote começam sem stock — use 'Receber lote' a seguir para registar o primeiro.",
+    path: ["initialQty"],
+  });
 export type CreateMaterialInput = z.infer<typeof createMaterialSchema>;
 
 export const updateMaterialSchema = z.object({
@@ -30,6 +37,7 @@ export const updateMaterialSchema = z.object({
   unit: z.string().trim().min(1, "Unidade obrigatória.").max(12),
   minStockQty: z.number().min(0, "Não pode ser negativo."),
   active: z.boolean(),
+  tracksBatches: z.boolean(),
 });
 export type UpdateMaterialInput = z.infer<typeof updateMaterialSchema>;
 
@@ -39,6 +47,16 @@ export const receiveStockSchema = z.object({
   note: z.string().trim().max(200).optional(),
 });
 export type ReceiveStockInput = z.infer<typeof receiveStockSchema>;
+
+export const receiveMaterialBatchSchema = z.object({
+  materialId: z.string().trim().min(1, "Material obrigatório."),
+  batchCode: z.string().trim().min(1, "Código do lote obrigatório.").max(60),
+  qty: z.number().gt(0, "Quantidade deve ser maior que zero."),
+  supplierName: z.string().trim().max(120).optional(),
+  certificateRef: z.string().trim().max(120).optional(),
+  note: z.string().trim().max(200).optional(),
+});
+export type ReceiveMaterialBatchInput = z.infer<typeof receiveMaterialBatchSchema>;
 
 export const adjustStockSchema = z.object({
   materialId: z.string().trim().min(1, "Material obrigatório."),
@@ -77,6 +95,7 @@ export async function createMaterial(input: CreateMaterialInput): Promise<void> 
         unit: input.unit,
         minStockQty: input.minStockQty,
         stockQty: input.initialQty,
+        tracksBatches: input.tracksBatches,
       },
     });
     if (input.initialQty > 0) {
@@ -107,18 +126,26 @@ export async function updateMaterial(input: UpdateMaterialInput): Promise<void> 
       unit: input.unit,
       minStockQty: input.minStockQty,
       active: input.active,
+      tracksBatches: input.tracksBatches,
     },
   });
   invalidateCache(CACHE_TAGS.materials);
 }
 
-/** Adds stock (goods receipt) and logs the movement. */
+/** Adds stock (goods receipt) and logs the movement. Not for `tracksBatches`
+ * materials — those must go through `receiveMaterialBatch` so the delivery's
+ * heat/cast number and certificate are captured. */
 export async function receiveStock(input: ReceiveStockInput): Promise<void> {
   const material = await prisma.material.findUnique({
     where: { id: input.materialId },
-    select: { id: true },
+    select: { id: true, tracksBatches: true },
   });
   if (!material) throw new NotFoundError("Material não encontrado.");
+  if (material.tracksBatches) {
+    throw new AppError(
+      "Este material é rastreável por lote — use 'Receber lote' para registar esta entrada.",
+    );
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.material.update({
@@ -131,6 +158,53 @@ export async function receiveStock(input: ReceiveStockInput): Promise<void> {
         delta: input.qty,
         reason: "receipt",
         note: input.note?.trim() || "Entrada de stock",
+      },
+    });
+  });
+  invalidateCache(CACHE_TAGS.materials);
+}
+
+/**
+ * Receives a goods delivery of a `tracksBatches` material, creating the
+ * `MaterialBatch` (with the supplier's heat/cast number and certificate
+ * reference) that later work-order consumption will draw from FIFO. This is
+ * the entry point of the whole traceability chain.
+ */
+export async function receiveMaterialBatch(input: ReceiveMaterialBatchInput): Promise<void> {
+  const material = await prisma.material.findUnique({
+    where: { id: input.materialId },
+    select: { id: true, tracksBatches: true },
+  });
+  if (!material) throw new NotFoundError("Material não encontrado.");
+  if (!material.tracksBatches) {
+    throw new AppError(
+      "Este material não está configurado para rastreio por lote. Use 'Entrada de stock'.",
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const batch = await tx.materialBatch.create({
+      data: {
+        materialId: input.materialId,
+        batchCode: input.batchCode,
+        supplierName: input.supplierName?.trim() || null,
+        certificateRef: input.certificateRef?.trim() || null,
+        receivedQty: input.qty,
+        remainingQty: input.qty,
+        note: input.note?.trim() || null,
+      },
+    });
+    await tx.material.update({
+      where: { id: input.materialId },
+      data: { stockQty: { increment: input.qty } },
+    });
+    await tx.stockMovement.create({
+      data: {
+        materialId: input.materialId,
+        delta: input.qty,
+        reason: "receipt",
+        materialBatchId: batch.id,
+        note: input.note?.trim() || `Receção de lote ${input.batchCode}`,
       },
     });
   });

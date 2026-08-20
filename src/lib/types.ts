@@ -503,6 +503,61 @@ export interface MaterialVM {
   minStockQty: number;
   active: boolean;
   belowMin: boolean;
+  /** Whether goods receipts for this material must go through the batch/heat
+   * traceability flow (`receiveMaterialBatch`) instead of plain `receiveStock`. */
+  tracksBatches: boolean;
+}
+
+/** One raw-material delivery (heat/cast number) received for a `tracksBatches`
+ * material, with its remaining quantity available for FIFO consumption. */
+export interface MaterialBatchVM {
+  id: string;
+  batchCode: string;
+  supplierName: string | null;
+  certificateRef: string | null;
+  receivedQty: number;
+  remainingQty: number;
+  unit: string;
+  receivedAt: string;
+  note: string | null;
+}
+
+/** One batch consumed by a work order towards an order's items — the
+ * forward view of the traceability ledger, shown on the order detail page. */
+export interface OrderBatchConsumptionVM {
+  workOrderRef: string;
+  productRef: string;
+  productName: string;
+  materialRef: string;
+  materialName: string;
+  batchCode: string;
+  supplierName: string | null;
+  certificateRef: string | null;
+  qty: number;
+  unit: string;
+}
+
+/** Result of a recall search by batch/heat code: the batch itself plus every
+ * order it fed into, for backward (batch → affected customers) tracing. */
+export interface RecallTraceVM {
+  batchId: string;
+  batchCode: string;
+  materialRef: string;
+  materialName: string;
+  supplierName: string | null;
+  certificateRef: string | null;
+  receivedQty: number;
+  remainingQty: number;
+  unit: string;
+  receivedAt: string;
+  consumedIn: {
+    workOrderRef: string;
+    orderReference: string;
+    companyName: string;
+    productRef: string;
+    productName: string;
+    qty: number;
+  }[];
 }
 
 /** One material line of a product's bill of materials, for the BOM editor. */

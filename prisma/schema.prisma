@@ -465,18 +465,24 @@ model NonConformity {
 // ── Armazém / Stock ──────────────────────────────────────────────────────────
 
 model Material {
-  id          String              @id @default(cuid())
-  reference   String              @unique
-  name        String
-  unit        String              @default("un")
-  stockQty    Float               @default(0)
-  minStockQty Float               @default(0)
-  active      Boolean             @default(true)
-  bomItems    BomItem[]
-  woMaterials WorkOrderMaterial[]
-  movements   StockMovement[]
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  id            String              @id @default(cuid())
+  reference     String              @unique
+  name          String
+  unit          String              @default("un")
+  stockQty      Float               @default(0)
+  minStockQty   Float               @default(0)
+  active        Boolean             @default(true)
+  // Opt-in per material: raw stainless/carbon steel needs heat/cast-number
+  // traceability (mill certificates), but small consumables (screws,
+  // gaskets) don't — forcing batch entry on everything would just add
+  // friction for no traceability value.
+  tracksBatches Boolean             @default(false)
+  bomItems      BomItem[]
+  woMaterials   WorkOrderMaterial[]
+  movements     StockMovement[]
+  batches       MaterialBatch[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   @@index([active])
 }
@@ -494,34 +500,81 @@ model BomItem {
   @@index([materialId])
 }
 
+/// A single goods-receipt lot of a `tracksBatches` material — one supplier
+/// delivery with its own heat/cast number and mill certificate. `remainingQty`
+/// is decremented as work orders consume it (see `WorkOrderMaterialBatch`),
+/// so at any time we know exactly which physical batch is still in stock and,
+/// once consumed, which finished work orders/orders it went into (forward
+/// trace for a recall) or which orders' materials trace back to it (backward
+/// trace for a customer certificate of conformity).
+model MaterialBatch {
+  id             String                    @id @default(cuid())
+  materialId     String
+  material       Material                  @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  batchCode      String
+  supplierName   String?
+  certificateRef String?
+  receivedQty    Float
+  remainingQty   Float
+  receivedAt     DateTime                  @default(now())
+  note           String?
+  createdAt      DateTime                  @default(now())
+  movements      StockMovement[]
+  consumptions   WorkOrderMaterialBatch[]
+
+  @@index([materialId])
+  @@index([materialId, batchCode])
+}
+
 model WorkOrderMaterial {
-  id           String    @id @default(cuid())
+  id           String                    @id @default(cuid())
   workOrderId  String
-  workOrder    WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  workOrder    WorkOrder                 @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   materialId   String
-  material     Material  @relation(fields: [materialId], references: [id], onDelete: Restrict)
+  material     Material                  @relation(fields: [materialId], references: [id], onDelete: Restrict)
   materialRef  String
   materialName String
-  unit         String    @default("un")
+  unit         String                    @default("un")
   requiredQty  Float
-  issuedQty    Float     @default(0)
-  createdAt    DateTime  @default(now())
+  issuedQty    Float                     @default(0)
+  createdAt    DateTime                  @default(now())
+  batches      WorkOrderMaterialBatch[]
 
   @@unique([workOrderId, materialId])
   @@index([materialId])
 }
 
+/// Ledger row: "this work order consumed `qty` from this specific material
+/// batch". A single `WorkOrderMaterial` requirement may draw from several
+/// batches (FIFO) if one delivery isn't enough to cover it. This table is
+/// the actual traceability chain — everything else is a view over it.
+model WorkOrderMaterialBatch {
+  id                  String            @id @default(cuid())
+  workOrderMaterialId String
+  workOrderMaterial   WorkOrderMaterial @relation(fields: [workOrderMaterialId], references: [id], onDelete: Cascade)
+  materialBatchId     String
+  materialBatch       MaterialBatch     @relation(fields: [materialBatchId], references: [id], onDelete: Restrict)
+  qty                 Float
+  createdAt           DateTime          @default(now())
+
+  @@index([workOrderMaterialId])
+  @@index([materialBatchId])
+}
+
 model StockMovement {
-  id          String   @id @default(cuid())
-  materialId  String
-  material    Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
-  delta       Float
-  reason      String
-  workOrderId String?
-  note        String?
-  createdAt   DateTime @default(now())
+  id              String         @id @default(cuid())
+  materialId      String
+  material        Material       @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  delta           Float
+  reason          String
+  workOrderId     String?
+  materialBatchId String?
+  materialBatch   MaterialBatch? @relation(fields: [materialBatchId], references: [id], onDelete: SetNull)
+  note            String?
+  createdAt       DateTime       @default(now())
 
   @@index([materialId, createdAt])
+  @@index([materialBatchId])
 }
 
 // ── Orçamentos ───────────────────────────────────────────────────────────────

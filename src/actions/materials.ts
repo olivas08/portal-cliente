@@ -7,20 +7,24 @@ import {
   createMaterial as createMaterialService,
   updateMaterial as updateMaterialService,
   receiveStock as receiveStockService,
+  receiveMaterialBatch as receiveMaterialBatchService,
   adjustStock as adjustStockService,
   setProductBom as setProductBomService,
   importMaterials as importMaterialsService,
   createMaterialSchema,
   updateMaterialSchema,
   receiveStockSchema,
+  receiveMaterialBatchSchema,
   adjustStockSchema,
   setProductBomSchema,
   type CreateMaterialInput,
   type UpdateMaterialInput,
   type ReceiveStockInput,
+  type ReceiveMaterialBatchInput,
   type AdjustStockInput,
   type SetProductBomInput,
 } from "@/services/materials.service";
+import { getMaterialBatches, findBatchTrace } from "@/lib/data";
 import {
   bulkImportMaterialsSchema,
   type MaterialImportRow,
@@ -55,6 +59,29 @@ export async function receiveStock(input: ReceiveStockInput) {
     await receiveStockService(data);
     revalidatePath(ADMIN_WAREHOUSE);
   });
+}
+
+export async function receiveMaterialBatch(input: ReceiveMaterialBatchInput) {
+  return guardAction(async () => {
+    await requireAdminArea("armazem");
+    const data = receiveMaterialBatchSchema.parse(input);
+    await receiveMaterialBatchService(data);
+    revalidatePath(ADMIN_WAREHOUSE);
+  });
+}
+
+/** On-demand batch history for one material, used by the warehouse table's
+ * expandable "lotes" row (fetched only when the admin actually opens it). */
+export async function getMaterialBatchesAction(materialId: string) {
+  await requireAdminArea("armazem");
+  return getMaterialBatches(materialId);
+}
+
+/** Recall search: given a batch/heat code, find every order it was consumed
+ * into, across all clients. */
+export async function findBatchTraceAction(batchCode: string) {
+  await requireAdminArea("armazem");
+  return findBatchTrace(batchCode);
 }
 
 export async function adjustStock(input: AdjustStockInput) {
