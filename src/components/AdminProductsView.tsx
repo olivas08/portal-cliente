@@ -3,9 +3,10 @@
 import { useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Plus, Pencil, X, Package, ImageOff, Upload, Trash2 } from "lucide-react";
+import { Plus, Pencil, Package, ImageOff, Upload, Trash2 } from "lucide-react";
 import type { ProductVM } from "@/lib/types";
 import { ProductsImportModal } from "@/components/ProductsImportModal";
+import { Modal } from "@/components/ui/Modal";
 import {
   createProduct,
   updateProduct,
@@ -306,230 +307,215 @@ export function AdminProductsView({ products, companies }: Props) {
         </div>
       )}
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={editingId ? "Editar produto" : "Novo produto"}
-            className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-          >
-            <div className="flex items-center justify-between p-5 border-b border-slate-100 sticky top-0 bg-white">
-              <h2 className="font-semibold text-slate-800">
-                {editingId ? "Editar produto" : "Novo produto"}
-              </h2>
-              <button
-                onClick={() => setOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X size={18} />
-              </button>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={editingId ? "Editar produto" : "Novo produto"}
+        maxWidth="2xl"
+        scrollable
+      >
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">
+            Referência *
+          </label>
+          <input
+                required
+                className={inputCls}
+                value={form.reference}
+                onChange={(e) => setField("reference", e.target.value)}
+              />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Nome *
+              </label>
+              <input
+                required
+                className={inputCls}
+                value={form.name}
+                onChange={(e) => setField("name", e.target.value)}
+              />
+            </div>
+          </div>
 
-            <form onSubmit={handleSubmit} className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Referência *
-                  </label>
-                  <input
-                    required
-                    className={inputCls}
-                    value={form.reference}
-                    onChange={(e) => setField("reference", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Nome *
-                  </label>
-                  <input
-                    required
-                    className={inputCls}
-                    value={form.name}
-                    onChange={(e) => setField("name", e.target.value)}
-                  />
-                </div>
-              </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              Descrição *
+            </label>
+            <textarea
+              required
+              rows={2}
+              className={inputCls + " resize-none"}
+              value={form.description}
+              onChange={(e) => setField("description", e.target.value)}
+            />
+          </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Descrição *
-                </label>
-                <textarea
-                  required
-                  rows={2}
-                  className={inputCls + " resize-none"}
-                  value={form.description}
-                  onChange={(e) => setField("description", e.target.value)}
-                />
-              </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Unidade *
+              </label>
+              <input
+                required
+                className={inputCls}
+                value={form.unit}
+                onChange={(e) => setField("unit", e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Preço base (€) *
+              </label>
+              <input
+                required
+                type="number"
+                min="0"
+                step="0.01"
+                className={inputCls}
+                value={form.unitPriceEur}
+                onChange={(e) => setField("unitPriceEur", e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Categoria
+              </label>
+              <input
+                className={inputCls}
+                value={form.category}
+                onChange={(e) => setField("category", e.target.value)}
+              />
+            </div>
+          </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Unidade *
-                  </label>
-                  <input
-                    required
-                    className={inputCls}
-                    value={form.unit}
-                    onChange={(e) => setField("unit", e.target.value)}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              Imagem
+            </label>
+            <div className="flex items-center gap-3">
+              <div className="h-16 w-16 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0 border border-slate-200">
+                {form.imageUrl ? (
+                  <Image
+                    src={form.imageUrl}
+                    alt="Pré-visualização"
+                    width={64}
+                    height={64}
+                    className="object-cover h-16 w-16"
+                    unoptimized
                   />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Preço base (€) *
-                  </label>
-                  <input
-                    required
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className={inputCls}
-                    value={form.unitPriceEur}
-                    onChange={(e) => setField("unitPriceEur", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Categoria
-                  </label>
-                  <input
-                    className={inputCls}
-                    value={form.category}
-                    onChange={(e) => setField("category", e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Imagem
-                </label>
-                <div className="flex items-center gap-3">
-                  <div className="h-16 w-16 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0 border border-slate-200">
-                    {form.imageUrl ? (
-                      <Image
-                        src={form.imageUrl}
-                        alt="Pré-visualização"
-                        width={64}
-                        height={64}
-                        className="object-cover h-16 w-16"
-                        unoptimized
-                      />
-                    ) : (
-                      <ImageOff size={18} className="text-slate-300" />
-                    )}
-                  </div>
-                  <div className="flex flex-col items-start gap-1">
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleImageChange}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileRef.current?.click()}
-                      className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50"
-                    >
-                      <Upload size={14} />
-                      {form.imageUrl ? "Trocar imagem" : "Carregar imagem"}
-                    </button>
-                    {form.imageUrl && (
-                      <button
-                        type="button"
-                        onClick={() => setField("imageUrl", "")}
-                        className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-600"
-                      >
-                        <Trash2 size={12} /> Remover
-                      </button>
-                    )}
-                  </div>
-                </div>
-                {imageError && (
-                  <p className="text-xs text-red-600 mt-1">{imageError}</p>
+                ) : (
+                  <ImageOff size={18} className="text-slate-300" />
                 )}
               </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-2">
-                  Preços negociados por empresa (opcional)
-                </label>
-                <p className="text-xs text-slate-400 mb-2">
-                  Deixe vazio para usar o preço base.
-                </p>
-                <div className="space-y-2">
-                  {companies.map((c) => (
-                    <div
-                      key={c.id}
-                      className="grid grid-cols-12 gap-2 items-center"
-                    >
-                      <span className="col-span-8 text-sm text-slate-600 truncate">
-                        {c.name}
-                      </span>
-                      <div className="col-span-4 relative">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder={form.unitPriceEur || "base"}
-                          className={inputCls + " pr-6"}
-                          value={overrides[c.id] ?? ""}
-                          onChange={(e) =>
-                            setOverrides((o) => ({
-                              ...o,
-                              [c.id]: e.target.value,
-                            }))
-                          }
-                        />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">
-                          €
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <label className="flex items-center gap-2 text-sm text-slate-600">
+              <div className="flex flex-col items-start gap-1">
                 <input
-                  type="checkbox"
-                  checked={form.active}
-                  onChange={(e) => setField("active", e.target.checked)}
-                  className="rounded border-slate-300"
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageChange}
                 />
-                Visível no catálogo do cliente
-              </label>
-
-              {error && (
-                <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                  {error}
-                </p>
-              )}
-
-              <div className="flex justify-end gap-3 pt-1">
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
-                  className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50"
+                  onClick={() => fileRef.current?.click()}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50"
                 >
-                  Cancelar
+                  <Upload size={14} />
+                  {form.imageUrl ? "Trocar imagem" : "Carregar imagem"}
                 </button>
-                <button
-                  type="submit"
-                  disabled={pending}
-                  className="px-4 py-2 text-sm font-semibold text-brand bg-accent rounded-lg hover:bg-accent-dark disabled:opacity-60"
-                >
-                  {pending ? "A guardar..." : "Guardar"}
-                </button>
+                {form.imageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setField("imageUrl", "")}
+                    className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-600"
+                  >
+                    <Trash2 size={12} /> Remover
+                  </button>
+                )}
               </div>
-            </form>
+            </div>
+            {imageError && (
+              <p className="text-xs text-red-600 mt-1">{imageError}</p>
+            )}
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-2">
+              Preços negociados por empresa (opcional)
+            </label>
+            <p className="text-xs text-slate-400 mb-2">
+              Deixe vazio para usar o preço base.
+            </p>
+            <div className="space-y-2">
+              {companies.map((c) => (
+                <div
+                  key={c.id}
+                  className="grid grid-cols-12 gap-2 items-center"
+                >
+                  <span className="col-span-8 text-sm text-slate-600 truncate">
+                    {c.name}
+                  </span>
+                  <div className="col-span-4 relative">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder={form.unitPriceEur || "base"}
+                      className={inputCls + " pr-6"}
+                      value={overrides[c.id] ?? ""}
+                      onChange={(e) =>
+                        setOverrides((o) => ({
+                          ...o,
+                          [c.id]: e.target.value,
+                        }))
+                      }
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                      €
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            <input
+              type="checkbox"
+              checked={form.active}
+              onChange={(e) => setField("active", e.target.checked)}
+              className="rounded border-slate-300"
+            />
+            Visível no catálogo do cliente
+          </label>
+
+          {error && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <div className="flex justify-end gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              className="px-4 py-2 text-sm font-semibold text-brand bg-accent rounded-lg hover:bg-accent-dark disabled:opacity-60"
+            >
+              {pending ? "A guardar..." : "Guardar"}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </>
   );
 }

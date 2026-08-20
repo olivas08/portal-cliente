@@ -4,7 +4,6 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Upload,
-  X,
   FileDown,
   CheckCircle2,
   AlertTriangle,
@@ -20,6 +19,7 @@ import {
 } from "@/lib/import-schemas";
 import { importProducts } from "@/actions/products";
 import { CsvColumnMapping } from "@/components/CsvColumnMapping";
+import { Modal } from "@/components/ui/Modal";
 
 /**
  * Lets an admin bulk-create/update catalog products from a CSV export of the
@@ -140,204 +140,182 @@ export function ProductsImportModal() {
         <Upload size={16} /> Importar CSV
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Importar produtos de CSV"
-            className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"
-          >
-            <div className="flex items-center justify-between p-5 border-b border-slate-100 sticky top-0 bg-white">
-              <div>
-                <h2 className="font-semibold text-slate-800">
-                  Importar produtos de CSV
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Traga a sua lista de preços (ex. exportada do Excel) para
-                  criar ou atualizar produtos do catálogo em massa.
-                </p>
-              </div>
+      <Modal
+        open={open}
+        onClose={close}
+        title="Importar produtos de CSV"
+        description="Traga a sua lista de preços (ex. exportada do Excel) para criar ou atualizar produtos do catálogo em massa."
+        maxWidth="3xl"
+        scrollable
+      >
+        <div className="p-5 space-y-4">
+          {!summary && !parsed && !mappingStep && (
+            <>
               <button
                 type="button"
-                onClick={close}
-                className="text-slate-400 hover:text-slate-600"
-                aria-label="Fechar"
+                onClick={downloadTemplate}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-800"
               >
-                <X size={20} />
+                <FileDown size={15} /> Descarregar modelo CSV
               </button>
-            </div>
 
-            <div className="p-5 space-y-4">
-              {!summary && !parsed && !mappingStep && (
-                <>
-                  <button
-                    type="button"
-                    onClick={downloadTemplate}
-                    className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-800"
-                  >
-                    <FileDown size={15} /> Descarregar modelo CSV
-                  </button>
-
-                  <div className="rounded-xl border-2 border-dashed border-slate-200 p-6 text-center">
-                    <input
-                      ref={inputRef}
-                      type="file"
-                      accept=".csv,text/csv"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleFile(file);
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => inputRef.current?.click()}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-                    >
-                      <Upload size={16} /> Escolher ficheiro CSV
-                    </button>
-                    {fileName && (
-                      <p className="text-xs text-slate-500 mt-2">{fileName}</p>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {error && (
-                <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  <AlertCircle size={16} /> {error}
-                </div>
-              )}
-
-              {mappingStep && !summary && (
-                <CsvColumnMapping
-                  headers={mappingStep.headers}
-                  fields={PRODUCT_IMPORT_FIELDS}
-                  initialMapping={mappingStep.autoMapping}
-                  onConfirm={confirmMapping}
-                  onCancel={reset}
+              <div className="rounded-xl border-2 border-dashed border-slate-200 p-6 text-center">
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFile(file);
+                  }}
                 />
-              )}
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                >
+                  <Upload size={16} /> Escolher ficheiro CSV
+                </button>
+                {fileName && (
+                  <p className="text-xs text-slate-500 mt-2">{fileName}</p>
+                )}
+              </div>
+            </>
+          )}
 
-              {parsed && !summary && (
-                <>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-4">
-                      <span className="inline-flex items-center gap-1.5 text-emerald-700">
-                        <CheckCircle2 size={15} /> {validRows.length} linhas válidas
-                      </span>
-                      {invalidRows.length > 0 && (
-                        <span className="inline-flex items-center gap-1.5 text-amber-700">
-                          <AlertTriangle size={15} /> {invalidRows.length} linhas com erro (serão ignoradas)
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const { headers, autoMapping } = parseProductsCsv(csvText ?? "");
-                        setMappingStep({ headers, autoMapping });
-                        setParsed(null);
-                      }}
-                      className="text-xs font-medium text-slate-500 hover:text-slate-700 underline"
-                    >
-                      Ajustar mapeamento de colunas
-                    </button>
-                  </div>
+          {error && (
+            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <AlertCircle size={16} /> {error}
+            </div>
+          )}
 
-                  <div className="max-h-64 overflow-y-auto rounded-lg border border-slate-200">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-50 text-xs text-slate-500 sticky top-0">
-                        <tr>
-                          <th className="text-left px-3 py-2">Linha</th>
-                          <th className="text-left px-3 py-2">Referência</th>
-                          <th className="text-left px-3 py-2">Nome</th>
-                          <th className="text-left px-3 py-2">Preço</th>
-                          <th className="text-left px-3 py-2">Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {parsed.results.map((r) => (
-                          <tr key={r.row} className="border-t border-slate-100">
-                            <td className="px-3 py-1.5 text-slate-500">{r.row}</td>
-                            <td className="px-3 py-1.5 text-slate-700">
-                              {r.ok ? r.data.reference : r.reference || "—"}
-                            </td>
-                            <td className="px-3 py-1.5 text-slate-700">
-                              {r.ok ? r.data.name : "—"}
-                            </td>
-                            <td className="px-3 py-1.5 text-slate-700">
-                              {r.ok ? `${r.data.unitPriceEur.toFixed(2)} €` : "—"}
-                            </td>
-                            <td className="px-3 py-1.5">
-                              {r.ok ? (
-                                <span className="text-emerald-600">OK</span>
-                              ) : (
-                                <span className="text-red-600">{r.message}</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+          {mappingStep && !summary && (
+            <CsvColumnMapping
+              headers={mappingStep.headers}
+              fields={PRODUCT_IMPORT_FIELDS}
+              initialMapping={mappingStep.autoMapping}
+              onConfirm={confirmMapping}
+              onCancel={reset}
+            />
+          )}
 
-                  <div className="flex items-center justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={reset}
-                      className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={confirmImport}
-                      disabled={pending || validRows.length === 0}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-                    >
-                      <Upload size={16} /> Importar {validRows.length} produtos
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {summary && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                    <CheckCircle2 size={16} />
-                    {summary.created} produtos criados, {summary.updated} atualizados.
-                  </div>
-                  {summary.errors.length > 0 && (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                      <p className="font-medium mb-1">
-                        {summary.errors.length} linhas não foram importadas:
-                      </p>
-                      <ul className="list-disc list-inside space-y-0.5">
-                        {summary.errors.map((e) => (
-                          <li key={e.row}>
-                            Linha {e.row} ({e.reference ?? "—"}): {e.message}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+          {parsed && !summary && (
+            <>
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-4">
+                  <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                    <CheckCircle2 size={15} /> {validRows.length} linhas válidas
+                  </span>
+                  {invalidRows.length > 0 && (
+                    <span className="inline-flex items-center gap-1.5 text-amber-700">
+                      <AlertTriangle size={15} /> {invalidRows.length} linhas com erro (serão ignoradas)
+                    </span>
                   )}
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={close}
-                      className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-                    >
-                      Fechar
-                    </button>
-                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const { headers, autoMapping } = parseProductsCsv(csvText ?? "");
+                    setMappingStep({ headers, autoMapping });
+                    setParsed(null);
+                  }}
+                  className="text-xs font-medium text-slate-500 hover:text-slate-700 underline"
+                >
+                  Ajustar mapeamento de colunas
+                </button>
+              </div>
+
+              <div className="max-h-64 overflow-y-auto rounded-lg border border-slate-200">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-xs text-slate-500 sticky top-0">
+                    <tr>
+                      <th className="text-left px-3 py-2">Linha</th>
+                      <th className="text-left px-3 py-2">Referência</th>
+                      <th className="text-left px-3 py-2">Nome</th>
+                      <th className="text-left px-3 py-2">Preço</th>
+                      <th className="text-left px-3 py-2">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsed.results.map((r) => (
+                      <tr key={r.row} className="border-t border-slate-100">
+                        <td className="px-3 py-1.5 text-slate-500">{r.row}</td>
+                        <td className="px-3 py-1.5 text-slate-700">
+                          {r.ok ? r.data.reference : r.reference || "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-slate-700">
+                          {r.ok ? r.data.name : "—"}
+                        </td>
+                        <td className="px-3 py-1.5 text-slate-700">
+                          {r.ok ? `${r.data.unitPriceEur.toFixed(2)} €` : "—"}
+                        </td>
+                        <td className="px-3 py-1.5">
+                          {r.ok ? (
+                            <span className="text-emerald-600">OK</span>
+                          ) : (
+                            <span className="text-red-600">{r.message}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={reset}
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmImport}
+                  disabled={pending || validRows.length === 0}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+                >
+                  <Upload size={16} /> Importar {validRows.length} produtos
+                </button>
+              </div>
+            </>
+          )}
+
+          {summary && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                <CheckCircle2 size={16} />
+                {summary.created} produtos criados, {summary.updated} atualizados.
+              </div>
+              {summary.errors.length > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                  <p className="font-medium mb-1">
+                    {summary.errors.length} linhas não foram importadas:
+                  </p>
+                  <ul className="list-disc list-inside space-y-0.5">
+                    {summary.errors.map((e) => (
+                      <li key={e.row}>
+                        Linha {e.row} ({e.reference ?? "—"}): {e.message}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={close}
+                  className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </Modal>
     </>
   );
 }

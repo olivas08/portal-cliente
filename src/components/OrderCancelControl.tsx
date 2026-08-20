@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, RotateCcw, X } from "lucide-react";
+import { Ban, RotateCcw } from "lucide-react";
 import type { OrderStatus } from "@/lib/types";
 import { cancelOrder, reactivateOrder } from "@/actions/orders";
+import { Modal } from "@/components/ui/Modal";
 
 interface Props {
   orderId: string;
@@ -105,73 +106,54 @@ export function OrderCancelControl({ orderId, status, isAdmin }: Props) {
         </button>
       </div>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={title}
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md"
-          >
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-800">{title}</h2>
-              <button
-                onClick={() => setOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCancel} className="p-5 space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Motivo *
-                </label>
-                <textarea
-                  required
-                  rows={3}
-                  autoFocus
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 resize-none"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder={
-                    isAdmin
-                      ? "Ex: rutura de stock de matéria-prima, especificação inviável..."
-                      : "Ex: já não preciso desta encomenda..."
-                  }
-                />
-                <p className="text-xs text-slate-400 mt-1">
-                  O motivo fica visível para a outra parte.
-                </p>
-              </div>
-
-              {error && (
-                <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                  {error}
-                </p>
-              )}
-
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50"
-                >
-                  Voltar
-                </button>
-                <button
-                  type="submit"
-                  disabled={pending}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-60"
-                >
-                  {pending ? "A processar..." : "Confirmar"}
-                </button>
-              </div>
-            </form>
+      <Modal open={open} onClose={() => setOpen(false)} title={title}>
+        <form onSubmit={handleCancel} className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              Motivo *
+            </label>
+            <textarea
+              required
+              rows={3}
+              autoFocus
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 resize-none"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder={
+                isAdmin
+                  ? "Ex: rutura de stock de matéria-prima, especificação inviável..."
+                  : "Ex: já não preciso desta encomenda..."
+              }
+            />
+            <p className="text-xs text-slate-400 mt-1">
+              O motivo fica visível para a outra parte.
+            </p>
           </div>
-        </div>
-      )}
+
+          {error && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50"
+            >
+              Voltar
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              className="px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-60"
+            >
+              {pending ? "A processar..." : "Confirmar"}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </>
   );
 }
