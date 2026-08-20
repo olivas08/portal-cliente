@@ -28,6 +28,7 @@ import {
   receiveStock,
 } from "@/actions/materials";
 import { releaseWorkOrder } from "@/actions/production";
+import { MaterialsImportModal } from "@/components/MaterialsImportModal";
 
 interface Props {
   materials: MaterialVM[];
@@ -275,13 +276,16 @@ export function WarehouseView({ materials, awaiting, movements }: Props) {
               </span>
             )}
           </h2>
-          <button
-            type="button"
-            onClick={() => setShowNew((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Plus size={16} /> Novo material
-          </button>
+          <div className="flex items-center gap-2">
+            <MaterialsImportModal />
+            <button
+              type="button"
+              onClick={() => setShowNew((v) => !v)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Plus size={16} /> Novo material
+            </button>
+          </div>
         </div>
 
         {showNew && (

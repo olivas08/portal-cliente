@@ -2,6 +2,11 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import { NotFoundError, AppError } from "@/lib/errors";
+import {
+  bulkImportMaterialsSchema,
+  type MaterialImportRow,
+  type ImportMaterialsResult,
+} from "@/lib/import-schemas";
 
 // ── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -158,6 +163,91 @@ export async function adjustStock(input: AdjustStockInput): Promise<void> {
     });
   });
   invalidateCache(CACHE_TAGS.materials);
+}
+
+// ── Bulk import (CSV) ────────────────────────────────────────────────────────
+
+/**
+ * Bulk-creates/updates materials from a client's spreadsheet export.
+ * Existing materials (matched by `reference`) only have their master data
+ * (name/unit/minStockQty) updated — stock quantities are never overwritten by
+ * an import to avoid silently corrupting a count that already has movements
+ * in the system; use "Entrada de stock" / "Acerto de inventário" for that.
+ * New materials are created with `initialQty` as their starting stock, same
+ * as the single-material creation flow.
+ */
+export async function importMaterials(
+  rows: MaterialImportRow[],
+): Promise<ImportMaterialsResult> {
+  const data = bulkImportMaterialsSchema.parse(rows);
+
+  const result: ImportMaterialsResult = { created: 0, updated: 0, errors: [] };
+  const seenReferences = new Set<string>();
+
+  const existing = await prisma.material.findMany({
+    where: { reference: { in: data.map((r) => r.reference) } },
+    select: { id: true, reference: true },
+  });
+  const existingByRef = new Map(existing.map((m) => [m.reference, m.id]));
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    const rowNumber = i + 2; // +1 for header row, +1 for 1-based index
+    if (seenReferences.has(row.reference)) {
+      result.errors.push({
+        row: rowNumber,
+        reference: row.reference,
+        message: "Referência duplicada dentro do ficheiro.",
+      });
+      continue;
+    }
+    seenReferences.add(row.reference);
+
+    try {
+      const existingId = existingByRef.get(row.reference);
+      if (existingId) {
+        await prisma.material.update({
+          where: { id: existingId },
+          data: { name: row.name, unit: row.unit, minStockQty: row.minStockQty },
+        });
+        result.updated++;
+      } else {
+        await prisma.$transaction(async (tx) => {
+          const material = await tx.material.create({
+            data: {
+              reference: row.reference,
+              name: row.name,
+              unit: row.unit,
+              minStockQty: row.minStockQty,
+              stockQty: row.initialQty,
+            },
+          });
+          if (row.initialQty > 0) {
+            await tx.stockMovement.create({
+              data: {
+                materialId: material.id,
+                delta: row.initialQty,
+                reason: "receipt",
+                note: "Importação CSV",
+              },
+            });
+          }
+        });
+        result.created++;
+      }
+    } catch {
+      result.errors.push({
+        row: rowNumber,
+        reference: row.reference,
+        message: "Erro ao gravar esta linha.",
+      });
+    }
+  }
+
+  if (result.created > 0 || result.updated > 0) {
+    invalidateCache(CACHE_TAGS.materials);
+  }
+  return result;
 }
 
 // ── Bill of materials ────────────────────────────────────────────────────────

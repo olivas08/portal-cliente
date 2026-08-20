@@ -9,6 +9,7 @@ import {
   receiveStock as receiveStockService,
   adjustStock as adjustStockService,
   setProductBom as setProductBomService,
+  importMaterials as importMaterialsService,
   createMaterialSchema,
   updateMaterialSchema,
   receiveStockSchema,
@@ -20,6 +21,10 @@ import {
   type AdjustStockInput,
   type SetProductBomInput,
 } from "@/services/materials.service";
+import {
+  bulkImportMaterialsSchema,
+  type MaterialImportRow,
+} from "@/lib/import-schemas";
 
 const ADMIN_WAREHOUSE = "/admin/armazem";
 const ADMIN_BOM = "/admin/armazem/fichas-tecnicas";
@@ -68,5 +73,16 @@ export async function setProductBom(input: SetProductBomInput) {
     await setProductBomService(data);
     revalidatePath(ADMIN_BOM);
     revalidatePath(ADMIN_BOARD);
+  });
+}
+
+/** Bulk import of materials from a parsed/validated CSV (see MaterialsImportModal). */
+export async function importMaterials(input: MaterialImportRow[]) {
+  return guardAction(async () => {
+    await requireAdminArea("armazem");
+    const data = bulkImportMaterialsSchema.parse(input);
+    const result = await importMaterialsService(data);
+    revalidatePath(ADMIN_WAREHOUSE);
+    return result;
   });
 }
