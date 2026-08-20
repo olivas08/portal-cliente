@@ -18,6 +18,13 @@ function makeOrder(overrides: Partial<OrderVM>): OrderVM {
     attachments: overrides.attachments ?? [],
     batchNumber: overrides.batchNumber ?? "LT-1",
     observations: overrides.observations,
+    companyFiscal: overrides.companyFiscal ?? {
+      taxId: null,
+      billingAddress: null,
+      billingPostalCode: null,
+      billingCity: null,
+      billingCountry: null,
+    },
   };
 }
 

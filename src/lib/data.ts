@@ -38,6 +38,7 @@ import type {
   OperationTypeVM,
   MaintenancePlanVM,
   MaintenanceTaskVM,
+  InvoiceVM,
 } from "@/lib/types";
 import { STOCK_REASON_LABELS } from "@/lib/types";
 import { toIsoDate } from "@/lib/dates";
@@ -123,6 +124,13 @@ function toOrderVM(o: OrderWith): OrderVM {
         createdAt: d.createdAt.toISOString(),
       }))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    companyFiscal: {
+      taxId: o.company.taxId,
+      billingAddress: o.company.billingAddress,
+      billingPostalCode: o.company.billingPostalCode,
+      billingCity: o.company.billingCity,
+      billingCountry: o.company.billingCountry,
+    },
   };
 }
 
@@ -192,6 +200,26 @@ export async function getOrderById(id: string): Promise<OrderVM | null> {
   });
   return order ? toOrderVM(order) : null;
 }
+
+export const getInvoiceForOrder = unstable_cache(
+  async (orderId: string): Promise<InvoiceVM | null> => {
+    const invoice = await prisma.invoice.findUnique({ where: { orderId } });
+    if (!invoice) return null;
+    return {
+      id: invoice.id,
+      orderId: invoice.orderId,
+      provider: invoice.provider,
+      status: invoice.status,
+      number: invoice.number,
+      pdfUrl: invoice.pdfUrl,
+      totalEur: invoice.totalEur,
+      issuedAt: invoice.issuedAt ? invoice.issuedAt.toISOString() : null,
+      errorMessage: invoice.errorMessage,
+    };
+  },
+  ["invoice-for-order"],
+  { tags: [CACHE_TAGS.invoices], revalidate: false },
+);
 
 export async function getRequestsForCompany(
   companyId: string,

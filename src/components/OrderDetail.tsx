@@ -12,7 +12,8 @@ import { OrderAttachments } from "@/components/OrderAttachments";
 import { ReorderModal } from "@/components/ReorderModal";
 import { DatesCard } from "@/components/DatesCard";
 import { ProductionProgress } from "@/components/ProductionProgress";
-import type { OrderProductionVM } from "@/lib/types";
+import { InvoiceCard } from "@/components/InvoiceCard";
+import type { OrderProductionVM, InvoiceVM } from "@/lib/types";
 
 interface OrderDetailProps {
   order: OrderVM;
@@ -22,6 +23,7 @@ interface OrderDetailProps {
   backLabel: string;
   production?: OrderProductionVM | null;
   traceability?: OrderBatchConsumptionVM[];
+  invoice?: InvoiceVM | null;
 }
 
 function fmt(n: number): string {
@@ -42,6 +44,7 @@ export function OrderDetail({
   backLabel,
   production,
   traceability,
+  invoice,
 }: OrderDetailProps) {
   return (
     <>
@@ -190,6 +193,14 @@ export function OrderDetail({
 
         <div className="flex flex-col gap-5">
           <DatesCard order={order} />
+          {isAdmin && order.status === "delivered" && (
+            <InvoiceCard
+              orderId={order.id}
+              companyId={order.companyId}
+              companyFiscal={order.companyFiscal}
+              invoice={invoice ?? null}
+            />
+          )}
           <OrderDocumentsCards order={order} />
           <OrderAttachments
             orderId={order.id}

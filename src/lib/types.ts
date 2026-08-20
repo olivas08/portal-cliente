@@ -19,6 +19,8 @@ export type NcStatus = $Enums.NcStatus;
 export type QuoteStatus = $Enums.QuoteStatus;
 export type MaintenanceType = $Enums.MaintenanceType;
 export type MaintenanceStatus = $Enums.MaintenanceStatus;
+export type InvoiceProvider = $Enums.InvoiceProvider;
+export type InvoiceStatus = $Enums.InvoiceStatus;
 
 export interface NotificationVM {
   id: string;
@@ -114,9 +116,19 @@ export interface OrderSummaryVM {
   cancelReason?: string;
 }
 
+/** Fiscal/billing data needed to issue a real invoice for a company. */
+export interface CompanyFiscalVM {
+  taxId: string | null;
+  billingAddress: string | null;
+  billingPostalCode: string | null;
+  billingCity: string | null;
+  billingCountry: string | null;
+}
+
 /** Full order, including attachments, for the order detail page. */
 export interface OrderVM extends OrderSummaryVM {
   attachments: OrderAttachmentVM[];
+  companyFiscal: CompanyFiscalVM;
 }
 
 export interface RequestMessageVM {
@@ -224,6 +236,33 @@ export interface QuoteSummaryVM extends QuoteBaseVM {
 /** Full quote, including all priced lines, for the detail/PDF views. */
 export interface QuoteVM extends QuoteBaseVM {
   lines: QuoteLineVM[];
+}
+
+export const INVOICE_PROVIDER_LABELS: Record<InvoiceProvider, string> = {
+  invoicexpress: "InvoiceXpress",
+  moloni: "Moloni",
+  vendus: "Vendus",
+  primavera: "Primavera",
+};
+
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+  pending: "Pendente",
+  issued: "Emitida",
+  failed: "Falhou",
+  cancelled: "Cancelada",
+};
+
+/** The real fiscal invoice issued for a delivered order (if any). */
+export interface InvoiceVM {
+  id: string;
+  orderId: string;
+  provider: InvoiceProvider;
+  status: InvoiceStatus;
+  number: string | null;
+  pdfUrl: string | null;
+  totalEur: number;
+  issuedAt: string | null;
+  errorMessage: string | null;
 }
 
 /** A per-company negotiated price override for a product. */

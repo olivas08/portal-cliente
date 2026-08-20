@@ -70,6 +70,13 @@ enum QuoteStatus {
 model Company {
   id            String         @id @default(cuid())
   name          String
+  /// Fiscal fields, required to issue a real invoice (see Invoice model) —
+  /// nullable because most companies were created before invoicing existed.
+  taxId         String?
+  billingAddress    String?
+  billingPostalCode String?
+  billingCity       String?
+  billingCountry    String?        @default("Portugal")
   users         User[]
   orders        Order[]
   requests      Request[]
@@ -167,6 +174,7 @@ model Order {
   documents     OrderDocument[]
   workOrders    WorkOrder[]
   quote         Quote?
+  invoice       Invoice?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
@@ -298,6 +306,25 @@ enum MaintenanceType {
 enum MaintenanceStatus {
   open
   resolved
+  cancelled
+}
+
+/// The real-invoicing platform used to actually issue a fiscal document.
+/// Exactly one is "active" at a time via the INVOICE_PROVIDER env var — see
+/// src/services/invoicing/registry.ts. Kept as a DB enum (not just a string)
+/// so a persisted Invoice always records, unambiguously, which platform it
+/// was issued through even if the active provider changes later.
+enum InvoiceProvider {
+  invoicexpress
+  moloni
+  vendus
+  primavera
+}
+
+enum InvoiceStatus {
+  pending
+  issued
+  failed
   cancelled
 }
 
@@ -735,5 +762,29 @@ model MaintenanceTask {
   createdAt   DateTime           @default(now())
 
   @@index([machineId])
+  @@index([status])
+}
+
+/// A real fiscal invoice issued for a delivered order, through one of the
+/// pluggable providers in src/services/invoicing/. One order maps to at most
+/// one invoice in v1 (no partial/multiple invoices per order, no credit
+/// notes yet) — `orderId` is unique. `provider`/`externalId`/`number`/
+/// `pdfUrl` are whatever the chosen platform returns; `totalEur` is frozen
+/// at issuance time from the order's items, like `Quote` freezes its pricing.
+model Invoice {
+  id           String          @id @default(cuid())
+  orderId      String          @unique
+  order        Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider     InvoiceProvider
+  status       InvoiceStatus   @default(pending)
+  externalId   String?
+  number       String?
+  pdfUrl       String?
+  totalEur     Float
+  issuedAt     DateTime?
+  errorMessage String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
   @@index([status])
 }
