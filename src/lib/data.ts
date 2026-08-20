@@ -16,6 +16,7 @@ import type {
   OrderProductionVM,
   WorkstationOptionVM,
   WorkstationLoadVM,
+  ScheduleWorkstationVM,
   WorkstationOeeVM,
   ProductRoutingVM,
   NonConformityVM,
@@ -45,6 +46,10 @@ import {
   computeDiscrepancy,
   isMachineOnline,
 } from "@/services/production-status";
+import {
+  computeProductionSchedule,
+  type ScheduleStepInput,
+} from "@/services/production-schedule";
 import {
   getPricingSettings as getPricingSettingsService,
   getOperationTypes as getOperationTypesService,
@@ -733,6 +738,111 @@ export const getWorkstationLoad = unstable_cache(
   ["workstation-load"],
   { tags: [CACHE_TAGS.workOrders], revalidate: false },
 );
+
+/**
+ * Production-schedule (Gantt) projection, grouped by workstation.
+ *
+ * Unlike the other queries in this file, this is intentionally NOT wrapped
+ * in `unstable_cache`: the projection is computed relative to `now`, so a
+ * tag-invalidated-only cache (`revalidate: false`) would keep showing bars
+ * positioned against a stale "now" until an unrelated work-order mutation
+ * happened to bust the tag. There is no finite-capacity time-slot scheduler
+ * behind this — it's a best-effort estimate of how the existing
+ * priority/FIFO queue would play out if each workstation worked back-to-back,
+ * built on top of `plannedMinutes` and actual start/finish timestamps.
+ */
+export async function getProductionSchedule(
+  horizonDays = 14,
+): Promise<ScheduleWorkstationVM[]> {
+  const now = new Date();
+  const horizonEnd = new Date(now.getTime() + horizonDays * 24 * 60 * 60_000);
+
+  const [workstations, steps] = await Promise.all([
+    prisma.workstation.findMany({
+      where: { active: true },
+      orderBy: { sequence: "asc" },
+      select: { id: true, name: true, clientStageLabel: true },
+    }),
+    prisma.workOrderStep.findMany({
+      where: {
+        status: { in: ["pending", "in_progress", "paused", "done"] },
+        workOrder: { status: { in: ["planned", "released", "in_progress"] } },
+      },
+      include: {
+        machine: { select: { name: true } },
+        workOrder: {
+          select: {
+            id: true,
+            reference: true,
+            productRef: true,
+            productName: true,
+            priority: true,
+            status: true,
+            plannedEnd: true,
+            createdAt: true,
+            order: { select: { company: { select: { name: true } } } },
+          },
+        },
+      },
+      orderBy: { sequence: "asc" },
+    }),
+  ]);
+
+  const scheduleInputs: ScheduleStepInput[] = steps.map((s) => ({
+    workOrderId: s.workOrder.id,
+    workOrderRef: s.workOrder.reference,
+    productRef: s.workOrder.productRef,
+    productName: s.workOrder.productName,
+    companyName: s.workOrder.order.company.name,
+    priority: s.workOrder.priority,
+    workOrderStatus: s.workOrder.status,
+    workOrderCreatedAt: s.workOrder.createdAt,
+    workOrderPlannedEnd: s.workOrder.plannedEnd,
+    stepId: s.id,
+    sequence: s.sequence,
+    name: s.name,
+    workstationId: s.workstationId,
+    machineId: s.machineId,
+    machineName: s.machine?.name ?? null,
+    status: s.status,
+    plannedMinutes: s.plannedMinutes,
+    startedAt: s.startedAt,
+    finishedAt: s.finishedAt,
+  }));
+
+  const bars = computeProductionSchedule(scheduleInputs, now).filter(
+    (bar) => bar.start < horizonEnd,
+  );
+
+  const barsByWorkstation = new Map<string, typeof bars>();
+  for (const bar of bars) {
+    const list = barsByWorkstation.get(bar.workstationId);
+    if (list) list.push(bar);
+    else barsByWorkstation.set(bar.workstationId, [bar]);
+  }
+
+  return workstations.map((ws) => ({
+    id: ws.id,
+    name: ws.name,
+    clientStageLabel: ws.clientStageLabel,
+    bars: (barsByWorkstation.get(ws.id) ?? []).map((bar) => ({
+      workOrderId: bar.workOrderId,
+      workOrderRef: bar.workOrderRef,
+      productRef: bar.productRef,
+      productName: bar.productName,
+      companyName: bar.companyName,
+      priority: bar.priority,
+      workOrderStatus: bar.workOrderStatus,
+      stepId: bar.stepId,
+      stepName: bar.stepName,
+      stepStatus: bar.stepStatus,
+      machineName: bar.machineName,
+      start: bar.start.toISOString(),
+      end: bar.end.toISOString(),
+      isEstimate: bar.isEstimate,
+    })),
+  }));
+}
 
 export const getOpenNonConformities = unstable_cache(
   async (): Promise<NonConformityVM[]> => {

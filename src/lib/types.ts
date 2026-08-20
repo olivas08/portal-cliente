@@ -462,6 +462,35 @@ export interface WorkstationLoadVM {
   readyCount: number;
 }
 
+/** One projected step bar in the production-schedule (Gantt) view. */
+export interface ScheduleBarVM {
+  workOrderId: string;
+  workOrderRef: string;
+  productRef: string;
+  productName: string;
+  companyName: string;
+  priority: Priority;
+  workOrderStatus: WorkOrderStatus;
+  stepId: string;
+  stepName: string;
+  stepStatus: StepStatus;
+  machineName: string | null;
+  /** ISO date-time. */
+  start: string;
+  /** ISO date-time. */
+  end: string;
+  /** True when the bar is a projection, not an already-observed timestamp. */
+  isEstimate: boolean;
+}
+
+/** One workstation row of the production-schedule (Gantt) view. */
+export interface ScheduleWorkstationVM {
+  id: string;
+  name: string;
+  clientStageLabel: string;
+  bars: ScheduleBarVM[];
+}
+
 /** OEE (Availability × Performance × Quality) for one workstation. */
 export interface WorkstationOeeVM {
   id: string;
