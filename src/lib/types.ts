@@ -462,6 +462,24 @@ export interface WorkstationLoadVM {
   readyCount: number;
 }
 
+/** Estimated WIP value sitting at one workstation right now. */
+export interface WipWorkstationVM {
+  workstationId: string;
+  workstationName: string;
+  valueEur: number;
+  orderCount: number;
+}
+
+/** Factory-wide production KPIs shown on the "Desempenho" dashboard. */
+export interface ProductionKpisVM {
+  /** 0-100, null when there is no completed production yet. */
+  scrapRatePct: number | null;
+  /** Work orders that can't be released to the shop floor yet for lack of material. */
+  materialBlockedCount: number;
+  wipByWorkstation: WipWorkstationVM[];
+  totalWipValueEur: number;
+}
+
 /** One projected step bar in the production-schedule (Gantt) view. */
 export interface ScheduleBarVM {
   workOrderId: string;

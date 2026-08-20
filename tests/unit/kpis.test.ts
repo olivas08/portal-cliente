@@ -88,6 +88,25 @@ describe("computeOrderKpis — headline numbers", () => {
     expect(kpis.avgLeadTimeDays).toBeNull();
     expect(kpis.onTimeDeliveryRate).toBeNull();
   });
+
+  it("computes the average delay in days across late deliveries only", () => {
+    const orders = [
+      makeOrder({ id: "o1", expectedDate: "2026-05-15", deliveredDate: "2026-05-14" }), // on time
+      makeOrder({ id: "o2", expectedDate: "2026-05-15", deliveredDate: "2026-05-20" }), // 5 days late
+      makeOrder({ id: "o3", expectedDate: "2026-05-15", deliveredDate: "2026-05-25" }), // 10 days late
+    ];
+    const kpis = computeOrderKpis(orders);
+    expect(kpis.avgDelayDays).toBe(7.5);
+  });
+
+  it("returns null avgDelayDays when no delivery was late", () => {
+    const orders = [
+      makeOrder({ id: "o1", expectedDate: "2026-05-15", deliveredDate: "2026-05-10" }),
+      makeOrder({ id: "o2", expectedDate: "2026-05-15", deliveredDate: "2026-05-15" }),
+    ];
+    const kpis = computeOrderKpis(orders);
+    expect(kpis.avgDelayDays).toBeNull();
+  });
 });
 
 describe("computeOrderKpis — monthly trend", () => {

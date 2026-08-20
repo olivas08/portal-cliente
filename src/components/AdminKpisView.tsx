@@ -17,9 +17,14 @@ import {
   TrendingUp,
   AlertTriangle,
   Package,
+  Gauge,
+  ShieldAlert,
+  PackageX,
+  Boxes,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { OrderKpis } from "@/lib/kpis";
+import type { ProductionKpisVM } from "@/lib/types";
 
 const BRAND = "#0f172a";
 const ACCENT = "#f59e0b";
@@ -64,7 +69,15 @@ function KpiCard({
   );
 }
 
-export function AdminKpisView({ kpis }: { kpis: OrderKpis }) {
+export function AdminKpisView({
+  kpis,
+  production,
+  factoryOee,
+}: {
+  kpis: OrderKpis;
+  production: ProductionKpisVM;
+  factoryOee: number | null;
+}) {
   const chartData = kpis.monthly.map((m) => ({
     month: formatMonth(m.month),
     "Lead time médio (dias)": m.avgLeadTimeDays !== null ? Math.round(m.avgLeadTimeDays * 10) / 10 : null,
@@ -124,6 +137,97 @@ export function AdminKpisView({ kpis }: { kpis: OrderKpis }) {
           chip="bg-brand text-white"
         />
       </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <KpiCard
+          icon={Clock}
+          label="Atraso Médio"
+          value={
+            kpis.avgDelayDays !== null ? `${kpis.avgDelayDays.toFixed(1)}d` : "—"
+          }
+          foot="Só entregas fora do prazo"
+          chip="bg-red-100 text-red-700"
+        />
+        <KpiCard
+          icon={ShieldAlert}
+          label="Taxa de Sucata"
+          value={
+            production.scrapRatePct !== null
+              ? `${production.scrapRatePct.toFixed(1)}%`
+              : "—"
+          }
+          foot="Refugo sobre produção concluída"
+          chip="bg-orange-100 text-orange-700"
+        />
+        <KpiCard
+          icon={Gauge}
+          label="OEE Médio"
+          value={factoryOee !== null ? `${Math.round(factoryOee * 100)}%` : "—"}
+          foot="Disponibilidade × Performance × Qualidade"
+          chip="bg-sky-100 text-sky-700"
+        />
+        <KpiCard
+          icon={PackageX}
+          label="Paradas por Material"
+          value={String(production.materialBlockedCount)}
+          foot="Ordens sem stock suficiente para lançar"
+          chip="bg-amber-100 text-amber-700"
+        />
+      </div>
+
+      {production.wipByWorkstation.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
+              <Boxes size={16} className="text-slate-400" />
+              Valor de WIP por posto
+            </h2>
+            <span className="text-sm font-semibold text-slate-700">
+              {production.totalWipValueEur.toLocaleString("pt-PT", {
+                style: "currency",
+                currency: "EUR",
+                maximumFractionDigits: 0,
+              })}{" "}
+              total
+            </span>
+          </div>
+          <div className="flex flex-col gap-3">
+            {production.wipByWorkstation.map((ws) => {
+              const maxValue = Math.max(
+                1,
+                ...production.wipByWorkstation.map((w) => w.valueEur),
+              );
+              const width = (ws.valueEur / maxValue) * 100;
+              return (
+                <div key={ws.workstationId}>
+                  <div className="flex items-baseline justify-between gap-3 mb-1.5">
+                    <span className="font-medium text-slate-700 text-sm">
+                      {ws.workstationName}
+                    </span>
+                    <span className="text-sm font-semibold text-slate-700 shrink-0">
+                      {ws.valueEur.toLocaleString("pt-PT", {
+                        style: "currency",
+                        currency: "EUR",
+                        maximumFractionDigits: 0,
+                      })}
+                      <span className="text-xs text-slate-400 font-normal ml-1.5">
+                        {ws.orderCount}{" "}
+                        {ws.orderCount === 1 ? "ordem" : "ordens"}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-slate-400"
+                      style={{ width: `${width}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {chartData.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

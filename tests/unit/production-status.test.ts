@@ -12,6 +12,7 @@ import {
   deriveOrderStatusFromProduction,
   buildClientStages,
   computeOee,
+  computeWipValueByWorkstation,
 } from "@/services/production-status";
 import type { StepStatus } from "@/lib/types";
 
@@ -273,5 +274,90 @@ describe("computeOee", () => {
     expect(r.availability).toBeCloseTo(0.8);
     expect(r.performance).toBeCloseTo(0.75);
     expect(r.quality).toBeCloseTo(0.9);
+  });
+});
+
+describe("computeWipValueByWorkstation", () => {
+  it("values a work order at its remaining quantity times unit price, attributed to the current step's workstation", () => {
+    const result = computeWipValueByWorkstation([
+      {
+        quantityPlanned: 10,
+        quantityDone: 4,
+        unitPriceEur: 25,
+        steps: [
+          { sequence: 1, status: "done", workstationId: "ws1", workstationName: "Corte" },
+          { sequence: 2, status: "in_progress", workstationId: "ws2", workstationName: "Maquinação" },
+        ],
+      },
+    ]);
+    expect(result).toEqual([
+      { workstationId: "ws2", workstationName: "Maquinação", valueEur: 150, orderCount: 1 },
+    ]);
+  });
+
+  it("aggregates several work orders currently sitting at the same workstation", () => {
+    const result = computeWipValueByWorkstation([
+      {
+        quantityPlanned: 5,
+        quantityDone: 0,
+        unitPriceEur: 10,
+        steps: [{ sequence: 1, status: "pending", workstationId: "ws1", workstationName: "Corte" }],
+      },
+      {
+        quantityPlanned: 3,
+        quantityDone: 1,
+        unitPriceEur: 20,
+        steps: [{ sequence: 1, status: "pending", workstationId: "ws1", workstationName: "Corte" }],
+      },
+    ]);
+    expect(result).toEqual([
+      { workstationId: "ws1", workstationName: "Corte", valueEur: 90, orderCount: 2 },
+    ]);
+  });
+
+  it("sorts workstations by value descending", () => {
+    const result = computeWipValueByWorkstation([
+      {
+        quantityPlanned: 1,
+        quantityDone: 0,
+        unitPriceEur: 10,
+        steps: [{ sequence: 1, status: "pending", workstationId: "small", workstationName: "Pequeno" }],
+      },
+      {
+        quantityPlanned: 1,
+        quantityDone: 0,
+        unitPriceEur: 1000,
+        steps: [{ sequence: 1, status: "pending", workstationId: "big", workstationName: "Grande" }],
+      },
+    ]);
+    expect(result.map((w) => w.workstationId)).toEqual(["big", "small"]);
+  });
+
+  it("skips work orders with no active step (all steps done)", () => {
+    const result = computeWipValueByWorkstation([
+      {
+        quantityPlanned: 5,
+        quantityDone: 5,
+        unitPriceEur: 10,
+        steps: [{ sequence: 1, status: "done", workstationId: "ws1", workstationName: "Corte" }],
+      },
+    ]);
+    expect(result).toEqual([]);
+  });
+
+  it("never produces a negative value when quantityDone exceeds quantityPlanned", () => {
+    const result = computeWipValueByWorkstation([
+      {
+        quantityPlanned: 5,
+        quantityDone: 8,
+        unitPriceEur: 10,
+        steps: [{ sequence: 1, status: "in_progress", workstationId: "ws1", workstationName: "Corte" }],
+      },
+    ]);
+    expect(result[0].valueEur).toBe(0);
+  });
+
+  it("returns an empty array for no work orders", () => {
+    expect(computeWipValueByWorkstation([])).toEqual([]);
   });
 });

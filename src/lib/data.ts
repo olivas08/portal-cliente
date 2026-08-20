@@ -18,6 +18,7 @@ import type {
   WorkstationLoadVM,
   ScheduleWorkstationVM,
   WorkstationOeeVM,
+  ProductionKpisVM,
   ProductRoutingVM,
   NonConformityVM,
   OperatorVM,
@@ -45,6 +46,8 @@ import {
   computeOee,
   computeDiscrepancy,
   isMachineOnline,
+  computeWipValueByWorkstation,
+  type WipWorkOrderInput,
 } from "@/services/production-status";
 import {
   computeProductionSchedule,
@@ -946,6 +949,65 @@ export const getFactoryOee = unstable_cache(
   },
   ["factory-oee"],
   { tags: [CACHE_TAGS.workOrders], revalidate: false },
+);
+
+/**
+ * Factory-wide KPIs for the "Desempenho" dashboard: scrap rate (derived from
+ * the same quality figure used by OEE), work orders stuck for lack of
+ * material, and an estimate of WIP value sitting at each workstation.
+ */
+export const getProductionKpis = unstable_cache(
+  async (): Promise<ProductionKpisVM> => {
+  const [factoryOee, awaitingMaterials, products, workOrders] = await Promise.all([
+    getFactoryOee(),
+    getWorkOrdersAwaitingMaterials(),
+    getProducts(),
+    prisma.workOrder.findMany({
+      where: { status: { in: ["released", "in_progress"] } },
+      select: {
+        quantityPlanned: true,
+        quantityDone: true,
+        productRef: true,
+        steps: {
+          select: {
+            sequence: true,
+            status: true,
+            workstationId: true,
+            workstation: { select: { name: true } },
+          },
+          orderBy: { sequence: "asc" },
+        },
+      },
+    }),
+  ]);
+
+  const priceByRef = new Map(products.map((p) => [p.reference, p.unitPriceEur]));
+  const wipInputs: WipWorkOrderInput[] = workOrders.map((wo) => ({
+    quantityPlanned: wo.quantityPlanned,
+    quantityDone: wo.quantityDone,
+    unitPriceEur: priceByRef.get(wo.productRef) ?? 0,
+    steps: wo.steps.map((s) => ({
+      sequence: s.sequence,
+      status: s.status,
+      workstationId: s.workstationId,
+      workstationName: s.workstation.name,
+    })),
+  }));
+
+  const wipByWorkstation = computeWipValueByWorkstation(wipInputs);
+  const materialBlockedCount = awaitingMaterials.filter(
+    (wo) => wo.hasBom && !wo.canRelease,
+  ).length;
+
+  return {
+    scrapRatePct: factoryOee ? (1 - factoryOee.quality) * 100 : null,
+    materialBlockedCount,
+    wipByWorkstation,
+    totalWipValueEur: wipByWorkstation.reduce((sum, w) => sum + w.valueEur, 0),
+  };
+  },
+  ["production-kpis"],
+  { tags: [CACHE_TAGS.workOrders, CACHE_TAGS.materials, CACHE_TAGS.products], revalidate: false },
 );
 
 export const getOperatorsWithStats = unstable_cache(

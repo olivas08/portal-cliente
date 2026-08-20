@@ -20,6 +20,8 @@ export interface OrderKpis {
   avgLeadTimeDays: number | null;
   /** 0-100, share of delivered orders that met the agreed deadline. */
   onTimeDeliveryRate: number | null;
+  /** Average days late, across delivered orders that missed the agreed deadline (null when none were late). */
+  avgDelayDays: number | null;
   /** Chronological series (oldest first) for the "ao longo do tempo" trend. */
   monthly: MonthlyKpiPoint[];
 }
@@ -40,6 +42,14 @@ function onTimeRate(orders: OrderSummaryVM[]): number | null {
     (o) => o.deliveredDate && o.deliveredDate <= o.expectedDate
   ).length;
   return (onTime / orders.length) * 100;
+}
+
+/** Average days late across orders delivered after their expected date. */
+function avgDelay(orders: OrderSummaryVM[]): number | null {
+  const lateDays = orders
+    .filter((o) => o.deliveredDate && o.deliveredDate > o.expectedDate)
+    .map((o) => daysBetween(o.expectedDate, o.deliveredDate!));
+  return average(lateDays);
 }
 
 /**
@@ -88,6 +98,7 @@ export function computeOrderKpis(orders: OrderSummaryVM[]): OrderKpis {
     cancelledCount: cancelled.length,
     avgLeadTimeDays: average(leadTimes),
     onTimeDeliveryRate: onTimeRate(delivered),
+    avgDelayDays: avgDelay(delivered),
     monthly,
   };
 }

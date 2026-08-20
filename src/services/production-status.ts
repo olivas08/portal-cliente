@@ -307,3 +307,61 @@ export function computeShortfalls(
   }
   return shortfalls;
 }
+
+// ── WIP value ────────────────────────────────────────────────────────────────
+
+interface WipStepLike {
+  sequence: number;
+  status: StepStatus;
+  workstationId: string;
+  workstationName: string;
+}
+
+export interface WipWorkOrderInput {
+  quantityPlanned: number;
+  quantityDone: number;
+  unitPriceEur: number;
+  steps: WipStepLike[];
+}
+
+export interface WipByWorkstation {
+  workstationId: string;
+  workstationName: string;
+  valueEur: number;
+  orderCount: number;
+}
+
+/**
+ * Estimated monetary value of work-in-progress, grouped by the workstation
+ * where each work order currently sits (its first not-done step). The value
+ * of a work order is its remaining (not-yet-produced) quantity at the
+ * product's unit price — an estimate, not an accounting figure (it ignores
+ * partial material/labour cost already sunk into the piece).
+ */
+export function computeWipValueByWorkstation(
+  workOrders: WipWorkOrderInput[],
+): WipByWorkstation[] {
+  const byWorkstation = new Map<string, WipByWorkstation>();
+
+  for (const wo of workOrders) {
+    const active = currentStep(wo.steps);
+    if (!active) continue;
+    const remainingQty = Math.max(0, wo.quantityPlanned - wo.quantityDone);
+    const valueEur = remainingQty * wo.unitPriceEur;
+
+    const existing = byWorkstation.get(active.workstationId);
+    if (existing) {
+      existing.valueEur += valueEur;
+      existing.orderCount += 1;
+    } else {
+      byWorkstation.set(active.workstationId, {
+        workstationId: active.workstationId,
+        workstationName: active.workstationName,
+        valueEur,
+        orderCount: 1,
+      });
+    }
+  }
+
+  return [...byWorkstation.values()].sort((a, b) => b.valueEur - a.valueEur);
+}
