@@ -35,6 +35,7 @@ import {
   updateProduct,
   setProductActive,
   placeCatalogOrder,
+  importProducts,
 } from "@/actions/products";
 
 const admin = { user: { role: "ADMIN", id: "a1", name: "Sofia" } };
@@ -210,5 +211,72 @@ describe("placeCatalogOrder — pricing and integrity", () => {
   it("returns the new order id", async () => {
     const id = await placeCatalogOrder(validOrder);
     expect(id).toBe("o-new");
+  });
+});
+
+describe("importProducts action", () => {
+  beforeEach(() => {
+    prismaMock.product.findMany.mockResolvedValue([]);
+  });
+
+  it("rejects a client", async () => {
+    mockAuth.mockResolvedValue(client);
+    await expect(
+      importProducts([
+        { reference: "PROD-1", name: "Reservatório", description: "", unit: "un", unitPriceEur: 100, category: "" },
+      ]),
+    ).rejects.toThrow("Não autorizado.");
+    expect(prismaMock.product.create).not.toHaveBeenCalled();
+  });
+
+  it("creates new products, defaulting the description to the name when blank", async () => {
+    const res = await importProducts([
+      { reference: "PROD-1", name: "Reservatório 500L", description: "", unit: "un", unitPriceEur: 850, category: "" },
+    ]);
+    expect(res).toMatchObject({ created: 1, updated: 0, errors: [] });
+    expect(prismaMock.product.create).toHaveBeenCalledWith({
+      data: {
+        reference: "PROD-1",
+        name: "Reservatório 500L",
+        description: "Reservatório 500L",
+        unit: "un",
+        unitPriceEur: 850,
+        category: null,
+        active: true,
+      },
+    });
+  });
+
+  it("updates master fields (including price) of an existing product by reference", async () => {
+    prismaMock.product.findMany.mockResolvedValue([{ id: "p-existing", reference: "PROD-2" }]);
+    const res = await importProducts([
+      { reference: "PROD-2", name: "Novo nome", description: "Nova descrição", unit: "m", unitPriceEur: 42, category: "Tubagens" },
+    ]);
+    expect(res).toMatchObject({ created: 0, updated: 1, errors: [] });
+    expect(prismaMock.product.update).toHaveBeenCalledWith({
+      where: { id: "p-existing" },
+      data: {
+        name: "Novo nome",
+        description: "Nova descrição",
+        unit: "m",
+        unitPriceEur: 42,
+        category: "Tubagens",
+      },
+    });
+    expect(prismaMock.product.create).not.toHaveBeenCalled();
+  });
+
+  it("reports duplicate references within the same file as row errors", async () => {
+    const res = await importProducts([
+      { reference: "PROD-3", name: "A", description: "", unit: "un", unitPriceEur: 1, category: "" },
+      { reference: "PROD-3", name: "B", description: "", unit: "un", unitPriceEur: 1, category: "" },
+    ]);
+    expect(res).toMatchObject({ created: 1, updated: 0 });
+    expect(res.errors).toHaveLength(1);
+    expect(res.errors[0].message).toMatch(/duplicada/i);
+  });
+
+  it("rejects an empty batch via the zod schema", async () => {
+    await expect(importProducts([])).rejects.toThrow();
   });
 });

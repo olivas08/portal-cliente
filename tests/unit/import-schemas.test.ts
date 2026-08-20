@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseMaterialsCsv } from "@/lib/import-schemas";
+import { parseMaterialsCsv, parseProductsCsv } from "@/lib/import-schemas";
 
 describe("parseMaterialsCsv", () => {
   it("parses a well-formed CSV with Portuguese headers", () => {
@@ -70,5 +70,55 @@ describe("parseMaterialsCsv", () => {
     const { unmappedFields, results } = parseMaterialsCsv(csv);
     expect(unmappedFields).toEqual([]);
     expect(results[0]).toMatchObject({ ok: true, data: { reference: "MAT-040" } });
+  });
+});
+
+describe("parseProductsCsv", () => {
+  it("parses a well-formed CSV with Portuguese headers", () => {
+    const csv =
+      "referencia,nome,descricao,unidade,preco_unitario,categoria\n" +
+      "PROD-001,Reservatório inox 500L,Vertical em aço 304,un,850.00,Reservatórios\n";
+    const { unmappedFields, results } = parseProductsCsv(csv);
+    expect(unmappedFields).toEqual([]);
+    expect(results[0]).toMatchObject({
+      ok: true,
+      data: {
+        reference: "PROD-001",
+        name: "Reservatório inox 500L",
+        description: "Vertical em aço 304",
+        unit: "un",
+        unitPriceEur: 850,
+        category: "Reservatórios",
+      },
+    });
+  });
+
+  it("defaults description and category to empty string when absent", () => {
+    const csv = "referencia,nome,unidade,preco_unitario\nPROD-010,Perfil,un,10\n";
+    const { unmappedFields, results } = parseProductsCsv(csv);
+    expect(unmappedFields).toEqual([]);
+    expect(results[0]).toMatchObject({
+      ok: true,
+      data: { description: "", category: "" },
+    });
+  });
+
+  it("reports missing required columns (price is required for products)", () => {
+    const csv = "referencia,nome,unidade\nPROD-020,Perfil,un\n";
+    const { unmappedFields } = parseProductsCsv(csv);
+    expect(unmappedFields).toEqual(["unitPriceEur"]);
+  });
+
+  it("flags a negative price as an invalid row", () => {
+    const csv = "referencia,nome,unidade,preco_unitario\nPROD-030,Perfil,un,-5\n";
+    const { results } = parseProductsCsv(csv);
+    expect(results[0].ok).toBe(false);
+  });
+
+  it("accepts price header aliases (preco, price, pvp)", () => {
+    const csv = "ref,nome,unidade,pvp\nPROD-040,Perfil,un,25.5\n";
+    const { unmappedFields, results } = parseProductsCsv(csv);
+    expect(unmappedFields).toEqual([]);
+    expect(results[0]).toMatchObject({ ok: true, data: { unitPriceEur: 25.5 } });
   });
 });

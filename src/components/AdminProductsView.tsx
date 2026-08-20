@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Plus, Pencil, X, Package, ImageOff, Upload, Trash2 } from "lucide-react";
 import type { ProductVM } from "@/lib/types";
+import { ProductsImportModal } from "@/components/ProductsImportModal";
 import {
   createProduct,
   updateProduct,
@@ -200,12 +201,15 @@ export function AdminProductsView({ products, companies }: Props) {
             Catálogo que os clientes veem no portal
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-accent text-brand text-sm font-semibold rounded-lg hover:bg-accent-dark transition-colors"
-        >
-          <Plus size={16} /> Novo produto
-        </button>
+        <div className="flex items-center gap-2">
+          <ProductsImportModal />
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 px-4 py-2 bg-accent text-brand text-sm font-semibold rounded-lg hover:bg-accent-dark transition-colors"
+          >
+            <Plus size={16} /> Novo produto
+          </button>
+        </div>
       </div>
 
       {optimisticProducts.length === 0 ? (

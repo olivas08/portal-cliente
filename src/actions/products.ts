@@ -7,11 +7,16 @@ import {
   updateProduct as updateProductService,
   setProductActive as setProductActiveService,
   orderFromCatalog as orderFromCatalogService,
+  importProducts as importProductsService,
   productSchema,
   catalogOrderSchema,
   type ProductInput,
   type CatalogOrderInput,
 } from "@/services/products.service";
+import {
+  bulkImportProductsSchema,
+  type ProductImportRow,
+} from "@/lib/import-schemas";
 
 export async function createProduct(input: ProductInput) {
   await requireAdminArea("armazem");
@@ -52,4 +57,15 @@ export async function placeCatalogOrder(input: CatalogOrderInput) {
   revalidatePath("/dashboard");
   revalidatePath("/admin");
   return id;
+}
+
+/** Bulk import of catalog products from a parsed/validated CSV (see ProductsImportModal). */
+export async function importProducts(input: ProductImportRow[]) {
+  await requireAdminArea("armazem");
+  const data = bulkImportProductsSchema.parse(input);
+  const result = await importProductsService(data);
+
+  revalidatePath("/admin/produtos");
+  revalidatePath("/dashboard/catalogo");
+  return result;
 }

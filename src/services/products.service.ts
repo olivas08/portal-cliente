@@ -6,6 +6,11 @@ import { assertCompanyAccess, type SessionUser } from "@/lib/auth-guard";
 import { isClientRole } from "@/lib/roles";
 import { createWithReference } from "@/services/reference.service";
 import { notifyAdmins } from "@/services/notifications.service";
+import {
+  bulkImportProductsSchema,
+  type ProductImportRow,
+  type ImportProductsResult,
+} from "@/lib/import-schemas";
 
 const companyPriceSchema = z.object({
   companyId: z.string().trim().min(1),
@@ -195,4 +200,86 @@ export async function orderFromCatalog(
   });
 
   return order.id;
+}
+
+// ── Bulk import (CSV) ────────────────────────────────────────────────────────
+
+/**
+ * Bulk-creates/updates catalog products from a client's spreadsheet export.
+ * Matched by `reference`: existing products have their base fields (name,
+ * description, unit, price, category) updated in place — new products are
+ * created active by default. Per-company price overrides and images stay
+ * out of scope for the importer; those are edited one by one afterwards.
+ */
+export async function importProducts(
+  rows: ProductImportRow[],
+): Promise<ImportProductsResult> {
+  const data = bulkImportProductsSchema.parse(rows);
+
+  const result: ImportProductsResult = { created: 0, updated: 0, errors: [] };
+  const seenReferences = new Set<string>();
+
+  const existing = await prisma.product.findMany({
+    where: { reference: { in: data.map((r) => r.reference) } },
+    select: { id: true, reference: true },
+  });
+  const existingByRef = new Map(existing.map((p) => [p.reference, p.id]));
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    const rowNumber = i + 2; // +1 for header row, +1 for 1-based index
+    if (seenReferences.has(row.reference)) {
+      result.errors.push({
+        row: rowNumber,
+        reference: row.reference,
+        message: "Referência duplicada dentro do ficheiro.",
+      });
+      continue;
+    }
+    seenReferences.add(row.reference);
+
+    const description = row.description.trim() || row.name;
+    const category = row.category.trim() ? row.category.trim() : null;
+
+    try {
+      const existingId = existingByRef.get(row.reference);
+      if (existingId) {
+        await prisma.product.update({
+          where: { id: existingId },
+          data: {
+            name: row.name,
+            description,
+            unit: row.unit,
+            unitPriceEur: row.unitPriceEur,
+            category,
+          },
+        });
+        result.updated++;
+      } else {
+        await prisma.product.create({
+          data: {
+            reference: row.reference,
+            name: row.name,
+            description,
+            unit: row.unit,
+            unitPriceEur: row.unitPriceEur,
+            category,
+            active: true,
+          },
+        });
+        result.created++;
+      }
+    } catch {
+      result.errors.push({
+        row: rowNumber,
+        reference: row.reference,
+        message: "Erro ao gravar esta linha.",
+      });
+    }
+  }
+
+  if (result.created > 0 || result.updated > 0) {
+    invalidateCache(CACHE_TAGS.products);
+  }
+  return result;
 }
