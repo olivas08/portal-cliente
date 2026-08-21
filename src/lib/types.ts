@@ -243,6 +243,7 @@ export const INVOICE_PROVIDER_LABELS: Record<InvoiceProvider, string> = {
   moloni: "Moloni",
   vendus: "Vendus",
   primavera: "Primavera",
+  sage100: "Sage 100",
 };
 
 export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {

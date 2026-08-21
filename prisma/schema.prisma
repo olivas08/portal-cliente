@@ -319,6 +319,7 @@ enum InvoiceProvider {
   moloni
   vendus
   primavera
+  sage100
 }
 
 enum InvoiceStatus {

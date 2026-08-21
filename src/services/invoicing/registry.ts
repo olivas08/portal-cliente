@@ -3,6 +3,7 @@ import { createInvoiceXpressAdapter } from "@/services/invoicing/adapters/invoic
 import { createMoloniAdapter } from "@/services/invoicing/adapters/moloni";
 import { createVendusAdapter } from "@/services/invoicing/adapters/vendus";
 import { createPrimaveraAdapter } from "@/services/invoicing/adapters/primavera";
+import { createSage100Adapter } from "@/services/invoicing/adapters/sage100";
 import { AppError } from "@/lib/errors";
 import type { InvoiceProvider } from "@/lib/types";
 
@@ -11,6 +12,7 @@ const ADAPTER_FACTORIES: Record<InvoiceProvider, () => InvoiceProviderAdapter> =
   moloni: createMoloniAdapter,
   vendus: createVendusAdapter,
   primavera: createPrimaveraAdapter,
+  sage100: createSage100Adapter,
 };
 
 /**
@@ -40,7 +42,7 @@ export function getActiveInvoiceProvider(): InvoiceProviderAdapter {
   const name = getActiveInvoiceProviderName();
   if (!name) {
     throw new AppError(
-      "Nenhuma plataforma de faturação está configurada. Defina a variável de ambiente INVOICE_PROVIDER (invoicexpress, moloni, vendus ou primavera) e as respetivas credenciais.",
+      "Nenhuma plataforma de faturação está configurada. Defina a variável de ambiente INVOICE_PROVIDER (invoicexpress, moloni, vendus, primavera ou sage100) e as respetivas credenciais.",
     );
   }
   const adapter = getInvoiceProviderAdapter(name);
