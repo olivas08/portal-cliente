@@ -184,15 +184,17 @@ export function PortalNav({ name, company, isAdmin, role, notifications, unreadC
         </div>
       </header>
 
-      {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-slate-200 h-16 flex">
+      {/* Mobile bottom nav — horizontally scrollable so it scales to however
+          many items a role has (up to ~10 for a full admin) without icons/
+          labels clipping or being pushed off-screen. */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-slate-200 h-16 flex overflow-x-auto">
         {navLinks.map(({ to, label, icon: Icon }) => {
           const active = isActive(to);
           return (
             <Link
               key={to}
               href={to}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${
+              className={`flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors shrink-0 min-w-[68px] px-2 ${
                 active ? "text-accent-dark" : "text-slate-400"
               }`}
             >

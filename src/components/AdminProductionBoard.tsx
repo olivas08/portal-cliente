@@ -80,7 +80,7 @@ export function AdminProductionBoard({ workOrders, unplanned }: Props) {
     <>
       <BreadcrumbSetter text="Produção" />
 
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex flex-wrap items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center">
           <Factory size={20} className="text-white" />
         </div>
