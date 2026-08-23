@@ -3,7 +3,53 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+/**
+ * This script deletes and recreates the demo dataset from scratch. That's
+ * fine for a throwaway dev/test database, but catastrophic if `DATABASE_URL`
+ * ever points at a real deployment (e.g. a pilot factory's Supabase project)
+ * — "one deployment per factory" means there's no tenant scoping to save us,
+ * a reseed wipes *everything*. Require an explicit opt-in so this only ever
+ * runs when whoever/whatever invoked it actually meant to.
+ *
+ * e2e/global-setup.ts sets this automatically (E2E runs are always against a
+ * disposable test database). For manual `npm run db:seed`, set it yourself:
+ *   ALLOW_DESTRUCTIVE_SEED=true npm run db:seed        (bash)
+ *   $env:ALLOW_DESTRUCTIVE_SEED='true'; npm run db:seed (PowerShell)
+ */
+function assertSeedAllowed() {
+  if (process.env.ALLOW_DESTRUCTIVE_SEED === "true") return;
+
+  let host = "desconhecido";
+  try {
+    host = new URL(process.env.DATABASE_URL ?? "").hostname || host;
+  } catch {
+    // Leave host as "desconhecido" if DATABASE_URL is missing/malformed.
+  }
+
+  console.error(
+    [
+      "",
+      "🚫 Seed abortado: esta operação APAGA todos os dados existentes",
+      "   (empresas, utilizadores, encomendas, orçamentos, produção, etc.)",
+      "   e substitui-os pelo dataset de demonstração.",
+      "",
+      `   Base de dados alvo: ${host}`,
+      "",
+      "   Se tens a certeza de que esta é uma base de dados de",
+      "   desenvolvimento/teste descartável (nunca a de um deployment real",
+      "   de um cliente/piloto), corre novamente com:",
+      "",
+      "     ALLOW_DESTRUCTIVE_SEED=true npm run db:seed        (bash)",
+      "     $env:ALLOW_DESTRUCTIVE_SEED='true'; npm run db:seed (PowerShell)",
+      "",
+    ].join("\n"),
+  );
+  process.exit(1);
+}
+
 async function main() {
+  assertSeedAllowed();
+
   console.log("🌱 A limpar dados existentes...");
   await prisma.workOrderStep.deleteMany();
   await prisma.nonConformity.deleteMany();
@@ -74,6 +120,41 @@ async function main() {
       passwordHash: hash("pn2026"),
       role: "CLIENT",
       companyId: norte.id,
+    },
+  });
+
+  // Area-scoped admin accounts (one per AdminArea in src/lib/roles.ts) — used by
+  // RBAC E2E coverage and available for local dev/manual testing of area guards.
+  await prisma.user.create({
+    data: {
+      name: "Pedro Nogueira",
+      email: "producao@fabrica-demo.pt",
+      passwordHash: hash("producao2026"),
+      role: "PRODUCTION_MANAGER",
+    },
+  });
+  await prisma.user.create({
+    data: {
+      name: "Beatriz Lima",
+      email: "armazem@fabrica-demo.pt",
+      passwordHash: hash("armazem2026"),
+      role: "WAREHOUSE_MANAGER",
+    },
+  });
+  await prisma.user.create({
+    data: {
+      name: "Tiago Rocha",
+      email: "comercial@fabrica-demo.pt",
+      passwordHash: hash("comercial2026"),
+      role: "SALES_MANAGER",
+    },
+  });
+  await prisma.user.create({
+    data: {
+      name: "Inês Cardoso",
+      email: "qualidade@fabrica-demo.pt",
+      passwordHash: hash("qualidade2026"),
+      role: "QUALITY_MANAGER",
     },
   });
 

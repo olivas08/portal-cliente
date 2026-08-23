@@ -6,7 +6,13 @@ import { execSync } from "node:child_process";
  */
 export default async function globalSetup() {
   console.log("🌱 A re-semear a base de dados para os testes E2E...");
-  execSync("npx prisma db seed", { stdio: "inherit" });
+  // E2E runs are always against a disposable test database, so opt in to the
+  // seed script's destructive-reset guard on their behalf (see the comment
+  // above assertSeedAllowed() in prisma/seed.ts for why that guard exists).
+  execSync("npx prisma db seed", {
+    stdio: "inherit",
+    env: { ...process.env, ALLOW_DESTRUCTIVE_SEED: "true" },
+  });
 
   // The reseed above bypasses the app (raw Prisma), so any `unstable_cache`
   // entries (revalidate: false — see src/lib/data.ts) on an already-running

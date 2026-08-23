@@ -34,8 +34,13 @@ de administração gerir estados de encomendas e responder a requerimentos.
 3. Aplicar o schema e semear dados de demonstração:
    ```bash
    npm run db:migrate      # cria as tabelas (primeira migration)
-   npm run db:seed         # insere empresas, utilizadores, encomendas e requerimentos
+   ALLOW_DESTRUCTIVE_SEED=true npm run db:seed   # apaga tudo e insere dados de demo
    ```
+   `db:seed` apaga *todos* os dados existentes antes de recriar o dataset de
+   demonstração, por isso exige a variável `ALLOW_DESTRUCTIVE_SEED=true`
+   explícita (no PowerShell: `$env:ALLOW_DESTRUCTIVE_SEED='true'; npm run db:seed`).
+   Confirma sempre que o `DATABASE_URL` aponta para uma base de dados
+   descartável — nunca para o Supabase de um deployment real de um cliente.
 
 4. Correr em desenvolvimento:
    ```bash
