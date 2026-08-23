@@ -1,0 +1,17 @@
+# Excluded from the semantic index, but still readable when explicitly asked
+# for. Use this (rather than .cursorignore) for code that is occasionally
+# relevant but should not surface in repo-wide searches for the portal.
+
+# Standalone IoT edge gateway: own package.json/lockfile, ~4.6k lines of .mjs
+# adapters, simulators and demos. Unrelated to the Next.js portal.
+edge-gateway/
+
+# Static marketing page (plain HTML + images), no shared code with src/.
+landing/
+
+# Historical SQL migrations. prisma/schema.prisma is the source of truth;
+# indexing these mostly surfaces column names that no longer exist.
+prisma/migrations/
+
+# Binary deliverables (PDF guide, PNG diagram) — not searchable as text.
+docs/

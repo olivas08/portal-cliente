@@ -1,0 +1,63 @@
+---
+description: Next.js 16 breaking changes and this project's caching/routing conventions
+globs: src/**/*.{ts,tsx},next.config.ts
+alwaysApply: false
+---
+
+# Next.js 16.2 — what differs from training data
+
+This project runs Next.js **16.2.10** / React **19.2.4**, App Router, TypeScript strict.
+The points below are the changes that actually affect this codebase. If you need an
+API that is *not* covered here, read the matching file under
+`node_modules/next/dist/docs/` before writing code — but grep it first with
+`rg --no-ignore` (that tree is gitignored, so ripgrep skips it by default) and read
+only the relevant section. Several of those docs are 40–60 KB.
+
+## Async request APIs
+
+Synchronous access is fully removed in 16 — `params`, `searchParams`, `cookies()`,
+`headers()` and `draftMode()` are all Promises.
+
+```tsx
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+}
+```
+
+`npx next typegen` generates `PageProps<'/admin/ordens/[id]'>`, `LayoutProps` and
+`RouteContext` helpers if you prefer typed route params over hand-written shapes.
+
+## Caching and invalidation
+
+`unstable_cache` is still named `unstable_cache` — do not "fix" it. It wraps the
+read side in `src/lib/data.ts`.
+
+For the write side, **always invalidate through the `invalidateCache()` helper in
+`src/lib/cache-tags.ts`** and use a tag from the `CACHE_TAGS` registry rather than a
+string literal. Bare `revalidateTag(tag)` is deprecated in 16 and is a TypeScript
+error: it now takes a second argument (a `cacheLife` profile such as `'max'`, or an
+options object). The helper passes `{ expire: 0 }` so writes are visible on the very
+next read, which matters because some call sites (e.g. the machine ingest route
+handler) are not Server Actions.
+
+Also available in 16, both Server-Action-only: `updateTag(tag)` for read-your-writes
+semantics, and `refresh()` to refresh the client router. Prefer the existing
+`invalidateCache()` + `revalidatePath()` pattern for consistency unless you have a
+specific reason.
+
+`cacheLife` and `cacheTag` are now stable — import them without the `unstable_`
+prefix. `experimental.dynamicIO` and `experimental.useCache` were removed.
+
+## Routing
+
+`middleware.ts` is now **`proxy.ts`** — this project has `src/proxy.ts`, which
+re-exports the Auth.js handler and a route `matcher`. Do not create a `middleware.ts`.
+
+Parallel routes now require a `default.js`. `next/image` dropped
+`images.domains` in favour of `remotePatterns`.
+
+## Tooling
+
+Turbopack is the default for `next dev` and `next build`. The `next lint` command was
+removed: the `lint` script calls `eslint` directly, with flat config in
+`eslint.config.mjs`.
