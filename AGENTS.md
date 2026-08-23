@@ -10,6 +10,54 @@ Next.js 16.2 App Router + Server Actions, Prisma 6 / PostgreSQL (Supabase),
 Auth.js v5, Tailwind v4, TypeScript strict. UI copy and domain vocabulary are in
 **Portuguese** — match the surrounding language when adding strings.
 
+## What this app is
+
+**Operon** is a manufacturing operations platform for an industrial SME in
+Portugal: a shop-floor MES joined to a customer-facing portal, so an order is
+tracked from quote to invoice against what the machines actually produced. The
+repo name predates the MES half — the client portal is now one module of four
+(`src/lib/branding.ts` is the source of truth for the product/module names).
+
+| Module | Surface | Audience |
+|---|---|---|
+| Operon Core | `/admin` | Factory staff — production, warehouse, sales, quality |
+| Operon Station | `/producao/terminal` | Shop-floor operators, PIN login on a shared tablet (not portal session users) |
+| Operon Portal | `/dashboard` | The factory's client companies |
+| Operon Link | `edge-gateway/` → `/api/machine/ingest` | Machines — PLCs, CNCs, sensors |
+
+The spine of the domain: **orçamento** (quote, costed from material weight plus
+operation rates) → client accepts → **encomenda** (`Order`) → one `WorkOrder` per
+order line → one `WorkOrderStep` per workstation in the product's routing
+(**roteiro**) → operators run steps at the terminal while Link counts real
+output → quality and **não conformidades** → shipped → `Invoice`, issued through
+an external provider adapter.
+
+Nav vocabulary: Encomendas = `Order`, Orçamentos = `Quote`, Requerimentos =
+`Request` (a client-raised message thread — quote/complaint/info), Produção =
+work orders, planning and OEE, Armazém = materials, batches and traceability,
+Trabalhadores = `Operator`, Desempenho = KPIs.
+
+### Domain invariants
+
+- **Clients never see the factory floor.** No machine, operator or internal
+  station name may reach `/dashboard` — the portal shows only
+  `Workstation.clientStageLabel`, collapsed by `buildClientStages()`. Adding a
+  field to a client-facing VM is a disclosure decision, not a formatting one.
+- **For quantities, the machine is the source of truth.** What the operator
+  declared is kept next to the machine count and the divergence is surfaced
+  (`computeDiscrepancy`), never silently reconciled — that anti-tampering
+  guarantee is the whole point of Link.
+- **History is snapshotted, not joined.** `OrderItem`, `WorkOrder` and
+  `QuoteLineOperation` freeze reference, name and price at write time, so a sent
+  quote or a past order never drifts when the catalogue or a rate changes. Keep
+  that property when adding fields.
+- **One deployment per factory.** The tenant is configuration, not data: factory
+  identity comes from `NEXT_PUBLIC_TENANT_*` and the invoicing backend from
+  `INVOICE_PROVIDER`. Never hardcode a factory's name, address or provider.
+
+`README.md` covers only the original client portal (orders and requests) and
+predates production, quotes, warehouse and invoicing — prefer this file.
+
 ## How to apply the Next.js rule above
 
 The bundled docs are ~2.6 MB across 423 files, and single pages run to 60 KB. The
@@ -35,7 +83,7 @@ whole file.
 | `src/auth.ts`, `auth.config.ts`, `proxy.ts` | Auth.js setup; `proxy.ts` is the route guard (Next 16 renamed `middleware`) |
 | `prisma/schema.prisma` | Data model, source of truth (705 lines) |
 | `tests/unit/`, `e2e/` | Vitest unit tests; Playwright end-to-end |
-| `edge-gateway/` | Separate IoT gateway subproject (`.mjs`, own deps). Unrelated to the portal |
+| `edge-gateway/` | Operon Link — separate IoT gateway subproject (`.mjs`, own deps and tests, own `README.md`). MQTT stays inside the factory; the gateway forwards to `/api/machine/ingest` over HTTPS |
 
 ## Conventions
 
