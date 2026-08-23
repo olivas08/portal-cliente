@@ -1,3 +1,5 @@
+import * as Sentry from "@sentry/nextjs";
+
 /**
  * Domain error hierarchy. Server actions still throw these (the UI reads
  * `error.message` for toasts), but typing them lets us reason about failure
@@ -51,6 +53,7 @@ export async function guardAction<T = void>(
     return await fn();
   } catch (e) {
     if (e instanceof AppError) return { error: e.message };
+    Sentry.captureException(e);
     throw e;
   }
 }

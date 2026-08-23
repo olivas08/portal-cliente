@@ -102,3 +102,24 @@ armazenamento ainda não está configurado.
    `SUPABASE_SERVICE_ROLE_KEY`).
 3. O `postinstall` corre `prisma generate` automaticamente.
 4. Aplicar migrations em produção com `npx prisma migrate deploy` (via CI ou localmente contra a BD de produção).
+
+## Monitorização (gratuita)
+
+### Sentry (erros)
+
+1. Criar projeto em [sentry.io](https://sentry.io) (plano Developer gratuito).
+2. Definir na Vercel:
+   - `NEXT_PUBLIC_SENTRY_DSN` — DSN do projeto (Settings → Client Keys)
+   - `SENTRY_ORG` / `SENTRY_PROJECT` — slugs do org e projeto (para source maps no build)
+   - `SENTRY_AUTH_TOKEN` — opcional; token de org com scope `project:releases` para stack traces legíveis em produção
+3. Sem `NEXT_PUBLIC_SENTRY_DSN`, o SDK fica desactivado — a app funciona igual.
+
+### UptimeRobot (disponibilidade)
+
+1. Criar conta em [uptimerobot.com](https://uptimerobot.com) (plano gratuito: 50 monitores).
+2. Adicionar monitor HTTP(S) para `https://<dominio>/api/health` — esperar status **200** e corpo com `"ok": true`.
+3. Configurar alerta por email quando o endpoint devolve **503** (BD inacessível) ou timeout.
+
+### Supabase (base de dados)
+
+No dashboard do projeto: **Reports** (conexões, CPU) e **Advisors** (índices, RLS, queries lentas). Sem custo extra no plano actual.

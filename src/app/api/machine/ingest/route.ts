@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import {
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
     if (err instanceof RateLimitedError) {
       return NextResponse.json({ error: err.message }, { status: 429 });
     }
-    console.error("machine ingest error", err);
+    Sentry.captureException(err);
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
 }
