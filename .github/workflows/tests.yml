@@ -1,4 +1,4 @@
-name: E2E
+name: Run Tests
 
 on:
   pull_request:
@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 jobs:
-  e2e:
+  run-tests:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -34,6 +34,8 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      - run: npm test
 
       - run: npx playwright install --with-deps chromium
 
