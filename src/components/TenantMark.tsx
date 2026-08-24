@@ -1,12 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import { TENANT } from "@/lib/branding";
 
 /**
  * Discreet factory mark. Renders nothing when NEXT_PUBLIC_TENANT_LOGO is
- * unset (demo / preview). The Equiproin asset has a solid black background,
- * so we sit it on black rather than fighting the PNG.
+ * unset (demo / preview). Served as a plain <img> so Next's image optimizer
+ * cannot swap the src after first paint (which was hiding the logo).
  */
 export function TenantMark({
   size = "md",
@@ -15,7 +14,7 @@ export function TenantMark({
 }) {
   if (!TENANT.logo) return null;
 
-  const dims = size === "sm" ? { width: 96, height: 30 } : { width: 148, height: 46 };
+  const dims = size === "sm" ? { width: 110, height: 47 } : { width: 141, height: 60 };
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -24,15 +23,15 @@ export function TenantMark({
           Fábrica
         </p>
       )}
-      <div className="bg-black rounded-md px-2 py-1">
-        <Image
-          src={TENANT.logo}
-          alt={TENANT.name}
-          width={dims.width}
-          height={dims.height}
-          className="object-contain"
-        />
-      </div>
+      {/* Native img: the file is already a transparent PNG (141×60). */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={TENANT.logo}
+        alt={TENANT.name}
+        width={dims.width}
+        height={dims.height}
+        className="object-contain"
+      />
     </div>
   );
 }
