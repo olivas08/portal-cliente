@@ -24,24 +24,31 @@ export const PRODUCT = {
   icon: "/operon-icon.svg",
 } as const;
 
-const env = (key: string, fallback: string) =>
-  process.env[key]?.trim() ? (process.env[key] as string) : fallback;
+// Next.js only inlines `process.env.NEXT_PUBLIC_*` when the key is a
+// static member expression. `process.env[key]` works on the server but
+// is `undefined` in the client bundle — the factory mark would SSR and
+// then vanish on hydrate.
+const env = (value: string | undefined, fallback: string) =>
+  value?.trim() ? value : fallback;
 
 export const TENANT = {
-  name: env("NEXT_PUBLIC_TENANT_NAME", "Fábrica Demo"),
+  name: env(process.env.NEXT_PUBLIC_TENANT_NAME, "Fábrica Demo"),
   legalName: env(
-    "NEXT_PUBLIC_TENANT_LEGAL_NAME",
+    process.env.NEXT_PUBLIC_TENANT_LEGAL_NAME,
     "Fábrica Demo, Lda.",
   ),
-  logo: env("NEXT_PUBLIC_TENANT_LOGO", ""),
+  logo: env(process.env.NEXT_PUBLIC_TENANT_LOGO, ""),
   address: env(
-    "NEXT_PUBLIC_TENANT_ADDRESS",
+    process.env.NEXT_PUBLIC_TENANT_ADDRESS,
     "Zona Industrial de Vale de Cambra, Lote 12",
   ),
-  city: env("NEXT_PUBLIC_TENANT_CITY", "3730-100 Vale de Cambra · Portugal"),
-  nif: env("NEXT_PUBLIC_TENANT_NIF", "NIF: PT 500 123 456"),
+  city: env(
+    process.env.NEXT_PUBLIC_TENANT_CITY,
+    "3730-100 Vale de Cambra · Portugal",
+  ),
+  nif: env(process.env.NEXT_PUBLIC_TENANT_NIF, "NIF: PT 500 123 456"),
   contact: env(
-    "NEXT_PUBLIC_TENANT_CONTACT",
+    process.env.NEXT_PUBLIC_TENANT_CONTACT,
     "Tel: +351 256 000 000 | geral@fabrica-demo.pt",
   ),
 } as const;
