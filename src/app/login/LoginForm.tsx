@@ -3,8 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
-import { PRODUCT } from "@/lib/branding";
+import { AuthBrand } from "@/components/AuthBrand";
 import { Eye, EyeOff, Info, ShieldCheck } from "lucide-react";
 import { loginAction } from "@/actions/auth";
 
@@ -14,7 +13,11 @@ const CLIENT_ACCOUNTS = [
   { company: "Plásticos do Norte", email: "encomendas@plasticosnorte.pt", password: "pn2026" },
 ];
 
-export function LoginForm() {
+export function LoginForm({
+  showDemoAccounts = true,
+}: {
+  showDemoAccounts?: boolean;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -52,19 +55,7 @@ export function LoginForm() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center p-4 w-full">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center bg-white rounded-2xl mb-4 p-3 shadow-sm border border-slate-100">
-            <Image
-              src={PRODUCT.logo}
-              alt={PRODUCT.name}
-              width={200}
-              height={48}
-              className="object-contain"
-              priority
-            />
-          </div>
-          <p className="text-slate-500 text-sm mt-1">{PRODUCT.modules.portal}</p>
-        </div>
+        <AuthBrand />
 
         <div className="bg-white rounded-2xl shadow-lg p-8">
           <h2 className="text-lg font-semibold text-slate-800 mb-6">
@@ -149,6 +140,7 @@ export function LoginForm() {
           </p>
         </div>
 
+        {showDemoAccounts && (
         <div className="mt-4 bg-blue-50 border border-blue-100 rounded-xl overflow-hidden">
           <button
             onClick={() => setShowHints(!showHints)}
@@ -202,6 +194,7 @@ export function LoginForm() {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );

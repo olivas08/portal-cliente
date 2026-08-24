@@ -9,9 +9,14 @@ export default async function LoginPage() {
   if (session?.user) {
     redirect(isAdminRole(session.user.role) ? "/admin" : "/dashboard");
   }
+  // NODE_ENV is "production" on Vercel Preview too. VERCEL_ENV is
+  // "production" | "preview" | "development" — demo logins stay on
+  // Preview + local, never on the factory's production domain.
+  const showDemoAccounts = process.env.VERCEL_ENV !== "production";
+
   return (
     <Suspense>
-      <LoginForm />
+      <LoginForm showDemoAccounts={showDemoAccounts} />
     </Suspense>
   );
 }

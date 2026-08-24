@@ -7,6 +7,7 @@ import { LogOut, Package, MessageSquare, ShieldCheck, BarChart3, ShoppingCart, B
 import type { LucideIcon } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
 import { PRODUCT } from "@/lib/branding";
+import { TenantMark } from "@/components/TenantMark";
 import { useBreadcrumb } from "@/components/BreadcrumbContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import type { NotificationVM } from "@/lib/types";
@@ -110,6 +111,9 @@ export function PortalNav({ name, company, isAdmin, role, notifications, unreadC
           <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide leading-none">
             {isAdmin ? "Core" : "Portal"}
           </p>
+          <div className="mt-2">
+            <TenantMark size="sm" />
+          </div>
         </div>
 
         <nav className="flex-1 px-3 py-5 space-y-1">
