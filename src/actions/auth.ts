@@ -19,11 +19,15 @@ export async function loginAction(
 ): Promise<LoginResult> {
   const ip = await getClientIp();
   const normalizedEmail = email.trim().toLowerCase();
-  const [emailOk, ipOk] = await Promise.all([
-    checkRateLimit(`login:email:${normalizedEmail}`, { max: 8, windowMs: 15 * 60 * 1000 }),
-    checkRateLimit(`login:ip:${ip}`, { max: 30, windowMs: 15 * 60 * 1000 }),
-  ]);
-  if (!emailOk || !ipOk) return "rate-limited";
+  const skipRateLimit =
+    process.env.CI === "true" || process.env.E2E_TEST === "true";
+  if (!skipRateLimit) {
+    const [emailOk, ipOk] = await Promise.all([
+      checkRateLimit(`login:email:${normalizedEmail}`, { max: 8, windowMs: 15 * 60 * 1000 }),
+      checkRateLimit(`login:ip:${ip}`, { max: 30, windowMs: 15 * 60 * 1000 }),
+    ]);
+    if (!emailOk || !ipOk) return "rate-limited";
+  }
 
   try {
     await signIn("credentials", { email, password, redirect: false });

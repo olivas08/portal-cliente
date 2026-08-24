@@ -18,7 +18,8 @@ test.describe("Admin cria nova encomenda", () => {
     await dialog.getByPlaceholder("Preço €").fill("10");
     await dialog.getByRole("button", { name: "Criar Encomenda" }).click();
 
-    await expect(page).toHaveURL(/\/admin\/ordens\/.+/);
+    // Dev server + server action can be slow in CI; wait for navigation explicitly.
+    await page.waitForURL(/\/admin\/ordens\/.+/, { timeout: 15000 });
     await expect(
       page.getByRole("heading", { name: /^ENC-\d{4}-\d{3}$/ })
     ).toBeVisible();

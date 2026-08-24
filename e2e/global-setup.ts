@@ -1,4 +1,7 @@
 import { execSync } from "node:child_process";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 /**
  * Re-seeds the database before the E2E run so tests start from a known state.
@@ -13,6 +16,14 @@ export default async function globalSetup() {
     stdio: "inherit",
     env: { ...process.env, ALLOW_DESTRUCTIVE_SEED: "true" },
   });
+
+  // loginAction rate limits persist across the reseed (the seed wipes business
+  // data but not RateLimitAttempt). A full E2E run logs in many times — the
+  // admin account alone can hit the per-email cap (8 / 15 min) before the last
+  // specs run. Reset counters so each run starts clean.
+  await prisma.rateLimitAttempt.deleteMany();
+  console.log("🔓 Contadores de rate limit limpos para os testes E2E.");
+  await prisma.$disconnect();
 
   // The reseed above bypasses the app (raw Prisma), so any `unstable_cache`
   // entries (revalidate: false — see src/lib/data.ts) on an already-running
