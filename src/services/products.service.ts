@@ -194,6 +194,7 @@ export async function orderFromCatalog(
       },
     }),
   );
+  invalidateCache(CACHE_TAGS.orders);
 
   await notifyAdmins({
     type: "ORDER_CREATED",

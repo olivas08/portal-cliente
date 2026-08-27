@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import { assertCompanyAccess, requireUser } from "@/lib/auth-guard";
 import { isAdminRole } from "@/lib/roles";
 import { NotFoundError, UnauthorizedError } from "@/lib/errors";
@@ -92,6 +93,7 @@ export async function uploadOrderDocument(orderId: string, formData: FormData) {
         user.name ?? (isAdminRole(user.role) ? "Administração" : "Cliente"),
     },
   });
+  invalidateCache(CACHE_TAGS.orders);
 
   revalidatePath(`/admin/ordens/${orderId}`);
   revalidatePath(`/dashboard/ordens/${orderId}`);
@@ -114,6 +116,7 @@ export async function deleteOrderDocument(documentId: string) {
 
   await deleteDocumentFile(doc.storageKey);
   await prisma.orderDocument.delete({ where: { id: documentId } });
+  invalidateCache(CACHE_TAGS.orders);
 
   revalidatePath(`/admin/ordens/${doc.orderId}`);
   revalidatePath(`/dashboard/ordens/${doc.orderId}`);

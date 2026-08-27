@@ -224,6 +224,7 @@ export async function startStep(
 
   await dispatchOrderNotification(notify);
   invalidateCache(CACHE_TAGS.workOrders);
+  invalidateCache(CACHE_TAGS.orders);
 }
 
 /** Pauses a running step, banking the elapsed run time. */
@@ -346,5 +347,6 @@ export async function completeStep(
   await dispatchOrderNotification(notify.order);
   await dispatchStageNotification(notify.stage);
   invalidateCache(CACHE_TAGS.workOrders);
+  invalidateCache(CACHE_TAGS.orders);
   if (input.defect) invalidateCache(CACHE_TAGS.nonConformities);
 }

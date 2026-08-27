@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import { getBaseUrl } from "@/lib/url";
 import {
   sendOrderCancelledEmail,
@@ -91,6 +92,7 @@ export async function changeOrderStatus(
     where: { id: orderId },
     data: { status, ...dates },
   });
+  invalidateCache(CACHE_TAGS.orders);
 
   await notifyOrderStatusChange(
     existing.id,
@@ -142,6 +144,7 @@ export async function cancelOrder(
       deliveredDate: null,
     },
   });
+  invalidateCache(CACHE_TAGS.orders);
 
   if (isClient) {
     await notifyAdmins({
@@ -197,6 +200,7 @@ export async function reactivateOrder(orderId: string): Promise<void> {
       cancelledDate: null,
     },
   });
+  invalidateCache(CACHE_TAGS.orders);
 
   await notifyCompanyClients(existing.companyId, {
     type: "ORDER_STATUS",
@@ -241,6 +245,7 @@ export async function createOrder(data: CreateOrderInput): Promise<string> {
       },
     }),
   );
+  invalidateCache(CACHE_TAGS.orders);
 
   await notifyCompanyClients(data.companyId, {
     type: "ORDER_CREATED",
@@ -309,6 +314,7 @@ export async function reorderOrder(
       },
     }),
   );
+  invalidateCache(CACHE_TAGS.orders);
 
   await notifyAdmins({
     type: "ORDER_CREATED",

@@ -50,6 +50,8 @@ export async function updateCompanyFiscalInfo(
   });
 
   invalidateCache(CACHE_TAGS.companies);
+  // OrderVM embeds fiscal/billing fields; over-invalidating is safe.
+  invalidateCache(CACHE_TAGS.orders);
 
   return {
     taxId: updated.taxId,

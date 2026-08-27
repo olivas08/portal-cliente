@@ -268,6 +268,7 @@ export async function cancelWorkOrder(workOrderId: string): Promise<void> {
 
   await dispatchOrderNotification(notify);
   invalidateCache(CACHE_TAGS.workOrders);
+  invalidateCache(CACHE_TAGS.orders);
   invalidateCache(CACHE_TAGS.materials);
 }
 
@@ -333,5 +334,6 @@ export async function reopenWorkOrder(workOrderId: string): Promise<void> {
 
   await dispatchOrderNotification(notify);
   invalidateCache(CACHE_TAGS.workOrders);
+  invalidateCache(CACHE_TAGS.orders);
   invalidateCache(CACHE_TAGS.materials);
 }

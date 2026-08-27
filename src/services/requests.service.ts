@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import { AppError, NotFoundError } from "@/lib/errors";
 import { assertCompanyAccess, type ClientUser, type SessionUser } from "@/lib/auth-guard";
 import { isAdminRole } from "@/lib/roles";
@@ -63,6 +64,7 @@ export async function createRequest(
       },
     }),
   );
+  invalidateCache(CACHE_TAGS.requests);
 
   await notifyAdmins({
     type: "REQUEST_CREATED",
@@ -122,6 +124,7 @@ export async function addRequestMessage(
       data: { status: newStatus },
     }),
   ]);
+  invalidateCache(CACHE_TAGS.requests);
 
   if (isAdmin) {
     await notifyCompanyClients(
@@ -182,4 +185,5 @@ export async function updateRequestStatus(
     where: { id: requestId },
     data: { status },
   });
+  invalidateCache(CACHE_TAGS.requests);
 }

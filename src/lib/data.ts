@@ -174,32 +174,42 @@ function toRequestSummaryVM(r: RequestSummaryWith): RequestSummaryVM {
   };
 }
 
-export async function getOrdersForCompany(
-  companyId: string,
-): Promise<OrderSummaryVM[]> {
-  const orders = await prisma.order.findMany({
-    where: { companyId },
-    include: { items: true, company: true },
-    orderBy: { createdDate: "desc" },
-  });
-  return orders.map(toOrderSummaryVM);
-}
+export const getOrdersForCompany = unstable_cache(
+  async (companyId: string): Promise<OrderSummaryVM[]> => {
+    const orders = await prisma.order.findMany({
+      where: { companyId },
+      include: { items: true, company: true },
+      orderBy: { createdDate: "desc" },
+    });
+    return orders.map(toOrderSummaryVM);
+  },
+  ["orders-for-company"],
+  { tags: [CACHE_TAGS.orders], revalidate: false },
+);
 
-export async function getAllOrders(): Promise<OrderSummaryVM[]> {
-  const orders = await prisma.order.findMany({
-    include: { items: true, company: true },
-    orderBy: { createdDate: "desc" },
-  });
-  return orders.map(toOrderSummaryVM);
-}
+export const getAllOrders = unstable_cache(
+  async (): Promise<OrderSummaryVM[]> => {
+    const orders = await prisma.order.findMany({
+      include: { items: true, company: true },
+      orderBy: { createdDate: "desc" },
+    });
+    return orders.map(toOrderSummaryVM);
+  },
+  ["all-orders"],
+  { tags: [CACHE_TAGS.orders], revalidate: false },
+);
 
-export async function getOrderById(id: string): Promise<OrderVM | null> {
-  const order = await prisma.order.findUnique({
-    where: { id },
-    include: { items: true, documents: true, company: true },
-  });
-  return order ? toOrderVM(order) : null;
-}
+export const getOrderById = unstable_cache(
+  async (id: string): Promise<OrderVM | null> => {
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: { items: true, documents: true, company: true },
+    });
+    return order ? toOrderVM(order) : null;
+  },
+  ["order-by-id"],
+  { tags: [CACHE_TAGS.orders], revalidate: false },
+);
 
 export const getInvoiceForOrder = unstable_cache(
   async (orderId: string): Promise<InvoiceVM | null> => {
@@ -221,40 +231,50 @@ export const getInvoiceForOrder = unstable_cache(
   { tags: [CACHE_TAGS.invoices], revalidate: false },
 );
 
-export async function getRequestsForCompany(
-  companyId: string,
-): Promise<RequestSummaryVM[]> {
-  const requests = await prisma.request.findMany({
-    where: { companyId },
-    include: {
-      company: true,
-      messages: { orderBy: { date: "desc" }, take: 1 },
-      _count: { select: { messages: true } },
-    },
-    orderBy: { createdDate: "desc" },
-  });
-  return requests.map(toRequestSummaryVM);
-}
+export const getRequestsForCompany = unstable_cache(
+  async (companyId: string): Promise<RequestSummaryVM[]> => {
+    const requests = await prisma.request.findMany({
+      where: { companyId },
+      include: {
+        company: true,
+        messages: { orderBy: { date: "desc" }, take: 1 },
+        _count: { select: { messages: true } },
+      },
+      orderBy: { createdDate: "desc" },
+    });
+    return requests.map(toRequestSummaryVM);
+  },
+  ["requests-for-company"],
+  { tags: [CACHE_TAGS.requests], revalidate: false },
+);
 
-export async function getAllRequests(): Promise<RequestSummaryVM[]> {
-  const requests = await prisma.request.findMany({
-    include: {
-      company: true,
-      messages: { orderBy: { date: "desc" }, take: 1 },
-      _count: { select: { messages: true } },
-    },
-    orderBy: { createdDate: "desc" },
-  });
-  return requests.map(toRequestSummaryVM);
-}
+export const getAllRequests = unstable_cache(
+  async (): Promise<RequestSummaryVM[]> => {
+    const requests = await prisma.request.findMany({
+      include: {
+        company: true,
+        messages: { orderBy: { date: "desc" }, take: 1 },
+        _count: { select: { messages: true } },
+      },
+      orderBy: { createdDate: "desc" },
+    });
+    return requests.map(toRequestSummaryVM);
+  },
+  ["all-requests"],
+  { tags: [CACHE_TAGS.requests], revalidate: false },
+);
 
-export async function getRequestById(id: string): Promise<RequestVM | null> {
-  const request = await prisma.request.findUnique({
-    where: { id },
-    include: { messages: { orderBy: { date: "asc" } }, company: true },
-  });
-  return request ? toRequestVM(request) : null;
-}
+export const getRequestById = unstable_cache(
+  async (id: string): Promise<RequestVM | null> => {
+    const request = await prisma.request.findUnique({
+      where: { id },
+      include: { messages: { orderBy: { date: "asc" } }, company: true },
+    });
+    return request ? toRequestVM(request) : null;
+  },
+  ["request-by-id"],
+  { tags: [CACHE_TAGS.requests], revalidate: false },
+);
 
 function toQuoteLineVM(l: QuoteLine & { operations: QuoteLineOperation[] }): QuoteLineVM {
   return {
@@ -297,34 +317,46 @@ function toQuoteBase(q: Quote & { company: Company }) {
   };
 }
 
-export async function getQuotesForCompany(companyId: string): Promise<QuoteSummaryVM[]> {
-  const quotes = await prisma.quote.findMany({
-    where: { companyId, status: { not: "draft" } },
-    include: { company: true, _count: { select: { lines: true } } },
-    orderBy: { createdDate: "desc" },
-  });
-  return quotes.map((q) => ({ ...toQuoteBase(q), lineCount: q._count.lines }));
-}
+export const getQuotesForCompany = unstable_cache(
+  async (companyId: string): Promise<QuoteSummaryVM[]> => {
+    const quotes = await prisma.quote.findMany({
+      where: { companyId, status: { not: "draft" } },
+      include: { company: true, _count: { select: { lines: true } } },
+      orderBy: { createdDate: "desc" },
+    });
+    return quotes.map((q) => ({ ...toQuoteBase(q), lineCount: q._count.lines }));
+  },
+  ["quotes-for-company"],
+  { tags: [CACHE_TAGS.quotes], revalidate: false },
+);
 
-export async function getAllQuotes(): Promise<QuoteSummaryVM[]> {
-  const quotes = await prisma.quote.findMany({
-    include: { company: true, _count: { select: { lines: true } } },
-    orderBy: { createdDate: "desc" },
-  });
-  return quotes.map((q) => ({ ...toQuoteBase(q), lineCount: q._count.lines }));
-}
+export const getAllQuotes = unstable_cache(
+  async (): Promise<QuoteSummaryVM[]> => {
+    const quotes = await prisma.quote.findMany({
+      include: { company: true, _count: { select: { lines: true } } },
+      orderBy: { createdDate: "desc" },
+    });
+    return quotes.map((q) => ({ ...toQuoteBase(q), lineCount: q._count.lines }));
+  },
+  ["all-quotes"],
+  { tags: [CACHE_TAGS.quotes], revalidate: false },
+);
 
-export async function getQuoteById(id: string): Promise<QuoteVM | null> {
-  const quote = await prisma.quote.findUnique({
-    where: { id },
-    include: {
-      company: true,
-      lines: { include: { operations: true }, orderBy: { sequence: "asc" } },
-    },
-  });
-  if (!quote) return null;
-  return { ...toQuoteBase(quote), lines: quote.lines.map(toQuoteLineVM) };
-}
+export const getQuoteById = unstable_cache(
+  async (id: string): Promise<QuoteVM | null> => {
+    const quote = await prisma.quote.findUnique({
+      where: { id },
+      include: {
+        company: true,
+        lines: { include: { operations: true }, orderBy: { sequence: "asc" } },
+      },
+    });
+    if (!quote) return null;
+    return { ...toQuoteBase(quote), lines: quote.lines.map(toQuoteLineVM) };
+  },
+  ["quote-by-id"],
+  { tags: [CACHE_TAGS.quotes], revalidate: false },
+);
 
 export const getPricingSettingsVM = unstable_cache(
   async (): Promise<PricingSettingsVM> => {
@@ -576,9 +608,15 @@ export const getWorkstationsWithQueue = unstable_cache(
   { tags: [CACHE_TAGS.workOrders], revalidate: false },
 );
 
-export async function getTerminalQueue(
-  workstationId: string,
-): Promise<TerminalStepVM[]> {
+/**
+ * Shop-floor terminal queue for one workstation. Cached on the work-orders
+ * tag — this getter does not derive anything from `now`, so `revalidate:
+ * false` is safe. start/pause/complete in routing.service and
+ * work-orders.service already bust `workOrders`. Do not add a clock-derived
+ * field here without dropping the cache (see `getProductionSchedule`).
+ */
+export const getTerminalQueue = unstable_cache(
+  async (workstationId: string): Promise<TerminalStepVM[]> => {
   const steps = await prisma.workOrderStep.findMany({
     where: {
       workstationId,
@@ -619,26 +657,33 @@ export async function getTerminalQueue(
       if (a.priority !== b.priority) return a.priority === "urgent" ? -1 : 1;
       return a.orderReference.localeCompare(b.orderReference);
     });
-}
+  },
+  ["terminal-queue"],
+  { tags: [CACHE_TAGS.workOrders], revalidate: false },
+);
 
-export async function getOrdersWithoutProduction(): Promise<
-  { id: string; reference: string; clientCompany: string; itemCount: number }[]
-> {
-  const orders = await prisma.order.findMany({
-    where: {
-      status: { in: ["pending", "production"] },
-      items: { some: { workOrders: { none: {} } } },
-    },
-    include: { company: true, _count: { select: { items: true } } },
-    orderBy: { createdDate: "desc" },
-  });
-  return orders.map((o) => ({
-    id: o.id,
-    reference: o.reference,
-    clientCompany: o.company.name,
-    itemCount: o._count.items,
-  }));
-}
+export const getOrdersWithoutProduction = unstable_cache(
+  async (): Promise<
+    { id: string; reference: string; clientCompany: string; itemCount: number }[]
+  > => {
+    const orders = await prisma.order.findMany({
+      where: {
+        status: { in: ["pending", "production"] },
+        items: { some: { workOrders: { none: {} } } },
+      },
+      include: { company: true, _count: { select: { items: true } } },
+      orderBy: { createdDate: "desc" },
+    });
+    return orders.map((o) => ({
+      id: o.id,
+      reference: o.reference,
+      clientCompany: o.company.name,
+      itemCount: o._count.items,
+    }));
+  },
+  ["orders-without-production"],
+  { tags: [CACHE_TAGS.orders, CACHE_TAGS.workOrders], revalidate: false },
+);
 
 /**
  * Client-facing production summary for an order: abstracted stage stepper and
@@ -1079,6 +1124,14 @@ export const getOperatorsWithStats = unstable_cache(
   { tags: [CACHE_TAGS.operators, CACHE_TAGS.workOrders], revalidate: false },
 );
 
+/**
+ * Machine list with live state. `online` is derived from `now` via
+ * `isMachineOnline(lastSeenAt)`, so a machine can stay "online" in the UI
+ * after it drops until the next ingest (or other machines-tag write) busts
+ * this entry. Left as-is: ingest is frequent enough in production, and a
+ * short TTL / computing `online` outside the cache is a separate issue —
+ * do not "fix" it by dropping `revalidate: false` here without a TTL.
+ */
 export const getMachinesWithStatus = unstable_cache(
   async (): Promise<MachineVM[]> => {
   const now = new Date();
