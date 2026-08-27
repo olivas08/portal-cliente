@@ -5,7 +5,10 @@ import { assertCompanyAccess, type ClientUser, type SessionUser } from "@/lib/au
 import { isAdminRole } from "@/lib/roles";
 import { createWithReference } from "@/services/reference.service";
 import { notifyAdmins, notifyCompanyClients } from "@/services/notifications.service";
-import type { MessageFrom, RequestStatus } from "@/lib/types";
+import { sendRequestCreatedEmail, sendRequestMessageEmail } from "@/lib/email";
+import { adminEmails, companyClientEmails } from "@/lib/email-recipients";
+import { getBaseUrl } from "@/lib/url";
+import { REQUEST_TYPE_LABELS, type MessageFrom, type RequestStatus } from "@/lib/types";
 
 export const createRequestSchema = z.object({
   type: z.enum(["quote", "complaint", "info", "other"]),
@@ -68,6 +71,22 @@ export async function createRequest(
     href: `/admin/requerimentos/${request.id}`,
   });
 
+  try {
+    const to = await adminEmails();
+    if (to.length > 0) {
+      const baseUrl = await getBaseUrl();
+      await sendRequestCreatedEmail(to, {
+        reference: request.reference,
+        typeLabel: REQUEST_TYPE_LABELS[data.type],
+        subject: data.subject,
+        authorName: actor.name ?? "Cliente",
+        requestUrl: `${baseUrl}/admin/requerimentos/${request.id}`,
+      });
+    }
+  } catch (err) {
+    console.error("[requests] Falha ao notificar administradores por email:", err);
+  }
+
   return request.id;
 }
 
@@ -115,6 +134,19 @@ export async function addRequestMessage(
       },
       actor.id,
     );
+    try {
+      const to = await companyClientEmails(request.companyId);
+      if (to.length > 0) {
+        const baseUrl = await getBaseUrl();
+        await sendRequestMessageEmail(to, {
+          reference: request.reference,
+          audience: "client",
+          requestUrl: `${baseUrl}/dashboard/requerimentos/${requestId}`,
+        });
+      }
+    } catch (err) {
+      console.error("[requests] Falha ao notificar cliente por email:", err);
+    }
   } else {
     await notifyAdmins(
       {
@@ -125,6 +157,20 @@ export async function addRequestMessage(
       },
       actor.id,
     );
+    try {
+      const to = await adminEmails();
+      if (to.length > 0) {
+        const baseUrl = await getBaseUrl();
+        await sendRequestMessageEmail(to, {
+          reference: request.reference,
+          audience: "admin",
+          authorName: actor.name ?? undefined,
+          requestUrl: `${baseUrl}/admin/requerimentos/${requestId}`,
+        });
+      }
+    } catch (err) {
+      console.error("[requests] Falha ao notificar administradores por email:", err);
+    }
   }
 }
 

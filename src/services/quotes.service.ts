@@ -5,6 +5,9 @@ import { NotFoundError, AppError } from "@/lib/errors";
 import { assertCompanyAccess, type SessionUser } from "@/lib/auth-guard";
 import { createWithReference } from "@/services/reference.service";
 import { notifyAdmins, notifyCompanyClients } from "@/services/notifications.service";
+import { sendQuoteDecisionEmail, sendQuoteSentEmail } from "@/lib/email";
+import { adminEmails, companyClientEmails } from "@/lib/email-recipients";
+import { getBaseUrl } from "@/lib/url";
 import type { PricingSettings, Quote, QuoteLine, OperationType } from "@prisma/client";
 
 // ── Schemas ─────────────────────────────────────────────────────────────────
@@ -346,6 +349,21 @@ export async function sendQuote(id: string): Promise<void> {
     body: `Recebeu um novo orçamento: ${quote.subject}.`,
     href: `/dashboard/orcamentos/${quote.id}`,
   });
+
+  try {
+    const to = await companyClientEmails(quote.companyId);
+    if (to.length > 0) {
+      const baseUrl = await getBaseUrl();
+      await sendQuoteSentEmail(to, {
+        reference: quote.reference,
+        subject: quote.subject,
+        totalEur: quote.totalEur,
+        quoteUrl: `${baseUrl}/dashboard/orcamentos/${quote.id}`,
+      });
+    }
+  } catch (err) {
+    console.error("[quotes] Falha ao notificar cliente por email:", err);
+  }
 }
 
 // ── Client: accept / reject ─────────────────────────────────────────────────
@@ -418,6 +436,22 @@ export async function decideQuote(
     body: `${quote.company.name} ${decision === "accepted" ? "aceitou" : "recusou"} o orçamento "${quote.subject}".`,
     href: `/admin/orcamentos/${quote.id}`,
   });
+
+  try {
+    const to = await adminEmails();
+    if (to.length > 0) {
+      const baseUrl = await getBaseUrl();
+      await sendQuoteDecisionEmail(to, {
+        reference: quote.reference,
+        subject: quote.subject,
+        companyName: quote.company.name,
+        decision,
+        quoteUrl: `${baseUrl}/admin/orcamentos/${quote.id}`,
+      });
+    }
+  } catch (err) {
+    console.error("[quotes] Falha ao notificar administradores por email:", err);
+  }
 
   return orderId;
 }

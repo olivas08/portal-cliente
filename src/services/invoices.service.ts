@@ -4,6 +4,9 @@ import { NotFoundError, AppError } from "@/lib/errors";
 import { getActiveInvoiceProvider } from "@/services/invoicing/registry";
 import type { InvoiceDraft } from "@/services/invoicing/types";
 import type { InvoiceVM } from "@/lib/types";
+import { sendInvoiceIssuedEmail } from "@/lib/email";
+import { companyClientEmails } from "@/lib/email-recipients";
+import { getBaseUrl } from "@/lib/url";
 
 /**
  * Issues the real fiscal invoice for a delivered order through whichever
@@ -81,6 +84,23 @@ export async function issueInvoice(orderId: string): Promise<InvoiceVM> {
       },
     });
     invalidateCache(CACHE_TAGS.invoices);
+
+    try {
+      const to = await companyClientEmails(order.companyId);
+      if (to.length > 0) {
+        const baseUrl = await getBaseUrl();
+        await sendInvoiceIssuedEmail(to, {
+          orderReference: order.reference,
+          invoiceNumber: record.number,
+          totalEur: record.totalEur,
+          pdfUrl: record.pdfUrl,
+          orderUrl: `${baseUrl}/dashboard/ordens/${order.id}`,
+        });
+      }
+    } catch (err) {
+      console.error("[invoices] Falha ao notificar cliente por email:", err);
+    }
+
     return toInvoiceVM(record);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro desconhecido ao emitir a fatura.";

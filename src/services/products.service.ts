@@ -6,6 +6,9 @@ import { assertCompanyAccess, type SessionUser } from "@/lib/auth-guard";
 import { isClientRole } from "@/lib/roles";
 import { createWithReference } from "@/services/reference.service";
 import { notifyAdmins } from "@/services/notifications.service";
+import { sendOrderCreatedEmail } from "@/lib/email";
+import { adminEmails } from "@/lib/email-recipients";
+import { getBaseUrl } from "@/lib/url";
 import {
   bulkImportProductsSchema,
   type ProductImportRow,
@@ -198,6 +201,21 @@ export async function orderFromCatalog(
     body: `${company?.name ?? "Um cliente"} encomendou a partir do catálogo.`,
     href: `/admin/ordens/${order.id}`,
   });
+
+  try {
+    const to = await adminEmails();
+    if (to.length > 0) {
+      const baseUrl = await getBaseUrl();
+      await sendOrderCreatedEmail(to, {
+        reference: order.reference,
+        audience: "admin",
+        companyName: company?.name ?? undefined,
+        orderUrl: `${baseUrl}/admin/ordens/${order.id}`,
+      });
+    }
+  } catch (err) {
+    console.error("[products] Falha ao notificar administradores por email:", err);
+  }
 
   return order.id;
 }

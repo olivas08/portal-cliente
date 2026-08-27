@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getBaseUrl } from "@/lib/url";
-import { sendOrderStatusUpdateEmail } from "@/lib/email";
+import {
+  sendOrderCancelledEmail,
+  sendOrderCreatedEmail,
+  sendOrderReactivatedEmail,
+  sendOrderStatusUpdateEmail,
+} from "@/lib/email";
+import { adminEmails, companyClientEmails } from "@/lib/email-recipients";
 import { ORDER_STATUS_LABELS, type OrderStatus } from "@/lib/types";
 import { NotFoundError, AppError } from "@/lib/errors";
 import { assertCompanyAccess, type SessionUser } from "@/lib/auth-guard";
@@ -144,12 +150,29 @@ export async function cancelOrder(
       body: `${actor.name ?? "O cliente"} anulou a encomenda: ${reason}`,
       href: `/admin/ordens/${existing.id}`,
     });
+    await emailAdminsSafely(async (to, baseUrl) => {
+      await sendOrderCancelledEmail(to, {
+        reference: existing.reference,
+        reason,
+        cancelledBy: "client",
+        actorName: actor.name ?? undefined,
+        orderUrl: `${baseUrl}/admin/ordens/${existing.id}`,
+      });
+    });
   } else {
     await notifyCompanyClients(existing.companyId, {
       type: "ORDER_STATUS",
       title: `Encomenda ${existing.reference} cancelada`,
       body: `A fábrica cancelou a encomenda: ${reason}`,
       href: `/dashboard/ordens/${existing.id}`,
+    });
+    await emailCompanyClientsSafely(existing.companyId, async (to, baseUrl) => {
+      await sendOrderCancelledEmail(to, {
+        reference: existing.reference,
+        reason,
+        cancelledBy: "factory",
+        orderUrl: `${baseUrl}/dashboard/ordens/${existing.id}`,
+      });
     });
   }
 }
@@ -180,6 +203,12 @@ export async function reactivateOrder(orderId: string): Promise<void> {
     title: `Encomenda ${existing.reference} reaberta`,
     body: "A encomenda foi reativada e está novamente pendente.",
     href: `/dashboard/ordens/${existing.id}`,
+  });
+  await emailCompanyClientsSafely(existing.companyId, async (to, baseUrl) => {
+    await sendOrderReactivatedEmail(to, {
+      reference: existing.reference,
+      orderUrl: `${baseUrl}/dashboard/ordens/${existing.id}`,
+    });
   });
 }
 
@@ -218,6 +247,13 @@ export async function createOrder(data: CreateOrderInput): Promise<string> {
     title: `Nova encomenda ${order.reference}`,
     body: "Foi registada uma nova encomenda no portal.",
     href: `/dashboard/ordens/${order.id}`,
+  });
+  await emailCompanyClientsSafely(data.companyId, async (to, baseUrl) => {
+    await sendOrderCreatedEmail(to, {
+      reference: order.reference,
+      audience: "client",
+      orderUrl: `${baseUrl}/dashboard/ordens/${order.id}`,
+    });
   });
 
   return order.id;
@@ -280,12 +316,20 @@ export async function reorderOrder(
     body: `${source.company?.name ?? "Um cliente"} solicitou uma nova encomenda.`,
     href: `/admin/ordens/${order.id}`,
   });
+  await emailAdminsSafely(async (to, baseUrl) => {
+    await sendOrderCreatedEmail(to, {
+      reference: order.reference,
+      audience: "admin",
+      companyName: source.company?.name ?? undefined,
+      orderUrl: `${baseUrl}/admin/ordens/${order.id}`,
+    });
+  });
 
   return order.id;
 }
 
 /**
- * Best-effort notification to the company's main client user. Email delivery
+ * Best-effort notification to the company's client users. Email delivery
  * must never break the admin's status-update flow, so any failure (missing
  * user, missing email, Resend error) is only logged.
  */
@@ -295,20 +339,36 @@ async function notifyOrderStatusChange(
   reference: string,
   status: OrderStatus,
 ): Promise<void> {
-  try {
-    const clientUser = await prisma.user.findFirst({
-      where: { companyId, role: "CLIENT" },
-      orderBy: { createdAt: "asc" },
-    });
-    if (!clientUser?.email) return;
-
-    const baseUrl = await getBaseUrl();
-    await sendOrderStatusUpdateEmail(clientUser.email, {
+  await emailCompanyClientsSafely(companyId, async (to, baseUrl) => {
+    await sendOrderStatusUpdateEmail(to, {
       reference,
       statusLabel: ORDER_STATUS_LABELS[status],
       orderUrl: `${baseUrl}/dashboard/ordens/${orderId}`,
     });
+  });
+}
+
+async function emailCompanyClientsSafely(
+  companyId: string,
+  send: (to: string[], baseUrl: string) => Promise<void>,
+): Promise<void> {
+  try {
+    const to = await companyClientEmails(companyId);
+    if (to.length === 0) return;
+    await send(to, await getBaseUrl());
   } catch (err) {
     console.error("[orders] Falha ao notificar cliente por email:", err);
+  }
+}
+
+async function emailAdminsSafely(
+  send: (to: string[], baseUrl: string) => Promise<void>,
+): Promise<void> {
+  try {
+    const to = await adminEmails();
+    if (to.length === 0) return;
+    await send(to, await getBaseUrl());
+  } catch (err) {
+    console.error("[orders] Falha ao notificar administradores por email:", err);
   }
 }

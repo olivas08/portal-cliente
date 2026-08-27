@@ -32,6 +32,9 @@ vi.mock("next/cache", () => ({
 vi.mock("@/lib/url", () => ({ getBaseUrl: mockGetBaseUrl }));
 vi.mock("@/lib/email", () => ({
   sendOrderStatusUpdateEmail: mockSendOrderStatusUpdateEmail,
+  sendOrderCancelledEmail: vi.fn(),
+  sendOrderReactivatedEmail: vi.fn(),
+  sendOrderCreatedEmail: vi.fn(),
 }));
 
 import {
@@ -67,6 +70,9 @@ beforeEach(() => {
     id: "u2",
     email: "cliente@empresa.pt",
   });
+  prismaMock.user.findMany.mockResolvedValue([
+    { id: "u2", email: "cliente@empresa.pt" },
+  ]);
   mockGetBaseUrl.mockResolvedValue("https://portal.example.com");
   mockSendOrderStatusUpdateEmail.mockResolvedValue(undefined);
 });
@@ -135,14 +141,15 @@ describe("updateOrderStatus — status transitions", () => {
 describe("updateOrderStatus — client notification email", () => {
   beforeEach(() => mockAuth.mockResolvedValue(adminSession));
 
-  it("emails the company's first CLIENT user with the new status", async () => {
+  it("emails the company's client users with the new status", async () => {
     await updateOrderStatus("o1", "shipped");
-    expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
-      where: { companyId: "c1", role: "CLIENT" },
-      orderBy: { createdAt: "asc" },
-    });
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ companyId: "c1" }),
+      }),
+    );
     expect(mockSendOrderStatusUpdateEmail).toHaveBeenCalledWith(
-      "cliente@empresa.pt",
+      ["cliente@empresa.pt"],
       {
         reference: "ENC-2026-001",
         statusLabel: "Expedido",
@@ -151,8 +158,8 @@ describe("updateOrderStatus — client notification email", () => {
     );
   });
 
-  it("does not email when the company has no CLIENT user", async () => {
-    prismaMock.user.findFirst.mockResolvedValue(null);
+  it("does not email when the company has no client users", async () => {
+    prismaMock.user.findMany.mockResolvedValue([]);
     await updateOrderStatus("o1", "shipped");
     expect(mockSendOrderStatusUpdateEmail).not.toHaveBeenCalled();
   });
