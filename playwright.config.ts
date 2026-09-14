@@ -10,9 +10,11 @@ export default defineConfig({
     ? [["list"], ["html", { open: "never" }]]
     : "list",
   globalSetup: "./e2e/global-setup.ts",
+  timeout: process.env.CI ? 60_000 : 30_000,
   use: {
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
+    navigationTimeout: process.env.CI ? 45_000 : 30_000,
   },
   projects: [
     {

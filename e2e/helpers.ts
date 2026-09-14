@@ -16,7 +16,7 @@ export async function login(
   account: { email: string; password: string },
   expectedPath: string | RegExp
 ) {
-  await page.goto("/login");
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
   await page.locator('input[type="email"]').fill(account.email);
   await page.locator('input[type="password"]').fill(account.password);
   await page.getByRole("button", { name: "Entrar" }).click();
@@ -25,6 +25,7 @@ export async function login(
       ? expectedPath
       : new RegExp(`${expectedPath}(/|$)`);
   await expect(page).toHaveURL(pattern);
+  await page.waitForLoadState("domcontentloaded");
 }
 
 /** Logs an operator in at the shop-floor terminal via the PIN keypad. */

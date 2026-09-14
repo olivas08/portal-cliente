@@ -53,7 +53,8 @@ test.describe("Gestão de utilizadores", () => {
     const email = `e2e-client-${Date.now()}@exemplo.pt`;
 
     await login(page, ACCOUNTS.admin, "/admin");
-    await page.goto("/admin/clientes");
+    await page.goto("/admin/clientes", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Clientes" })).toBeVisible();
 
     await page.getByRole("button", { name: "Novo cliente" }).click();
     await page.getByPlaceholder("Ex: Metalúrgica Silva, Lda.").fill(company);
