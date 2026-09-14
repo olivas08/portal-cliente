@@ -46,4 +46,23 @@ test.describe("Gestão de utilizadores", () => {
     await expect(userCard.getByText(email)).toBeVisible();
     await expect(userCard.getByText("Produção")).toBeVisible();
   });
+
+  test("admin de fábrica cria um cliente e envia o convite", async ({ page }) => {
+    const company = `Cliente E2E ${Date.now()}`;
+    const name = `Contacto E2E ${Date.now()}`;
+    const email = `e2e-client-${Date.now()}@exemplo.pt`;
+
+    await login(page, ACCOUNTS.admin, "/admin");
+    await page.goto("/admin/clientes");
+
+    await page.getByRole("button", { name: "Novo cliente" }).click();
+    await page.getByPlaceholder("Ex: Metalúrgica Silva, Lda.").fill(company);
+    await page.getByPlaceholder("Ex: Ana Silva").fill(name);
+    await page.getByPlaceholder("Ex: ana@silva.pt").fill(email);
+    await page.getByRole("button", { name: "Enviar convite" }).click();
+
+    await expect(page.getByRole("heading", { name: company })).toBeVisible();
+    await expect(page.getByText(email)).toBeVisible();
+    await expect(page.getByText("Convite pendente")).toBeVisible();
+  });
 });

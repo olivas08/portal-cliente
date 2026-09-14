@@ -7,6 +7,8 @@ const { prismaMock, mockHash, mockSendInvite, mockGetBaseUrl, mockCreateResetTok
       create: vi.fn(),
       update: vi.fn(),
     },
+    $transaction: vi.fn(),
+    company: { findUnique: vi.fn(), create: vi.fn() },
   },
   mockHash: vi.fn(),
   mockSendInvite: vi.fn(),
@@ -19,8 +21,13 @@ vi.mock("@/lib/email", () => ({ sendInviteEmail: mockSendInvite }));
 vi.mock("@/lib/url", () => ({ getBaseUrl: mockGetBaseUrl }));
 vi.mock("@/lib/reset-token", () => ({ createResetToken: mockCreateResetToken }));
 vi.mock("bcryptjs", () => ({ default: { hash: mockHash } }));
+vi.mock("next/cache", () => ({
+  revalidateTag: vi.fn(),
+  revalidatePath: vi.fn(),
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
+}));
 
-import { inviteUser, setUserActive } from "@/services/users.service";
+import { inviteUser, onboardClientCompany, setUserActive } from "@/services/users.service";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -28,6 +35,7 @@ beforeEach(() => {
   mockGetBaseUrl.mockResolvedValue("https://portal.example.com");
   mockCreateResetToken.mockResolvedValue("raw-token");
   prismaMock.user.findUnique.mockResolvedValue(null);
+  prismaMock.company.findUnique.mockResolvedValue({ id: "c1" });
 });
 
 describe("inviteUser", () => {
@@ -81,6 +89,57 @@ describe("inviteUser", () => {
       inviterName: "Admin da Empresa",
     });
     expect(result.active).toBe(false);
+  });
+});
+
+describe("onboardClientCompany", () => {
+  it("rejects an email that already has an account", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ id: "u-existing" });
+    await expect(
+      onboardClientCompany({
+        companyName: "Silva Lda.",
+        contactName: "Ana Silva",
+        email: "ana@silva.pt",
+        inviterName: "Admin",
+      }),
+    ).rejects.toThrow("Já existe uma conta com este email.");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("creates the company and an inactive CLIENT, then emails the invite", async () => {
+    const createdUser = {
+      id: "u-new",
+      name: "Ana Silva",
+      email: "ana@silva.pt",
+      role: "CLIENT" as const,
+      active: false,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    };
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) =>
+      fn({
+        company: {
+          create: vi.fn().mockResolvedValue({ id: "c-new", name: "Silva Lda." }),
+        },
+        user: { create: vi.fn().mockResolvedValue(createdUser) },
+      }),
+    );
+
+    const result = await onboardClientCompany({
+      companyName: "Silva Lda.",
+      contactName: "Ana Silva",
+      email: "ANA@Silva.PT",
+      inviterName: "Administração",
+    });
+
+    expect(result.companyId).toBe("c-new");
+    expect(result.user.role).toBe("CLIENT");
+    expect(result.user.active).toBe(false);
+    expect(mockSendInvite).toHaveBeenCalledWith("ana@silva.pt", {
+      name: "Ana Silva",
+      roleLabel: "Administrador da empresa",
+      setupUrl: "https://portal.example.com/reset-password?token=raw-token",
+      inviterName: "Administração",
+    });
   });
 });
 

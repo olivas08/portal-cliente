@@ -39,6 +39,7 @@ import type {
   MaintenancePlanVM,
   MaintenanceTaskVM,
   InvoiceVM,
+  ClientCompanyVM,
 } from "@/lib/types";
 import { STOCK_REASON_LABELS } from "@/lib/types";
 import { toIsoDate } from "@/lib/dates";
@@ -415,6 +416,26 @@ export const getCompanies = unstable_cache(
   { tags: [CACHE_TAGS.companies], revalidate: false },
 );
 
+export const getClientCompanies = unstable_cache(
+  async (): Promise<ClientCompanyVM[]> => {
+    const companies = await prisma.company.findMany({
+      orderBy: { name: "asc" },
+      include: {
+        users: {
+          orderBy: { createdAt: "asc" },
+          select: { id: true, name: true, email: true, role: true, active: true },
+        },
+      },
+    });
+    return companies.map((c) => ({
+      id: c.id,
+      name: c.name,
+      users: c.users,
+    }));
+  },
+  ["client-companies"],
+  { tags: [CACHE_TAGS.companies], revalidate: false },
+);
 
 export const getProducts = unstable_cache(
   async (): Promise<ProductVM[]> => {

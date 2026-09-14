@@ -22,8 +22,8 @@ export function RegisterForm() {
           </h2>
           <p className="text-sm text-slate-600 leading-relaxed">
             O acesso ao portal é concedido pela fábrica. Se a sua empresa já é
-            cliente, peça a um administrador que envie o convite para o seu
-            email — recebe um link para definir a palavra-passe.
+            cliente, peça à fábrica um convite para o seu email — recebe um
+            link para definir a palavra-passe.
           </p>
           <p className="text-sm text-slate-500 mt-3 flex items-start gap-2">
             <Mail size={16} className="mt-0.5 shrink-0" />

@@ -22,6 +22,21 @@ export type MaintenanceStatus = $Enums.MaintenanceStatus;
 export type InvoiceProvider = $Enums.InvoiceProvider;
 export type InvoiceStatus = $Enums.InvoiceStatus;
 export type MachineState = $Enums.MachineState;
+export type Role = $Enums.Role;
+
+export interface ClientCompanyUserVM {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  active: boolean;
+}
+
+export interface ClientCompanyVM {
+  id: string;
+  name: string;
+  users: ClientCompanyUserVM[];
+}
 
 export interface NotificationVM {
   id: string;

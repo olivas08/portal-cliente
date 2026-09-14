@@ -113,9 +113,10 @@ Pure helpers live next to their IO services but without a `.service` suffix:
 `production/*.service.ts` and `production/maintenance.service.ts`. Do not
 import Prisma from the pure modules.
 
-Public self-registration is **closed**. New portal users are created by
-`inviteUser` (factory admin or company admin). `/registo` explains the
-invite flow.
+Public self-registration is **closed**. The factory onboards a client
+company from `/admin/clientes` (`onboardClientCompany` — creates `Company`
++ first `CLIENT`, then emails the invite). Company admins invite teammates
+via `inviteUser`. `/registo` explains the invite flow.
 
 `landing/` is a static marketing site (HTML/CSS), deployed as a separate
 Vercel project from the same repo. It is not part of the Next.js app.

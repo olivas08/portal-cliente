@@ -68,8 +68,8 @@ export type RegisterResult =
 
 /**
  * Public self-registration is closed. New client companies are created by
- * factory invitation (`inviteUser`); this action exists only so leftover
- * callers fail closed instead of creating a tenant.
+ * the factory from `/admin/clientes` (`onboardClientCompany`). This action
+ * exists only so leftover callers fail closed instead of creating a tenant.
  */
 export async function registerAction(input?: {
   companyName: string;
