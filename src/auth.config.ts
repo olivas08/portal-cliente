@@ -8,6 +8,9 @@ export const authConfig = {
   pages: {
     signIn: "/login",
   },
+  // Vercel + custom domain (test.operonfactory.com). Without this, Auth.js
+  // waits on host checks when AUTH_URL / AUTH_TRUST_HOST are missing.
+  trustHost: true,
   providers: [],
   callbacks: {
     jwt({ token, user }) {

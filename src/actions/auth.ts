@@ -12,26 +12,38 @@ import {
 
 export type LoginResult = "ok" | "invalid" | "error" | "rate-limited";
 
+function isNextRedirect(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    typeof (error as { digest: unknown }).digest === "string" &&
+    (error as { digest: string }).digest.startsWith("NEXT_REDIRECT")
+  );
+}
+
 export async function loginAction(
   email: string,
   password: string
 ): Promise<LoginResult> {
-  const ip = await getClientIp();
-  const normalizedEmail = email.trim().toLowerCase();
-  const skipRateLimit =
-    process.env.CI === "true" || process.env.E2E_TEST === "true";
-  if (!skipRateLimit) {
-    const [emailOk, ipOk] = await Promise.all([
-      checkRateLimit(`login:email:${normalizedEmail}`, { max: 8, windowMs: 15 * 60 * 1000 }),
-      checkRateLimit(`login:ip:${ip}`, { max: 30, windowMs: 15 * 60 * 1000 }),
-    ]);
-    if (!emailOk || !ipOk) return "rate-limited";
-  }
-
   try {
+    const ip = await getClientIp();
+    const normalizedEmail = email.trim().toLowerCase();
+    const skipRateLimit =
+      process.env.CI === "true" || process.env.E2E_TEST === "true";
+    if (!skipRateLimit) {
+      const [emailOk, ipOk] = await Promise.all([
+        checkRateLimit(`login:email:${normalizedEmail}`, { max: 8, windowMs: 15 * 60 * 1000 }),
+        checkRateLimit(`login:ip:${ip}`, { max: 30, windowMs: 15 * 60 * 1000 }),
+      ]);
+      if (!emailOk || !ipOk) return "rate-limited";
+    }
+
     await signIn("credentials", { email, password, redirect: false });
     return "ok";
   } catch (error) {
+    // Auth.js / Next may still throw a redirect; swallowing it hangs the action.
+    if (isNextRedirect(error)) throw error;
     if (error instanceof AuthError) {
       return "invalid";
     }

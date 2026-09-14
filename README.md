@@ -103,10 +103,12 @@ armazenamento ainda não está configurado.
 
 1. Criar projeto na Vercel a partir deste repositório.
 2. Definir as variáveis de ambiente (`DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`,
-   `AUTH_TRUST_HOST`, `RESEND_API_KEY`, `EMAIL_FROM`, `SUPABASE_URL`,
-   `SUPABASE_SERVICE_ROLE_KEY`).
+   `AUTH_TRUST_HOST`, …). No Supabase, **Connect → Prisma**: `DATABASE_URL` é o
+   pooler em transação (`*.pooler.supabase.com:6543`); `DIRECT_URL` é o pooler
+   em **session** (`*.pooler.supabase.com:5432`). Não uses `db.<ref>.supabase.co`
+   na Vercel — esse host é IPv6-only e o build falha com `P1001`.
 3. O `postinstall` corre `prisma generate` automaticamente.
-4. Aplicar migrations em produção com `npx prisma migrate deploy` (via CI ou localmente contra a BD de produção).
+4. O `vercel.json` da raiz corre `prisma migrate deploy` antes de `next build`.
 
 ## Monitorização (gratuita)
 
