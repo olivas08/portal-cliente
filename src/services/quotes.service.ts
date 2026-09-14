@@ -444,8 +444,6 @@ export async function decideQuote(
     href: `/admin/orcamentos/${quote.id}`,
   });
 
-  });
-
   try {
     const to = await adminEmails();
     if (to.length > 0) {

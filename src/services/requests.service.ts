@@ -73,8 +73,6 @@ export async function createRequest(
     href: `/admin/requerimentos/${request.id}`,
   });
 
-  });
-
   try {
     const to = await adminEmails();
     if (to.length > 0) {

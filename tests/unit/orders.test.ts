@@ -14,7 +14,7 @@ const { mockAuth, prismaMock, mockGetBaseUrl, mockSendOrderStatusUpdateEmail } =
     },
     user: {
       findFirst: vi.fn(),
-      findMany: vi.fn(() => Promise.resolve([])),
+      findMany: vi.fn(async (): Promise<{ id: string; email: string }[]> => []),
     },
     notification: { createMany: vi.fn(() => Promise.resolve({ count: 0 })) },
   },
