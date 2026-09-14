@@ -6,6 +6,8 @@ import { RotateCcw, Trash2 } from "lucide-react";
 import type { OrderVM } from "@/lib/types";
 import { reorderOrder } from "@/actions/orders";
 import { Modal } from "@/components/ui/Modal";
+import { inputCls } from "@/components/ui/Input";
+import { formatEur } from "@/lib/format";
 
 interface ReorderLine {
   sourceItemId: string;
@@ -24,9 +26,6 @@ export function ReorderModal({ order }: { order: OrderVM }) {
   const [lines, setLines] = useState<ReorderLine[]>([]);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
-
-  const inputCls =
-    "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400";
 
   const open = () => {
     setLines(
@@ -130,7 +129,7 @@ export function ReorderModal({ order }: { order: OrderVM }) {
                       {line.description}
                     </p>
                     <p className="text-xs font-mono text-slate-400">
-                      {line.reference} · {line.unitPriceEur.toFixed(2)} €/
+                      {line.reference} · {formatEur(line.unitPriceEur)}/
                       {line.unit}
                     </p>
                   </div>
@@ -163,7 +162,7 @@ export function ReorderModal({ order }: { order: OrderVM }) {
 
             <p className="text-xs text-slate-500 text-right mt-2">
               Total estimado (s/ IVA):{" "}
-              <strong className="text-brand">{total.toFixed(2)} €</strong>
+              <strong className="text-brand">{formatEur(total)}</strong>
             </p>
           </div>
 

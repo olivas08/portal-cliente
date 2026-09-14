@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
-import { auth } from "@/auth";
+import { requireSessionUser } from "@/lib/auth-guard";
 import {
   getOrderById,
   getOrderProduction,
@@ -16,7 +16,7 @@ export default async function AdminOrderDetail({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await auth();
+  const user = await requireSessionUser();
   const order = await getOrderById(id);
   if (!order) notFound();
 
@@ -29,7 +29,7 @@ export default async function AdminOrderDetail({
   return (
     <OrderDetail
       order={order}
-      currentUserId={session!.user.id}
+      currentUserId={user.id}
       isAdmin
       backHref="/admin"
       backLabel="Voltar ao painel"

@@ -7,6 +7,8 @@ import Link from "next/link";
 import type { OperationTypeVM, PricingSettingsVM, QuoteVM } from "@/lib/types";
 import { createQuote, updateQuote } from "@/actions/quotes";
 import { actionError } from "@/lib/action-result";
+import { inputCls } from "@/components/ui/Input";
+import { formatEur } from "@/lib/format";
 
 interface LineOperationForm {
   operationTypeId: string;
@@ -52,8 +54,6 @@ function lineCost(
   return num(l.materialWeightKg) * pricing.steelPriceEurKg + opsCost;
 }
 
-const inputCls =
-  "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400";
 const smallInputCls =
   "w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400";
 
@@ -284,7 +284,7 @@ export function QuoteBuilder({
               </span>
               <div className="flex items-center gap-3">
                 <span className="text-sm font-semibold text-slate-700">
-                  {priced[i].total.toFixed(2)} €
+                  {formatEur(priced[i].total)}
                 </span>
                 <button
                   type="button"
@@ -432,7 +432,7 @@ export function QuoteBuilder({
           <div className="text-right">
             <p className="text-xs text-slate-400">Total (com margem de {margin}%)</p>
             <p className="text-xl font-bold text-slate-800">
-              {grandTotal.toFixed(2)} €
+              {formatEur(grandTotal)}
             </p>
           </div>
           <button

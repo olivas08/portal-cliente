@@ -7,6 +7,7 @@ import { INVOICE_PROVIDER_LABELS } from "@/lib/types";
 import { actionError } from "@/lib/action-result";
 import { issueInvoice } from "@/actions/invoices";
 import { updateCompanyFiscalInfo } from "@/actions/companies";
+import { formatEur } from "@/lib/format";
 
 interface Props {
   orderId: string;
@@ -121,7 +122,7 @@ export function InvoiceCard({ orderId, companyId, companyFiscal, invoice }: Prop
             {INVOICE_PROVIDER_LABELS[invoice.provider]}
           </p>
           <p className="mt-1 text-xs text-slate-400">
-            Total: {invoice.totalEur.toFixed(2)} €
+            Total: {formatEur(invoice.totalEur)}
           </p>
           {invoice.pdfUrl && (
             <a

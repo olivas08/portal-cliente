@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Search, ArrowLeft, PackageSearch, AlertTriangle } from "lucide-react";
 import type { RecallTraceVM } from "@/lib/types";
 import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
+import { formatInstantPt } from "@/lib/format";
 
 interface Props {
   query: string;
@@ -88,8 +89,7 @@ export function RecallSearchView({ query, results }: Props) {
                   {r.supplierName && r.certificateRef ? " · " : ""}
                   {r.certificateRef ? `Certificado: ${r.certificateRef}` : ""}
                   {" · "}
-                  Recebido em{" "}
-                  {new Date(r.receivedAt).toLocaleDateString("pt-PT")}
+                  Recebido em {formatInstantPt(r.receivedAt)}
                 </p>
               </div>
               <div className="text-right text-xs text-slate-500">

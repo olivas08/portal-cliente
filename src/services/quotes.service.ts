@@ -329,6 +329,7 @@ export async function updateQuote(id: string, data: QuoteInput): Promise<void> {
     if (isUniqueViolation(err)) throw new AppError("Referência de orçamento em conflito.");
     throw err;
   }
+  invalidateCache(CACHE_TAGS.quotes);
 }
 
 export async function deleteQuote(id: string): Promise<void> {
@@ -441,6 +442,8 @@ export async function decideQuote(
     title: `Orçamento ${quote.reference} ${decision === "accepted" ? "aceite" : "recusado"}`,
     body: `${quote.company.name} ${decision === "accepted" ? "aceitou" : "recusou"} o orçamento "${quote.subject}".`,
     href: `/admin/orcamentos/${quote.id}`,
+  });
+
   });
 
   try {

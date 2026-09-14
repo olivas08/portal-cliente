@@ -8,6 +8,11 @@ import {
   type ImportMaterialsResult,
 } from "@/lib/import-schemas";
 
+function invalidateStock() {
+  invalidateCache(CACHE_TAGS.materials);
+  invalidateCache(CACHE_TAGS.workOrders);
+}
+
 // ── Schemas ─────────────────────────────────────────────────────────────────
 
 export const createMaterialSchema = z
@@ -109,7 +114,7 @@ export async function createMaterial(input: CreateMaterialInput): Promise<void> 
       });
     }
   });
-  invalidateCache(CACHE_TAGS.materials);
+  invalidateStock();
 }
 
 export async function updateMaterial(input: UpdateMaterialInput): Promise<void> {
@@ -129,7 +134,7 @@ export async function updateMaterial(input: UpdateMaterialInput): Promise<void> 
       tracksBatches: input.tracksBatches,
     },
   });
-  invalidateCache(CACHE_TAGS.materials);
+  invalidateStock();
 }
 
 /** Adds stock (goods receipt) and logs the movement. Not for `tracksBatches`
@@ -161,7 +166,7 @@ export async function receiveStock(input: ReceiveStockInput): Promise<void> {
       },
     });
   });
-  invalidateCache(CACHE_TAGS.materials);
+  invalidateStock();
 }
 
 /**
@@ -208,7 +213,7 @@ export async function receiveMaterialBatch(input: ReceiveMaterialBatchInput): Pr
       },
     });
   });
-  invalidateCache(CACHE_TAGS.materials);
+  invalidateStock();
 }
 
 /** Corrects stock to an absolute value (inventory count) and logs the delta. */
@@ -236,7 +241,7 @@ export async function adjustStock(input: AdjustStockInput): Promise<void> {
       },
     });
   });
-  invalidateCache(CACHE_TAGS.materials);
+  invalidateStock();
 }
 
 // ── Bulk import (CSV) ────────────────────────────────────────────────────────
@@ -319,7 +324,7 @@ export async function importMaterials(
   }
 
   if (result.created > 0 || result.updated > 0) {
-    invalidateCache(CACHE_TAGS.materials);
+    invalidateStock();
   }
   return result;
 }
@@ -358,5 +363,5 @@ export async function setProductBom(input: SetProductBomInput): Promise<void> {
       });
     }
   });
-  invalidateCache(CACHE_TAGS.materials);
+  invalidateStock();
 }

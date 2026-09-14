@@ -73,6 +73,8 @@ export async function createRequest(
     href: `/admin/requerimentos/${request.id}`,
   });
 
+  });
+
   try {
     const to = await adminEmails();
     if (to.length > 0) {
@@ -175,6 +177,7 @@ export async function addRequestMessage(
       console.error("[requests] Falha ao notificar administradores por email:", err);
     }
   }
+  invalidateCache(CACHE_TAGS.requests);
 }
 
 export async function updateRequestStatus(

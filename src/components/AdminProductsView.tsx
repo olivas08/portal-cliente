@@ -1,17 +1,25 @@
 "use client";
 
-import { useOptimistic, useRef, useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Plus, Pencil, Package, ImageOff, Upload, Trash2 } from "lucide-react";
+import { Plus, Pencil, Package, ImageOff } from "lucide-react";
 import type { ProductVM } from "@/lib/types";
 import { ProductsImportModal } from "@/components/ProductsImportModal";
-import { Modal } from "@/components/ui/Modal";
+import { actionError } from "@/lib/action-result";
+import { Alert } from "@/components/ui/Alert";
+import { formatEur } from "@/lib/format";
+import { Button } from "@/components/ui/Button";
 import {
   createProduct,
   updateProduct,
   setProductActive,
 } from "@/actions/products";
+import {
+  ProductFormModal,
+  emptyProductForm,
+  type ProductFormState,
+} from "@/components/products/ProductFormModal";
 
 interface CompanyOption {
   id: string;
@@ -23,66 +31,16 @@ interface Props {
   companies: CompanyOption[];
 }
 
-const inputCls =
-  "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400";
-
-const emptyForm = {
-  reference: "",
-  name: "",
-  description: "",
-  unit: "un",
-  unitPriceEur: "",
-  category: "",
-  imageUrl: "",
-  active: true,
-};
-
-type FormState = typeof emptyForm;
-
-// Downscale an uploaded image in the browser and return a compact JPEG data URL,
-// so it can be stored inline in the DB without any external storage service.
-async function fileToResizedDataUrl(
-  file: File,
-  maxDim = 512,
-  quality = 0.8,
-): Promise<string> {
-  const original = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error("read"));
-    reader.readAsDataURL(file);
-  });
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const el = new window.Image();
-    el.onload = () => resolve(el);
-    el.onerror = () => reject(new Error("decode"));
-    el.src = original;
-  });
-  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-  const w = Math.max(1, Math.round(img.width * scale));
-  const h = Math.max(1, Math.round(img.height * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return original;
-  ctx.drawImage(img, 0, 0, w, h);
-  return canvas.toDataURL("image/jpeg", quality);
-}
-
 export function AdminProductsView({ products, companies }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(emptyForm);
+  const [form, setForm] = useState<ProductFormState>(emptyProductForm);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [imageError, setImageError] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
   const [pending, startTransition] = useTransition();
 
-  // Optimistic active state so the switch flips instantly instead of waiting
-  // for the server round-trip; it reconciles with fresh props after refresh.
   const [optimisticProducts, applyOptimisticActive] = useOptimistic(
     products,
     (state, patch: { id: string; active: boolean }) =>
@@ -91,7 +49,7 @@ export function AdminProductsView({ products, companies }: Props) {
 
   const openCreate = () => {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm(emptyProductForm);
     setOverrides({});
     setError("");
     setImageError("");
@@ -120,38 +78,27 @@ export function AdminProductsView({ products, companies }: Props) {
     setOpen(true);
   };
 
-  const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
-    setForm((f) => ({ ...f, [key]: value }));
-
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-selecting the same file
-    if (!file) return;
-    setImageError("");
-    if (!file.type.startsWith("image/")) {
-      setImageError("Selecione um ficheiro de imagem.");
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      setImageError("Imagem demasiado grande (máx. 8 MB).");
-      return;
-    }
-    try {
-      const dataUrl = await fileToResizedDataUrl(file);
-      setField("imageUrl", dataUrl);
-    } catch {
-      setImageError("Não foi possível processar a imagem.");
-    }
-  };
+  const setField = <K extends keyof ProductFormState>(
+    key: K,
+    value: ProductFormState[K],
+  ) => setForm((f) => ({ ...f, [key]: value }));
 
   const toggleActive = (p: ProductVM) => {
     startTransition(async () => {
       applyOptimisticActive({ id: p.id, active: !p.active });
       try {
-        await setProductActive(p.id, !p.active);
+        const res = await setProductActive(p.id, !p.active);
+        const msg = actionError(res);
+        if (msg) {
+          setError(msg);
+          router.refresh();
+          return;
+        }
         router.refresh();
-      } catch {
-        /* best-effort UI; refresh reconciles with the server state */
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Ocorreu um erro. Tente novamente.",
+        );
         router.refresh();
       }
     });
@@ -178,10 +125,13 @@ export function AdminProductsView({ products, companies }: Props) {
 
     startTransition(async () => {
       try {
-        if (editingId) {
-          await updateProduct(editingId, payload);
-        } else {
-          await createProduct(payload);
+        const res = editingId
+          ? await updateProduct(editingId, payload)
+          : await createProduct(payload);
+        const msg = actionError(res);
+        if (msg) {
+          setError(msg);
+          return;
         }
         setOpen(false);
         router.refresh();
@@ -204,14 +154,12 @@ export function AdminProductsView({ products, companies }: Props) {
         </div>
         <div className="flex items-center gap-2">
           <ProductsImportModal />
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 px-4 py-2 bg-accent text-brand text-sm font-semibold rounded-lg hover:bg-accent-dark transition-colors"
-          >
+          <Button variant="accent" onClick={openCreate}>
             <Plus size={16} /> Novo produto
-          </button>
+          </Button>
         </div>
       </div>
+      {error && !open && <Alert className="mb-4">{error}</Alert>}
 
       {optimisticProducts.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-slate-100">
@@ -254,20 +202,14 @@ export function AdminProductsView({ products, companies }: Props) {
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-medium text-slate-700 truncate">
-                            {p.name}
-                          </p>
-                          <p className="text-xs font-mono text-slate-400">
-                            {p.reference}
-                          </p>
+                          <p className="font-medium text-slate-700 truncate">{p.name}</p>
+                          <p className="text-xs font-mono text-slate-400">{p.reference}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-500">
-                      {p.category ?? "—"}
-                    </td>
+                    <td className="px-4 py-3 text-slate-500">{p.category ?? "—"}</td>
                     <td className="px-4 py-3 text-right font-medium text-slate-700">
-                      {p.unitPriceEur.toFixed(2)} €/{p.unit}
+                      {formatEur(p.unitPriceEur)}/{p.unit}
                     </td>
                     <td className="px-4 py-3 text-center text-slate-500">
                       {p.companyPrices.length > 0 ? p.companyPrices.length : "—"}
@@ -307,215 +249,21 @@ export function AdminProductsView({ products, companies }: Props) {
         </div>
       )}
 
-      <Modal
+      <ProductFormModal
         open={open}
         onClose={() => setOpen(false)}
-        title={editingId ? "Editar produto" : "Novo produto"}
-        maxWidth="2xl"
-        scrollable
-      >
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">
-            Referência *
-          </label>
-          <input
-                required
-                className={inputCls}
-                value={form.reference}
-                onChange={(e) => setField("reference", e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Nome *
-              </label>
-              <input
-                required
-                className={inputCls}
-                value={form.name}
-                onChange={(e) => setField("name", e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              Descrição *
-            </label>
-            <textarea
-              required
-              rows={2}
-              className={inputCls + " resize-none"}
-              value={form.description}
-              onChange={(e) => setField("description", e.target.value)}
-            />
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Unidade *
-              </label>
-              <input
-                required
-                className={inputCls}
-                value={form.unit}
-                onChange={(e) => setField("unit", e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Preço base (€) *
-              </label>
-              <input
-                required
-                type="number"
-                min="0"
-                step="0.01"
-                className={inputCls}
-                value={form.unitPriceEur}
-                onChange={(e) => setField("unitPriceEur", e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Categoria
-              </label>
-              <input
-                className={inputCls}
-                value={form.category}
-                onChange={(e) => setField("category", e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              Imagem
-            </label>
-            <div className="flex items-center gap-3">
-              <div className="h-16 w-16 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0 border border-slate-200">
-                {form.imageUrl ? (
-                  <Image
-                    src={form.imageUrl}
-                    alt="Pré-visualização"
-                    width={64}
-                    height={64}
-                    className="object-cover h-16 w-16"
-                    unoptimized
-                  />
-                ) : (
-                  <ImageOff size={18} className="text-slate-300" />
-                )}
-              </div>
-              <div className="flex flex-col items-start gap-1">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageChange}
-                />
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50"
-                >
-                  <Upload size={14} />
-                  {form.imageUrl ? "Trocar imagem" : "Carregar imagem"}
-                </button>
-                {form.imageUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setField("imageUrl", "")}
-                    className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-600"
-                  >
-                    <Trash2 size={12} /> Remover
-                  </button>
-                )}
-              </div>
-            </div>
-            {imageError && (
-              <p className="text-xs text-red-600 mt-1">{imageError}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-2">
-              Preços negociados por empresa (opcional)
-            </label>
-            <p className="text-xs text-slate-400 mb-2">
-              Deixe vazio para usar o preço base.
-            </p>
-            <div className="space-y-2">
-              {companies.map((c) => (
-                <div
-                  key={c.id}
-                  className="grid grid-cols-12 gap-2 items-center"
-                >
-                  <span className="col-span-8 text-sm text-slate-600 truncate">
-                    {c.name}
-                  </span>
-                  <div className="col-span-4 relative">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder={form.unitPriceEur || "base"}
-                      className={inputCls + " pr-6"}
-                      value={overrides[c.id] ?? ""}
-                      onChange={(e) =>
-                        setOverrides((o) => ({
-                          ...o,
-                          [c.id]: e.target.value,
-                        }))
-                      }
-                    />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">
-                      €
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <label className="flex items-center gap-2 text-sm text-slate-600">
-            <input
-              type="checkbox"
-              checked={form.active}
-              onChange={(e) => setField("active", e.target.checked)}
-              className="rounded border-slate-300"
-            />
-            Visível no catálogo do cliente
-          </label>
-
-          {error && (
-            <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-              {error}
-            </p>
-          )}
-
-          <div className="flex justify-end gap-3 pt-1">
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pending}
-              className="px-4 py-2 text-sm font-semibold text-brand bg-accent rounded-lg hover:bg-accent-dark disabled:opacity-60"
-            >
-              {pending ? "A guardar..." : "Guardar"}
-            </button>
-          </div>
-        </form>
-      </Modal>
+        editing={Boolean(editingId)}
+        form={form}
+        setField={setField}
+        companies={companies}
+        overrides={overrides}
+        setOverrides={setOverrides}
+        error={error}
+        imageError={imageError}
+        setImageError={setImageError}
+        pending={pending}
+        onSubmit={handleSubmit}
+      />
     </>
   );
 }

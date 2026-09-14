@@ -225,6 +225,7 @@ export async function startStep(
   await dispatchOrderNotification(notify);
   invalidateCache(CACHE_TAGS.workOrders);
   invalidateCache(CACHE_TAGS.orders);
+  invalidateCache(CACHE_TAGS.machines);
 }
 
 /** Pauses a running step, banking the elapsed run time. */
@@ -249,6 +250,7 @@ export async function pauseStep(
     },
   });
   invalidateCache(CACHE_TAGS.workOrders);
+  invalidateCache(CACHE_TAGS.machines);
 }
 
 /** Completes a step, recording good/scrap quantities and rolling up state. */
@@ -348,5 +350,6 @@ export async function completeStep(
   await dispatchStageNotification(notify.stage);
   invalidateCache(CACHE_TAGS.workOrders);
   invalidateCache(CACHE_TAGS.orders);
+  invalidateCache(CACHE_TAGS.machines);
   if (input.defect) invalidateCache(CACHE_TAGS.nonConformities);
 }

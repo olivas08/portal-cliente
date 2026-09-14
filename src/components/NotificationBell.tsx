@@ -9,18 +9,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "@/actions/notifications";
-
-function relativeTime(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diffMs / 60000);
-  if (min < 1) return "agora";
-  if (min < 60) return `há ${min}m`;
-  const hours = Math.floor(min / 60);
-  if (hours < 24) return `há ${hours}h`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `há ${days}d`;
-  return new Date(iso).toLocaleDateString("pt-PT");
-}
+import { formatRelativeTime } from "@/lib/format";
 
 interface Props {
   notifications: NotificationVM[];
@@ -140,7 +129,7 @@ export function NotificationBell({
                     </p>
                     <p className="text-xs text-slate-500 truncate">{n.body}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      {relativeTime(n.createdAt)}
+                      {formatRelativeTime(n.createdAt)}
                     </p>
                   </div>
                 </div>

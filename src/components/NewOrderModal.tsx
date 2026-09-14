@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { createOrder } from "@/actions/orders";
 import { Modal } from "@/components/ui/Modal";
+import { inputCls } from "@/components/ui/Input";
+import { formatEur } from "@/lib/format";
 
 interface ItemForm {
   reference: string;
@@ -37,9 +39,6 @@ export function NewOrderModal({
   const [items, setItems] = useState<ItemForm[]>([{ ...emptyItem }]);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
-
-  const inputCls =
-    "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400";
 
   const updateItem = (index: number, patch: Partial<ItemForm>) => {
     setItems((prev) =>
@@ -252,7 +251,7 @@ export function NewOrderModal({
 
             <p className="text-xs text-slate-500 text-right mt-2">
               Total estimado (s/ IVA):{" "}
-              <strong className="text-brand">{total.toFixed(2)} €</strong>
+              <strong className="text-brand">{formatEur(total)}</strong>
             </p>
           </div>
 

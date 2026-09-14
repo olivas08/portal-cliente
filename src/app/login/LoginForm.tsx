@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AuthBrand } from "@/components/AuthBrand";
 import { Eye, EyeOff, Info, ShieldCheck } from "lucide-react";
@@ -18,32 +18,42 @@ export function LoginForm({
 }: {
   showDemoAccounts?: boolean;
 }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState("");
   const [showHints, setShowHints] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
   const resetOk = searchParams.get("reset") === "ok";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    startTransition(async () => {
-      const result = await loginAction(email.trim(), password);
-      if (result === "ok") {
-        router.push("/");
-        router.refresh();
-      } else if (result === "invalid") {
-        setError("Email ou palavra-passe incorretos.");
-      } else if (result === "rate-limited") {
-        setError("Demasiadas tentativas. Aguarde alguns minutos antes de tentar novamente.");
-      } else {
+    setPending(true);
+    void (async () => {
+      try {
+        const result = await loginAction(email.trim(), password);
+        if (result === "ok") {
+          // Full navigation so the session cookie is sent on a fresh document
+          // request. `router.push` + `useTransition` stays pending until the
+          // dashboard RSC finishes — that looks like a stuck "A entrar...".
+          window.location.assign("/");
+          return;
+        }
+        if (result === "invalid") {
+          setError("Email ou palavra-passe incorretos.");
+        } else if (result === "rate-limited") {
+          setError("Demasiadas tentativas. Aguarde alguns minutos antes de tentar novamente.");
+        } else {
+          setError("Ocorreu um erro. Tente novamente.");
+        }
+        setPending(false);
+      } catch {
         setError("Ocorreu um erro. Tente novamente.");
+        setPending(false);
       }
-    });
+    })();
   };
 
   const fillAccount = (e: string, p: string) => {
@@ -135,7 +145,7 @@ export function LoginForm({
               href="/registo"
               className="font-medium text-brand hover:text-accent-dark transition-colors"
             >
-              Registar a minha empresa
+              Pedir convite
             </Link>
           </p>
         </div>

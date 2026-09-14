@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdminArea, requireClient } from "@/lib/auth-guard";
 import { guardAction } from "@/lib/errors";
+import { idSchema, quoteDecisionSchema } from "@/lib/schemas";
 import {
   createQuote as createQuoteService,
   updateQuote as updateQuoteService,
@@ -38,7 +39,7 @@ export async function updateQuote(id: string, input: QuoteInput) {
   return guardAction(async () => {
     await requireAdminArea("comercial");
     const data = quoteSchema.parse(input);
-    await updateQuoteService(id, data);
+    await updateQuoteService(idSchema.parse(id), data);
     revalidatePath(ADMIN_QUOTES);
     revalidatePath(`${ADMIN_QUOTES}/${id}`);
   });
@@ -47,7 +48,7 @@ export async function updateQuote(id: string, input: QuoteInput) {
 export async function deleteQuote(id: string) {
   return guardAction(async () => {
     await requireAdminArea("comercial");
-    await deleteQuoteService(id);
+    await deleteQuoteService(idSchema.parse(id));
     revalidatePath(ADMIN_QUOTES);
   });
 }
@@ -55,7 +56,7 @@ export async function deleteQuote(id: string) {
 export async function sendQuote(id: string) {
   return guardAction(async () => {
     await requireAdminArea("comercial");
-    await sendQuoteService(id);
+    await sendQuoteService(idSchema.parse(id));
     revalidatePath(ADMIN_QUOTES);
     revalidatePath(`${ADMIN_QUOTES}/${id}`);
   });
@@ -84,7 +85,7 @@ export async function updateOperationType(id: string, input: OperationTypeInput)
   return guardAction(async () => {
     await requireAdminArea("comercial");
     const data = operationTypeSchema.parse(input);
-    await updateOperationTypeService(id, data);
+    await updateOperationTypeService(idSchema.parse(id), data);
     revalidatePath(`${ADMIN_QUOTES}/definicoes`);
   });
 }
@@ -92,7 +93,7 @@ export async function updateOperationType(id: string, input: OperationTypeInput)
 export async function deleteOperationType(id: string) {
   return guardAction(async () => {
     await requireAdminArea("comercial");
-    await deleteOperationTypeService(id);
+    await deleteOperationTypeService(idSchema.parse(id));
     revalidatePath(`${ADMIN_QUOTES}/definicoes`);
   });
 }
@@ -100,7 +101,11 @@ export async function deleteOperationType(id: string) {
 export async function decideQuote(id: string, decision: "accepted" | "rejected") {
   return guardAction(async () => {
     const actor = await requireClient();
-    const orderId = await decideQuoteService(actor, id, decision);
+    const orderId = await decideQuoteService(
+      actor,
+      idSchema.parse(id),
+      quoteDecisionSchema.parse(decision),
+    );
     revalidatePath(CLIENT_QUOTES);
     revalidatePath(`${CLIENT_QUOTES}/${id}`);
     revalidatePath(ADMIN_QUOTES);

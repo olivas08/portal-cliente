@@ -107,6 +107,7 @@ export async function changeOrderStatus(
     body: `Novo estado: ${ORDER_STATUS_LABELS[status]}.`,
     href: `/dashboard/ordens/${existing.id}`,
   });
+  invalidateCache(CACHE_TAGS.orders);
 }
 
 /**
@@ -178,6 +179,7 @@ export async function cancelOrder(
       });
     });
   }
+  invalidateCache(CACHE_TAGS.orders);
 }
 
 /**
@@ -261,6 +263,7 @@ export async function createOrder(data: CreateOrderInput): Promise<string> {
     });
   });
 
+  invalidateCache(CACHE_TAGS.orders);
   return order.id;
 }
 
@@ -331,6 +334,7 @@ export async function reorderOrder(
     });
   });
 
+  invalidateCache(CACHE_TAGS.orders);
   return order.id;
 }
 

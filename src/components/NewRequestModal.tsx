@@ -7,6 +7,7 @@ import type { RequestType } from "@/lib/types";
 import { REQUEST_TYPE_LABELS } from "@/lib/types";
 import { createRequest } from "@/actions/requests";
 import { Modal } from "@/components/ui/Modal";
+import { inputCls } from "@/components/ui/Input";
 
 export function NewRequestModal() {
   const router = useRouter();
@@ -17,9 +18,6 @@ export function NewRequestModal() {
     text: "",
   });
   const [pending, startTransition] = useTransition();
-
-  const inputCls =
-    "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

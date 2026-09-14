@@ -101,6 +101,35 @@ Reads belong in `src/lib/data.ts` behind `unstable_cache` with a tag from
 `CACHE_TAGS`; writes belong in a service and must invalidate every tag they touch.
 Over-invalidating is safe, under-invalidating shows stale data.
 
+Commercial reads (`orders`, `quotes`, `requests`) use the same tag cache as
+production. Exceptions that stay uncached are **now-relative** projections
+(`getProductionSchedule`, `getMaintenancePlans`) and ad-hoc search
+(`findBatchTrace`). Readers must list every model family they join — e.g.
+`getWorkOrders` tags both `workOrders` and `materials` because shortfalls
+read `stockQty`.
+
+Pure helpers live next to their IO services but without a `.service` suffix:
+`production-status.ts`, `order-status.ts`, `maintenance.ts` (date/urgency) vs
+`production/*.service.ts` and `production/maintenance.service.ts`. Do not
+import Prisma from the pure modules.
+
+Public self-registration is **closed**. New portal users are created by
+`inviteUser` (factory admin or company admin). `/registo` explains the
+invite flow.
+
+`landing/` is a static marketing site (HTML/CSS), deployed as a separate
+Vercel project from the same repo. It is not part of the Next.js app.
+
+### Money: planned `Float` → `Decimal`
+
+Every `*Eur` / cost field is currently PostgreSQL `DOUBLE PRECISION`
+(`Float` in Prisma). Sums of unit prices for quotes and invoices can
+accumulate binary rounding error. The intended follow-up is a dedicated
+migration to `Decimal(12, 2)` starting with `Quote*`, `Invoice.totalEur`
+and `OrderItem.unitPriceEur`, then the remaining catalogue/stock cost
+fields. Do not mix `Float` and `Decimal` in the same arithmetic path
+once that starts.
+
 Nearly every page sets `export const dynamic = "force-dynamic"` (freshness is
 handled by `unstable_cache` tags, not by static rendering); follow suit for new
 pages. Most of `src/components/` is `"use client"`; shared primitives live in

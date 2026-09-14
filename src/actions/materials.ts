@@ -25,6 +25,7 @@ import {
   type SetProductBomInput,
 } from "@/services/materials.service";
 import { getMaterialBatches, findBatchTrace } from "@/lib/data";
+import { idSchema } from "@/lib/schemas";
 import {
   bulkImportMaterialsSchema,
   type MaterialImportRow,
@@ -74,14 +75,14 @@ export async function receiveMaterialBatch(input: ReceiveMaterialBatchInput) {
  * expandable "lotes" row (fetched only when the admin actually opens it). */
 export async function getMaterialBatchesAction(materialId: string) {
   await requireAdminArea("armazem");
-  return getMaterialBatches(materialId);
+  return getMaterialBatches(idSchema.parse(materialId));
 }
 
 /** Recall search: given a batch/heat code, find every order it was consumed
  * into, across all clients. */
 export async function findBatchTraceAction(batchCode: string) {
   await requireAdminArea("armazem");
-  return findBatchTrace(batchCode);
+  return findBatchTrace(idSchema.parse(batchCode));
 }
 
 export async function adjustStock(input: AdjustStockInput) {

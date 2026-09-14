@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { OrderVM, QuoteVM } from "@/lib/types";
-import { formatDatePt } from "@/lib/dates";
+import { formatDatePt, toIsoDate } from "@/lib/dates";
 import { TENANT } from "@/lib/branding";
 
 const CO = {
@@ -78,7 +78,7 @@ function addFooter(doc: jsPDF) {
   doc.setFontSize(7);
   doc.setTextColor(170, 170, 170);
   doc.text(
-    `Documento gerado em ${new Date().toLocaleDateString("pt-PT")}`,
+    `Documento gerado em ${formatDatePt(toIsoDate(new Date()))}`,
     105,
     290,
     { align: "center" }

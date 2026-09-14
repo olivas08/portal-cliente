@@ -126,7 +126,7 @@ export async function issueInvoice(orderId: string): Promise<InvoiceVM> {
   }
 }
 
-function toInvoiceVM(invoice: {
+export function toInvoiceVM(invoice: {
   id: string;
   orderId: string;
   provider: string;

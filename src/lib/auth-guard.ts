@@ -1,4 +1,5 @@
 import type { Session } from "next-auth";
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { UnauthorizedError } from "@/lib/errors";
 import {
@@ -22,6 +23,16 @@ export async function requireUser(): Promise<SessionUser> {
   const user = session?.user;
   if (!user) throw new UnauthorizedError();
   return user;
+}
+
+/**
+ * Page-level counterpart of `requireUser()`: redirects to login instead of
+ * throwing, so layouts/pages can drop `session!.user`.
+ */
+export async function requireSessionUser(): Promise<SessionUser> {
+  const session = await auth();
+  if (!session?.user) redirect("/login");
+  return session.user;
 }
 
 /** Any factory-side account (super-admin or area-scoped manager). */

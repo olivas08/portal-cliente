@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
-    order: { findUnique: vi.fn() },
-    request: { findUnique: vi.fn() },
+    order: { findUnique: vi.fn(), findFirst: vi.fn() },
+    request: { findUnique: vi.fn(), findFirst: vi.fn() },
   },
 }));
 
@@ -101,6 +101,17 @@ describe("getOrderById → OrderVM mapping", () => {
   it("returns null when the order is missing", async () => {
     prismaMock.order.findUnique.mockResolvedValue(null);
     expect(await getOrderById("missing")).toBeNull();
+  });
+
+  it("scopes by companyId using findFirst so another tenant cannot load the row", async () => {
+    prismaMock.order.findFirst.mockResolvedValue(null);
+    expect(await getOrderById("o1", "other-company")).toBeNull();
+    expect(prismaMock.order.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "o1", companyId: "other-company" },
+      }),
+    );
+    expect(prismaMock.order.findUnique).not.toHaveBeenCalled();
   });
 });
 

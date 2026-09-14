@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import type { OrderVM } from "@/lib/types";
+import { formatEur } from "@/lib/format";
 
 type SortKey = "reference" | "description" | "quantity" | "unitPriceEur" | "total";
 type SortDir = "asc" | "desc";
@@ -85,7 +86,6 @@ export function OrderItemsTable({
           return 0;
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.items, sortKey, sortDir]);
 
   const subtotal = order.items.reduce(
@@ -156,10 +156,10 @@ export function OrderItemsTable({
                   {item.unit}
                 </td>
                 <td className="px-5 py-3 text-right text-slate-500 whitespace-nowrap">
-                  {item.unitPriceEur.toFixed(2)} €
+                  {formatEur(item.unitPriceEur)}
                 </td>
                 <td className="px-5 py-3 text-right font-medium text-slate-700 whitespace-nowrap">
-                  {(item.quantity * item.unitPriceEur).toFixed(2)} €
+                  {formatEur(item.quantity * item.unitPriceEur)}
                 </td>
               </tr>
             ))}
@@ -173,7 +173,7 @@ export function OrderItemsTable({
                 Total Estimado (s/ IVA):
               </td>
               <td className="px-5 py-3 text-right font-bold text-brand text-base whitespace-nowrap">
-                {subtotal.toFixed(2)} €
+                {formatEur(subtotal)}
               </td>
             </tr>
           </tfoot>
