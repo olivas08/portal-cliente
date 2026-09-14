@@ -147,7 +147,11 @@ export async function reworkStep(stepId: string) {
     revalidatePath(ADMIN_QUALITY);
     revalidatePath(ADMIN_BOARD);
     revalidatePath(TERMINAL);
-    refresh();
+    try {
+      refresh();
+    } catch {
+      // Client-cache hint; the mutation already committed.
+    }
   });
 }
 
@@ -159,7 +163,11 @@ export async function resolveNonConformity(id: string) {
     await resolveNonConformityService(data.id);
 
     revalidatePath(ADMIN_QUALITY);
-    refresh();
+    try {
+      refresh();
+    } catch {
+      // Client-cache hint; the mutation already committed.
+    }
   });
 }
 

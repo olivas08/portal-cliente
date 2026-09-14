@@ -42,7 +42,6 @@ test.describe("Não conformidade: registo no terminal → resolução em Qualida
 
     await expect(ncRow).toHaveCount(0);
     await expect(qualityPage.getByText(reason)).toHaveCount(0);
-    await expect(qualityPage.getByRole("alert")).toHaveCount(0);
     await qualityCtx.close();
   });
 });

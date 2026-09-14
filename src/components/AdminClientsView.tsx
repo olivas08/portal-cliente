@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/Button";
 import { ROLE_LABELS, type ClientRole } from "@/lib/roles";
 import type { ClientCompanyVM } from "@/lib/types";
 
-type InviteResult = { ok: true } | { ok: false; error: string };
+type InviteResult =
+  | { ok: true; company?: ClientCompanyVM }
+  | { ok: false; error: string };
 
 interface Props {
   companies: ClientCompanyVM[];
@@ -37,6 +39,12 @@ export function AdminClientsView({ companies, onOnboard, onInviteUser }: Props) 
   const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<ClientRole>("CLIENT_USER");
+  const [added, setAdded] = useState<ClientCompanyVM[]>([]);
+
+  const visibleCompanies = [
+    ...companies,
+    ...added.filter((c) => !companies.some((existing) => existing.id === c.id)),
+  ];
 
   const handleOnboard = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +54,9 @@ export function AdminClientsView({ companies, onOnboard, onInviteUser }: Props) 
       if (!result.ok) {
         setError(result.error);
         return;
+      }
+      if (result.company) {
+        setAdded((list) => [...list, result.company!]);
       }
       setCompanyName("");
       setContactName("");
@@ -161,7 +172,7 @@ export function AdminClientsView({ companies, onOnboard, onInviteUser }: Props) 
       )}
 
       <div className="grid gap-4">
-        {companies.map((company) => (
+        {visibleCompanies.map((company) => (
           <div
             key={company.id}
             className="rounded-xl border border-slate-200 bg-white p-4"
@@ -263,7 +274,7 @@ export function AdminClientsView({ companies, onOnboard, onInviteUser }: Props) 
         ))}
       </div>
 
-      {companies.length === 0 && !showOnboard && (
+      {visibleCompanies.length === 0 && !showOnboard && (
         <p className="mt-8 text-center text-sm text-slate-400">
           Ainda não há clientes. Crie o primeiro com «Novo cliente».
         </p>

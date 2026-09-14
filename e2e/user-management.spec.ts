@@ -22,7 +22,7 @@ test.describe("Gestão de utilizadores", () => {
     await expect(userCard.getByText("Convite pendente / inativo")).toBeVisible();
 
     await userCard.getByRole("button", { name: "Reativar" }).click();
-    await expect(userCard.getByText("Ativo")).toBeVisible();
+    await expect(userCard.getByText("Ativo", { exact: true })).toBeVisible();
     await expect(userCard.getByRole("button", { name: "Desativar" })).toBeVisible();
   });
 
@@ -62,8 +62,9 @@ test.describe("Gestão de utilizadores", () => {
     await page.getByPlaceholder("Ex: ana@silva.pt").fill(email);
     await page.getByRole("button", { name: "Enviar convite" }).click();
 
-    await expect(page.getByRole("heading", { name: company })).toBeVisible();
-    await expect(page.getByText(email)).toBeVisible();
-    await expect(page.getByText("Convite pendente")).toBeVisible();
+    const companyCard = page.locator("div.rounded-xl", { hasText: company }).first();
+    await expect(companyCard.getByRole("heading", { name: company })).toBeVisible();
+    await expect(companyCard.getByText(email)).toBeVisible();
+    await expect(companyCard.getByText("Convite pendente", { exact: true })).toBeVisible();
   });
 });

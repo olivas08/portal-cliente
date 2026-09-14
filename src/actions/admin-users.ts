@@ -24,7 +24,7 @@ const inviteAdminUserSchema = z.object({
 export type InviteAdminUserInput = z.infer<typeof inviteAdminUserSchema>;
 
 export type InviteAdminUserResult =
-  | { ok: true }
+  | { ok: true; user?: InvitedUserVM }
   | { ok: false; error: string };
 
 export async function inviteAdminUser(
@@ -37,22 +37,21 @@ export async function inviteAdminUser(
   }
 
   try {
-    await inviteUser({
+    const user = await inviteUser({
       name: parsed.data.name,
       email: parsed.data.email,
       role: parsed.data.role,
       companyId: null,
       inviterName: actor.name ?? "Administração",
     });
+    revalidatePath(ADMIN_USERS_PATH);
+    return { ok: true, user };
   } catch (error) {
     if (error instanceof AppError) {
       return { ok: false, error: error.message };
     }
     throw error;
   }
-
-  revalidatePath(ADMIN_USERS_PATH);
-  return { ok: true };
 }
 
 export async function setAdminUserActive(

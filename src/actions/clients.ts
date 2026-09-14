@@ -7,6 +7,7 @@ import { AppError } from "@/lib/errors";
 import { CLIENT_ROLES, type ClientRole } from "@/lib/roles";
 import { idSchema } from "@/lib/schemas";
 import { inviteUser, onboardClientCompany } from "@/services/users.service";
+import type { ClientCompanyVM } from "@/lib/types";
 
 const CLIENTS_PATH = "/admin/clientes";
 
@@ -25,7 +26,9 @@ const inviteClientUserSchema = z.object({
 
 export type OnboardClientInput = z.infer<typeof onboardSchema>;
 export type InviteClientUserInput = z.infer<typeof inviteClientUserSchema>;
-export type ClientInviteResult = { ok: true } | { ok: false; error: string };
+export type ClientInviteResult =
+  | { ok: true; company?: ClientCompanyVM }
+  | { ok: false; error: string };
 
 export async function onboardClientCompanyAction(
   input: OnboardClientInput,
@@ -37,21 +40,35 @@ export async function onboardClientCompanyAction(
   }
 
   try {
-    await onboardClientCompany({
+    const created = await onboardClientCompany({
       companyName: parsed.data.companyName,
       contactName: parsed.data.contactName,
       email: parsed.data.email,
       inviterName: actor.name ?? "Administração",
     });
+    revalidatePath(CLIENTS_PATH);
+    return {
+      ok: true,
+      company: {
+        id: created.companyId,
+        name: created.companyName,
+        users: [
+          {
+            id: created.user.id,
+            name: created.user.name,
+            email: created.user.email,
+            role: created.user.role,
+            active: created.user.active,
+          },
+        ],
+      },
+    };
   } catch (error) {
     if (error instanceof AppError) {
       return { ok: false, error: error.message };
     }
     throw error;
   }
-
-  revalidatePath(CLIENTS_PATH);
-  return { ok: true };
 }
 
 export async function inviteClientUserAction(

@@ -15,7 +15,9 @@ export interface UserRow {
   createdAt: Date | string;
 }
 
-type InviteResult = { ok: true } | { ok: false; error: string };
+type InviteResult =
+  | { ok: true; user?: UserRow }
+  | { ok: false; error: string };
 
 interface Props {
   title: string;
@@ -45,6 +47,12 @@ export function UsersManagementView({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<AdminRole>(roleOptions?.[0] ?? "ADMIN");
+  const [added, setAdded] = useState<UserRow[]>([]);
+  const [activeById, setActiveById] = useState<Record<string, boolean>>({});
+
+  const visibleUsers = [...users, ...added.filter((u) => !users.some((e) => e.id === u.id))].map(
+    (u) => (activeById[u.id] === undefined ? u : { ...u, active: activeById[u.id] }),
+  );
 
   const handleInvite = (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +66,9 @@ export function UsersManagementView({
       if (!result.ok) {
         setError(result.error);
         return;
+      }
+      if (result.user) {
+        setAdded((list) => [...list, result.user!]);
       }
       setName("");
       setEmail("");
@@ -74,6 +85,7 @@ export function UsersManagementView({
         setError(result.error);
         return;
       }
+      setActiveById((prev) => ({ ...prev, [userId]: active }));
       router.refresh();
     });
   };
@@ -168,7 +180,7 @@ export function UsersManagementView({
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
-        {users.map((u) => (
+        {visibleUsers.map((u) => (
           <div
             key={u.id}
             className={`rounded-xl border bg-white p-4 ${
@@ -221,7 +233,7 @@ export function UsersManagementView({
         ))}
       </div>
 
-      {users.length === 0 && (
+      {visibleUsers.length === 0 && (
         <p className="mt-8 text-center text-sm text-slate-400">
           Ainda não há outros utilizadores. Convide o primeiro acima.
         </p>

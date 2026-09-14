@@ -22,7 +22,7 @@ const inviteCompanyUserSchema = z.object({
 export type InviteCompanyUserInput = z.infer<typeof inviteCompanyUserSchema>;
 
 export type InviteCompanyUserResult =
-  | { ok: true }
+  | { ok: true; user?: InvitedUserVM }
   | { ok: false; error: string };
 
 export async function inviteCompanyUser(
@@ -35,22 +35,21 @@ export async function inviteCompanyUser(
   }
 
   try {
-    await inviteUser({
+    const user = await inviteUser({
       name: parsed.data.name,
       email: parsed.data.email,
       role: "CLIENT_USER",
       companyId: actor.companyId,
       inviterName: actor.name ?? "Administrador da empresa",
     });
+    revalidatePath(DASHBOARD_USERS_PATH);
+    return { ok: true, user };
   } catch (error) {
     if (error instanceof AppError) {
       return { ok: false, error: error.message };
     }
     throw error;
   }
-
-  revalidatePath(DASHBOARD_USERS_PATH);
-  return { ok: true };
 }
 
 export async function setCompanyUserActive(
