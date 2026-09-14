@@ -101,7 +101,13 @@ armazenamento ainda não está configurado.
 
 ## Deploy (Vercel + Supabase)
 
-1. Criar projeto na Vercel a partir deste repositório.
+O GitHub Actions (workflow **CI**) corre em **todos os branches**. Os projectos
+Vercel da fábrica **não** fazem build no push: o `vercel.json` da raiz tem
+`git.deploymentEnabled: false`. Só depois dos testes passarem é que o job
+`deploy` dispara os Deploy Hooks (`main` → produção, `staging` → preview/staging).
+
+1. Criar o projeto na Vercel a partir deste repositório (Root Directory vazio —
+   app Next.js, não `landing/`).
 2. Definir as variáveis de ambiente (`DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`,
    `AUTH_TRUST_HOST`, …). No Supabase, **Connect → Prisma**: `DATABASE_URL` é o
    pooler em transação (`*.pooler.supabase.com:6543`); `DIRECT_URL` é o pooler
@@ -109,6 +115,13 @@ armazenamento ainda não está configurado.
    na Vercel — esse host é IPv6-only e o build falha com `P1001`.
 3. O `postinstall` corre `prisma generate` automaticamente.
 4. O `vercel.json` da raiz corre `prisma migrate deploy` antes de `next build`.
+5. Em cada projeto-fábrica na Vercel: **Settings → Git → Deploy Hooks**. Criar
+   um hook para o branch `main` (e outro para `staging` se esse projeto o usar).
+   Colar os URLs, um por linha, nos secrets do repositório GitHub:
+   - `VERCEL_DEPLOY_HOOKS_PRODUCTION` — hooks de `main`
+   - `VERCEL_DEPLOY_HOOKS_STAGING` — hooks de `staging`
+
+O site em `landing/` é um projeto Vercel à parte e continua a publicar no push.
 
 ## Monitorização (gratuita)
 

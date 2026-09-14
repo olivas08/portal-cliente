@@ -1,12 +1,18 @@
-name: Run Tests
+name: CI
 
 on:
-  pull_request:
   push:
-    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   run-tests:
+    # Same-repo PRs already run via `push` on the head branch; skip the extra
+    # pull_request job. Fork PRs only get pull_request, so those still run.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -62,3 +68,34 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  # Factory Vercel projects have git auto-deploy off (vercel.json). After CI
+  # is green, POST each project's Deploy Hook. One URL per line in the secret.
+  deploy:
+    needs: run-tests
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel deploy hooks
+        env:
+          BRANCH: ${{ github.ref_name }}
+          HOOKS_PRODUCTION: ${{ secrets.VERCEL_DEPLOY_HOOKS_PRODUCTION }}
+          HOOKS_STAGING: ${{ secrets.VERCEL_DEPLOY_HOOKS_STAGING }}
+        run: |
+          if [ "${BRANCH}" = "main" ]; then
+            HOOKS="${HOOKS_PRODUCTION}"
+            SECRET_NAME=VERCEL_DEPLOY_HOOKS_PRODUCTION
+          else
+            HOOKS="${HOOKS_STAGING}"
+            SECRET_NAME=VERCEL_DEPLOY_HOOKS_STAGING
+          fi
+          if [ -z "${HOOKS}" ]; then
+            echo "::warning::No Vercel deploy hooks in secret ${SECRET_NAME}. Add one URL per factory project (Settings → Git → Deploy Hooks). See README Deploy."
+            exit 0
+          fi
+          while IFS= read -r hook || [ -n "${hook}" ]; do
+            hook="${hook%%$'\r'}"
+            [ -z "${hook}" ] && continue
+            curl -fsS -X POST "${hook}" >/dev/null
+            echo "Triggered a Vercel deploy hook."
+          done <<< "${HOOKS}"

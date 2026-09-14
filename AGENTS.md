@@ -120,6 +120,11 @@ invite flow.
 `landing/` is a static marketing site (HTML/CSS), deployed as a separate
 Vercel project from the same repo. It is not part of the Next.js app.
 
+CI (`.github/workflows/tests.yml`) runs on every branch. Factory Vercel
+projects do not auto-deploy on git push (`git.deploymentEnabled: false` in
+the root `vercel.json`); after tests pass, the workflow POSTs Deploy Hooks
+for `main` / `staging`. Landing is unchanged and still deploys from git.
+
 ### Money: planned `Float` → `Decimal`
 
 Every `*Eur` / cost field is currently PostgreSQL `DOUBLE PRECISION`
