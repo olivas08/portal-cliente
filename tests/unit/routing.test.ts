@@ -4,7 +4,7 @@ const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     workOrderStep: { findUnique: vi.fn(), update: vi.fn() },
     workOrder: { update: vi.fn(), findUnique: vi.fn() },
-    nonConformity: { findUnique: vi.fn(), update: vi.fn() },
+    nonConformity: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -19,6 +19,7 @@ vi.mock("next/cache", () => ({
 import {
   startStep,
   pauseStep,
+  reworkStep,
   resolveNonConformity,
   completeWorkOrderFromOffice,
 } from "@/services/production/routing.service";
@@ -58,6 +59,39 @@ describe("pauseStep", () => {
       status: "pending",
     });
     await expect(pauseStep(operator, "s1")).rejects.toThrow(/pausar/);
+  });
+});
+
+describe("reworkStep", () => {
+  it("reopens a done step and resolves every open NC on it", async () => {
+    prismaMock.workOrderStep.findUnique.mockResolvedValue({
+      id: "s1",
+      status: "done",
+      workOrder: {
+        id: "wo1",
+        status: "in_progress",
+        finishedAt: null,
+        steps: [
+          { id: "s1", status: "done", sequence: 1 },
+          { id: "s2", status: "pending", sequence: 2 },
+        ],
+      },
+    });
+
+    await reworkStep("s1");
+
+    expect(prismaMock.workOrderStep.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "s1" },
+        data: expect.objectContaining({ status: "pending" }),
+      }),
+    );
+    expect(prismaMock.nonConformity.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { stepId: "s1", status: "open" },
+        data: expect.objectContaining({ status: "resolved" }),
+      }),
+    );
   });
 });
 

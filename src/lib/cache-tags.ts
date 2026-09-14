@@ -10,7 +10,7 @@
  * under-invalidating shows stale data. Mutations should tag every model they
  * write to, even if a given cached getter doesn't use every field.
  */
-import { revalidateTag } from "next/cache";
+import * as nextCache from "next/cache";
 
 export const CACHE_TAGS = {
   workOrders: "work-orders",
@@ -37,11 +37,17 @@ export const CACHE_TAGS = {
  * Next.js version, `revalidateTag(tag)` with a single argument is deprecated
  * and — when a profile is provided — defaults to stale-while-revalidate
  * ("max") behaviour, which can keep serving stale data until the next
- * visit. We pass `{ expire: 0 }` instead so every write is reflected
- * immediately on the next read, since several call sites (e.g. the machine
- * ingest Route Handler) aren't Server Actions and can't use `updateTag`.
+ * visit. We pass `{ expire: 0 }` so Route Handlers (e.g. machine ingest)
+ * expire immediately. Server Actions also call `updateTag`, which is the
+ * read-your-writes API — without it, `router.refresh()` on `next start`
+ * can keep serving the pre-mutation `unstable_cache` payload.
  */
 export function invalidateCache(tag: string): void {
-  revalidateTag(tag, { expire: 0 });
+  nextCache.revalidateTag(tag, { expire: 0 });
+  try {
+    nextCache.updateTag(tag);
+  } catch {
+    // updateTag is Server-Action-only; unit tests may omit it from the mock.
+  }
 }
 

@@ -105,7 +105,7 @@ export async function setProductRouting(
 /**
  * Reopens a completed step for reprocessing: the step returns to `pending`
  * (re-entering its station queue) and the work order status is recomputed.
- * Any open rework non-conformity on that step is marked resolved.
+ * Any open non-conformity on that step is marked resolved.
  */
 export async function reworkStep(stepId: string): Promise<void> {
   const now = new Date();
@@ -144,7 +144,7 @@ export async function reworkStep(stepId: string): Promise<void> {
     });
 
     await tx.nonConformity.updateMany({
-      where: { stepId, disposition: "rework", status: "open" },
+      where: { stepId, status: "open" },
       data: { status: "resolved", resolvedAt: now },
     });
   });

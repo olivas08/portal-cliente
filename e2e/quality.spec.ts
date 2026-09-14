@@ -17,6 +17,8 @@ test.describe("Não conformidade: registo no terminal → resolução em Qualida
       .first();
     await expect(card).toBeVisible();
 
+    const start = card.getByRole("button", { name: "Iniciar" });
+    if (await start.isVisible()) await start.click();
     await card.getByRole("button", { name: "Concluir" }).click();
     await card.getByRole("button", { name: "Registar não conforme" }).click();
     await card.getByLabel("Qtd. não conforme").fill("2");
@@ -34,13 +36,13 @@ test.describe("Não conformidade: registo no terminal → resolução em Qualida
       "/admin/producao/qualidade"
     );
 
-    const ncRow = qualityPage
-      .locator("div.rounded-lg", { hasText: reason })
-      .first();
+    const ncRow = qualityPage.locator("div.rounded-lg", { hasText: reason });
     await expect(ncRow).toBeVisible();
     await ncRow.getByRole("button", { name: "Reprocessar" }).click();
 
+    await expect(ncRow).toHaveCount(0);
     await expect(qualityPage.getByText(reason)).toHaveCount(0);
+    await expect(qualityPage.getByRole("alert")).toHaveCount(0);
     await qualityCtx.close();
   });
 });

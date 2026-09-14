@@ -24,8 +24,11 @@ export function QualityView({ nonConformities }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
 
-  const run = (fn: () => Promise<unknown>) => {
+  const visible = nonConformities.filter((nc) => !dismissedIds.includes(nc.id));
+
+  const run = (id: string, fn: () => Promise<unknown>) => {
     setError(null);
     startTransition(async () => {
       try {
@@ -35,6 +38,7 @@ export function QualityView({ nonConformities }: Props) {
           setError(msg);
           return;
         }
+        setDismissedIds((ids) => [...ids, id]);
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Ocorreu um erro.");
@@ -65,13 +69,16 @@ export function QualityView({ nonConformities }: Props) {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 mb-5 text-sm text-red-700">
+        <div
+          role="alert"
+          className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 mb-5 text-sm text-red-700"
+        >
           <AlertCircle size={16} /> {error}
         </div>
       )}
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
-        {nonConformities.length === 0 ? (
+        {visible.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-center">
             <Check size={32} className="text-emerald-500 mb-2" />
             <p className="text-sm text-slate-500">
@@ -80,7 +87,7 @@ export function QualityView({ nonConformities }: Props) {
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {nonConformities.map((nc) => (
+            {visible.map((nc) => (
               <div
                 key={nc.id}
                 className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3"
@@ -115,7 +122,7 @@ export function QualityView({ nonConformities }: Props) {
                 <div className="flex items-center gap-2 shrink-0">
                   {nc.canRework && nc.stepId && (
                     <button
-                      onClick={() => run(() => reworkStep(nc.stepId!))}
+                      onClick={() => run(nc.id, () => reworkStep(nc.stepId!))}
                       disabled={pending}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 text-slate-900 text-sm font-semibold px-3 py-2 hover:bg-amber-400 disabled:opacity-60"
                     >
@@ -123,7 +130,7 @@ export function QualityView({ nonConformities }: Props) {
                     </button>
                   )}
                   <button
-                    onClick={() => run(() => resolveNonConformity(nc.id))}
+                    onClick={() => run(nc.id, () => resolveNonConformity(nc.id))}
                     disabled={pending}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 px-3 py-2 hover:bg-slate-50 disabled:opacity-60"
                   >

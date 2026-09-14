@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, refresh } from "next/cache";
 import { requireAdminArea } from "@/lib/auth-guard";
 import { guardAction } from "@/lib/errors";
 import {
@@ -147,6 +147,7 @@ export async function reworkStep(stepId: string) {
     revalidatePath(ADMIN_QUALITY);
     revalidatePath(ADMIN_BOARD);
     revalidatePath(TERMINAL);
+    refresh();
   });
 }
 
@@ -158,6 +159,7 @@ export async function resolveNonConformity(id: string) {
     await resolveNonConformityService(data.id);
 
     revalidatePath(ADMIN_QUALITY);
+    refresh();
   });
 }
 
@@ -210,6 +212,7 @@ export async function completeStepAction(input: CompleteStepInput) {
 
     revalidatePath(TERMINAL);
     revalidatePath(ADMIN_BOARD);
+    if (data.defect) revalidatePath(ADMIN_QUALITY);
   });
 }
 
