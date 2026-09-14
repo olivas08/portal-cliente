@@ -96,14 +96,11 @@
   figcaption { border-top: 1px solid rgba(74,95,107,.2); background: #f8fafc; padding: 12px 16px; font-size: 14px; color: #475569; }
   .contact-wrap { max-width: 560px; margin: 0 auto; text-align: center; }
   .founder-card { text-align: center; }
-  .founder-photo, .founder-avatar {
+  .founder-solo { max-width: 520px; margin: 48px auto 0; }
+  .founder-photo {
     width: 200px; height: 240px; border-radius: 16px; margin: 0 auto 20px;
     box-shadow: 0 2px 10px rgba(0,0,0,.1);
-  }
-  .founder-photo { object-fit: cover; object-position: top; }
-  .founder-avatar {
-    background: var(--brand); color: #fff; display: flex; align-items: center; justify-content: center;
-    font-size: 40px; font-weight: 700;
+    object-fit: cover; object-position: top;
   }
   .founder-card h3 { font-size: 18px; }
   .founder-role { color: var(--accent-dark); font-weight: 600; font-size: 14px; margin-top: 4px; }
@@ -279,20 +276,14 @@
   <div class="wrap">
     <div class="center" style="max-width:640px;margin:0 auto;">
       <h2>Quem somos</h2>
-      <p class="lead">Duas pessoas, um objetivo: tirar a fábrica do papel e do Excel.</p>
+      <p class="lead">De Vale de Cambra, com um objetivo: tirar a fábrica do papel e do Excel.</p>
     </div>
-    <div class="grid grid-2">
+    <div class="founder-solo">
       <div class="card card-shadow founder-card">
         <img class="founder-photo" src="founder-nuno.png" alt="Nuno Oliveira" />
         <h3>Nuno Oliveira</h3>
         <div class="founder-role">Founder &amp; CEO</div>
         <p class="founder-bio">Engenheiro de Software (ISEP). Nos últimos anos desenvolveu software para seguradoras norte-americanas como a Voya e a New York Life, e atualmente constrói software crítico de chão de fábrica para a BMW. Também desenvolveu uma solução digital para implementação de novos produtos na Colep. Já foi operador de chão de fábrica em Vale de Cambra — conhece os processos por dentro e foi essa combinação de experiência técnica e industrial que deu origem à Operon.</p>
-      </div>
-      <div class="card card-shadow founder-card">
-        <div class="founder-avatar">DB</div>
-        <h3>Duarte Bastos</h3>
-        <div class="founder-role">Co-Founder &amp; CCO</div>
-        <p class="founder-bio">Licenciado em Gestão de Marketing (IPAM) e Mestre em Direção Comercial (ISCAP). Key Account Manager na Acerinox Europa, onde gere relações comerciais com contas que vão de grandes corporações a PMEs. Traz essa experiência para a Operon, garantindo que cada projeto começa com uma conversa real sobre as dores do negócio, não com uma apresentação genérica.</p>
       </div>
     </div>
   </div>
@@ -310,7 +301,7 @@
 
 <footer>
   <img src="operon-icon.svg" alt="Operon" width="28" height="28" />
-  <p>Operon · Nuno Oliveira &amp; Duarte Bastos · Vale de Cambra, Portugal</p>
+  <p>Operon · Nuno Oliveira · Vale de Cambra, Portugal</p>
 </footer>
 
 </body>
