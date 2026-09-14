@@ -1,11 +1,12 @@
 import type { OrderStatus } from "@/lib/types";
+import { ORDER_STATUS_SHORT_LABELS } from "@/lib/types";
 
-const STAGES: { id: OrderStatus; label: string }[] = [
-  { id: "pending", label: "Pendente" },
-  { id: "production", label: "Em Produção" },
-  { id: "quality", label: "Controlo Q." },
-  { id: "shipped", label: "Expedido" },
-  { id: "delivered", label: "Entregue" },
+const STAGES: OrderStatus[] = [
+  "pending",
+  "production",
+  "quality",
+  "shipped",
+  "delivered",
 ];
 
 const stageIndex: Record<OrderStatus, number> = {
@@ -21,7 +22,7 @@ export function StatusStepper({ status }: { status: OrderStatus }) {
   const current = stageIndex[status];
   return (
     <div className="flex items-center gap-0">
-      {STAGES.map((stage, i) => {
+      {STAGES.map((stageId, i) => {
         // Each stage label represents a milestone already reached once the
         // order is at or past that status (e.g. "Expedido" means shipping
         // already happened), so the current stage also gets a checkmark —
@@ -29,7 +30,7 @@ export function StatusStepper({ status }: { status: OrderStatus }) {
         const done = i <= current;
         const active = i === current;
         return (
-          <div key={stage.id} className="flex items-center flex-1 last:flex-none">
+          <div key={stageId} className="flex items-center flex-1 last:flex-none">
             <div className="flex flex-col items-center gap-1">
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${
@@ -51,7 +52,7 @@ export function StatusStepper({ status }: { status: OrderStatus }) {
                     : "text-slate-300"
                 }`}
               >
-                {stage.label}
+                {ORDER_STATUS_SHORT_LABELS[stageId]}
               </span>
             </div>
             {i < STAGES.length - 1 && (

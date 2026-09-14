@@ -1,13 +1,12 @@
 export const dynamic = "force-dynamic";
 
 import { Package, Loader, CheckCircle } from "lucide-react";
-import { auth } from "@/auth";
+import { requireSessionUser } from "@/lib/auth-guard";
 import { getOrdersForCompany } from "@/lib/data";
 import { ClientOrdersList } from "@/components/ClientOrdersList";
 
 export default async function DashboardPage() {
-  const session = await auth();
-  const user = session!.user;
+  const user = await requireSessionUser();
   const myOrders = user.companyId
     ? await getOrdersForCompany(user.companyId)
     : [];

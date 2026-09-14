@@ -5,6 +5,7 @@ import { assertCompanyAccess, type ClientUser, type SessionUser } from "@/lib/au
 import { isAdminRole } from "@/lib/roles";
 import { createWithReference } from "@/services/reference.service";
 import { notifyAdmins, notifyCompanyClients } from "@/services/notifications.service";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import type { MessageFrom, RequestStatus } from "@/lib/types";
 
 export const createRequestSchema = z.object({
@@ -68,6 +69,7 @@ export async function createRequest(
     href: `/admin/requerimentos/${request.id}`,
   });
 
+  invalidateCache(CACHE_TAGS.requests);
   return request.id;
 }
 
@@ -126,6 +128,7 @@ export async function addRequestMessage(
       actor.id,
     );
   }
+  invalidateCache(CACHE_TAGS.requests);
 }
 
 export async function updateRequestStatus(
@@ -136,4 +139,5 @@ export async function updateRequestStatus(
     where: { id: requestId },
     data: { status },
   });
+  invalidateCache(CACHE_TAGS.requests);
 }

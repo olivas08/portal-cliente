@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { QuoteSummaryVM } from "@/lib/types";
 import { QuoteStatusBadge } from "@/components/QuoteBadges";
+import { formatEur } from "@/lib/format";
 
 export function ClientQuotesList({ quotes }: { quotes: QuoteSummaryVM[] }) {
   const pendingCount = quotes.filter((q) => q.status === "sent").length;
@@ -42,7 +43,7 @@ export function ClientQuotesList({ quotes }: { quotes: QuoteSummaryVM[] }) {
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
                 <span className="text-sm font-semibold text-slate-700">
-                  {q.totalEur.toFixed(2)} €
+                  {formatEur(q.totalEur)}
                 </span>
                 <QuoteStatusBadge status={q.status} />
               </div>

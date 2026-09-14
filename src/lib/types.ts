@@ -21,6 +21,7 @@ export type MaintenanceType = $Enums.MaintenanceType;
 export type MaintenanceStatus = $Enums.MaintenanceStatus;
 export type InvoiceProvider = $Enums.InvoiceProvider;
 export type InvoiceStatus = $Enums.InvoiceStatus;
+export type MachineState = $Enums.MachineState;
 
 export interface NotificationVM {
   id: string;
@@ -347,7 +348,7 @@ export interface MachineVM {
   name: string;
   active: boolean;
   online: boolean;
-  state: "run" | "idle" | "down" | "offline";
+  state: MachineState;
   lastSeenAt: string | null;
   stationName: string | null;
   stationId: string | null;

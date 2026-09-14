@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdminArea, requireClient, requireUser } from "@/lib/auth-guard";
+import { idSchema } from "@/lib/schemas";
 import {
   addRequestMessage as addRequestMessageService,
   createRequest as createRequestService,
@@ -30,7 +31,7 @@ export async function addRequestMessage(requestId: string, rawText: string) {
   const user = await requireUser();
   const text = requestMessageSchema.parse(rawText);
 
-  await addRequestMessageService(user, requestId, text);
+  await addRequestMessageService(user, idSchema.parse(requestId), text);
 
   revalidatePath(`/dashboard/requerimentos/${requestId}`);
   revalidatePath(`/admin/requerimentos/${requestId}`);
@@ -42,7 +43,7 @@ export async function updateRequestStatus(requestId: string, status: string) {
   await requireAdminArea("comercial");
   const parsed = requestStatusSchema.parse(status);
 
-  await updateRequestStatusService(requestId, parsed);
+  await updateRequestStatusService(idSchema.parse(requestId), parsed);
 
   revalidatePath(`/admin/requerimentos/${requestId}`);
   revalidatePath(`/dashboard/requerimentos/${requestId}`);

@@ -25,6 +25,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/portal_e2e
       DIRECT_URL: postgresql://postgres:postgres@localhost:5432/portal_e2e
       AUTH_SECRET: e2e-ci-secret-not-for-production
+      AUTH_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v4
 
@@ -37,11 +38,21 @@ jobs:
 
       - run: npm ci
 
+      - run: npm run typecheck
+
+      - run: npm run lint
+
       - run: npm test
+
+      - run: npm test --prefix edge-gateway
 
       - run: npx playwright install --with-deps chromium
 
       - run: npx prisma migrate deploy
+
+      - run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+
+      - run: npm run build
 
       - run: npm run test:e2e
 

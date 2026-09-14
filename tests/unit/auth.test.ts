@@ -48,21 +48,12 @@ vi.mock("bcryptjs", () => ({
 
 import { registerAction, requestPasswordReset, resetPassword } from "@/actions/auth";
 
-const validRegisterInput = {
-  companyName: "Auto Peças Mota, Lda.",
-  name: "Jorge Mota",
-  email: "jorge@motapecas.pt",
-  password: "segredo123",
-};
-
 beforeEach(() => {
   vi.clearAllMocks();
   mockHash.mockResolvedValue("hashed-password");
   mockGetBaseUrl.mockResolvedValue("https://portal.example.com");
   prismaMock.user.findUnique.mockResolvedValue(null);
-  prismaMock.company.create.mockResolvedValue({ id: "c-new" });
   prismaMock.rateLimitAttempt.count.mockResolvedValue(0);
-  // $transaction receives a callback; execute it with a tx object mirroring prismaMock.
   prismaMock.$transaction.mockImplementation(async (arg) => {
     if (typeof arg === "function") {
       return arg({ company: prismaMock.company, user: { create: vi.fn() } });
@@ -72,50 +63,18 @@ beforeEach(() => {
   mockSignIn.mockResolvedValue(undefined);
 });
 
-describe("registerAction — validation", () => {
-  it("rejects a company name that is too short", async () => {
-    const result = await registerAction({ ...validRegisterInput, companyName: "A" });
-    expect(result.ok).toBe(false);
-  });
-
-  it("rejects an invalid email", async () => {
-    const result = await registerAction({ ...validRegisterInput, email: "not-an-email" });
-    expect(result.ok).toBe(false);
-  });
-
-  it("rejects a short password", async () => {
-    const result = await registerAction({ ...validRegisterInput, password: "123" });
-    expect(result.ok).toBe(false);
-  });
-});
-
-describe("registerAction — duplicate email", () => {
-  it("rejects when the email is already registered", async () => {
-    prismaMock.user.findUnique.mockResolvedValue({ id: "u1" });
-    const result = await registerAction(validRegisterInput);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/já existe/i);
-    expect(prismaMock.$transaction).not.toHaveBeenCalled();
-  });
-});
-
-describe("registerAction — success", () => {
-  it("creates the company and user, then signs the user in", async () => {
-    const result = await registerAction(validRegisterInput);
-    expect(result.ok).toBe(true);
-    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
-    expect(mockHash).toHaveBeenCalledWith(validRegisterInput.password, 10);
-    expect(mockSignIn).toHaveBeenCalledWith("credentials", {
-      email: validRegisterInput.email,
-      password: validRegisterInput.password,
-      redirect: false,
+describe("registerAction — public registration closed", () => {
+  it("rejects every attempt without creating a company or user", async () => {
+    const result = await registerAction({
+      companyName: "Auto Peças Mota, Lda.",
+      name: "Jorge Mota",
+      email: "jorge@motapecas.pt",
+      password: "segredo123",
     });
-  });
-
-  it("still reports success even if the auto sign-in throws", async () => {
-    mockSignIn.mockRejectedValue(new Error("boom"));
-    const result = await registerAction(validRegisterInput);
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/convite/i);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(mockSignIn).not.toHaveBeenCalled();
   });
 });
 

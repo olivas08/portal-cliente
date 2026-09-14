@@ -199,6 +199,7 @@ export async function orderFromCatalog(
     href: `/admin/ordens/${order.id}`,
   });
 
+  invalidateCache(CACHE_TAGS.orders);
   return order.id;
 }
 

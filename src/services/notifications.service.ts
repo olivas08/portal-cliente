@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import type { NotificationType, NotificationVM } from "@/lib/types";
 import { ADMIN_ROLES, CLIENT_ROLES } from "@/lib/roles";
 
@@ -45,6 +46,7 @@ async function notifyUsers(
   await prisma.notification.createMany({
     data: userIds.map((userId) => ({ userId, ...data })),
   });
+  invalidateCache(CACHE_TAGS.notifications);
 }
 
 /**
@@ -105,6 +107,7 @@ export async function markRead(userId: string, id: string): Promise<void> {
     where: { id, userId, readAt: null },
     data: { readAt: new Date() },
   });
+  invalidateCache(CACHE_TAGS.notifications);
 }
 
 export async function markAllRead(userId: string): Promise<void> {
@@ -112,4 +115,5 @@ export async function markAllRead(userId: string): Promise<void> {
     where: { userId, readAt: null },
     data: { readAt: new Date() },
   });
+  invalidateCache(CACHE_TAGS.notifications);
 }

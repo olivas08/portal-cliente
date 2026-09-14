@@ -13,13 +13,12 @@ import {
 } from "lucide-react";
 import type { CatalogProductVM } from "@/lib/types";
 import { placeCatalogOrder } from "@/actions/products";
+import { formatEur } from "@/lib/format";
+import { inputCls } from "@/components/ui/Input";
 
 interface Props {
   products: CatalogProductVM[];
 }
-
-const inputCls =
-  "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400";
 
 export function CatalogView({ products }: Props) {
   const router = useRouter();
@@ -215,7 +214,7 @@ export function CatalogView({ products }: Props) {
                     </p>
                     <div className="flex items-center justify-between mt-3">
                       <p className="text-sm font-bold text-brand">
-                        {p.unitPriceEur.toFixed(2)} €
+                        {formatEur(p.unitPriceEur)}
                         <span className="text-xs font-normal text-slate-400">
                           /{p.unit}
                         </span>
@@ -288,8 +287,8 @@ export function CatalogView({ products }: Props) {
                         {product.name}
                       </p>
                       <p className="text-xs text-slate-400">
-                        {qty} × {product.unitPriceEur.toFixed(2)} € ={" "}
-                        {(qty * product.unitPriceEur).toFixed(2)} €
+                        {qty} × {formatEur(product.unitPriceEur)} ={" "}
+                        {formatEur(qty * product.unitPriceEur)}
                       </p>
                     </div>
                     <input
@@ -316,7 +315,7 @@ export function CatalogView({ products }: Props) {
 
               <div className="flex items-center justify-between text-sm pt-1 border-t border-slate-100">
                 <span className="text-slate-500">Total (s/ IVA)</span>
-                <strong className="text-brand">{total.toFixed(2)} €</strong>
+                <strong className="text-brand">{formatEur(total)}</strong>
               </div>
 
               <div>

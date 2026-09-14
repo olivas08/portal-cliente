@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { PortalNav } from "@/components/PortalNav";
 import { BreadcrumbProvider } from "@/components/BreadcrumbContext";
 import {
-  countUnread,
-  listNotifications,
-} from "@/services/notifications.service";
+  getCompanyName,
+  getNotificationsForUser,
+  getUnreadNotificationCount,
+} from "@/lib/data";
 import { isClientRole } from "@/lib/roles";
 
 export default async function DashboardLayout({
@@ -21,16 +21,12 @@ export default async function DashboardLayout({
 
   let company = "";
   if (user.companyId) {
-    const c = await prisma.company.findUnique({
-      where: { id: user.companyId },
-      select: { name: true },
-    });
-    company = c?.name ?? "";
+    company = await getCompanyName(user.companyId);
   }
 
   const [notifications, unreadCount] = await Promise.all([
-    listNotifications(user.id),
-    countUnread(user.id),
+    getNotificationsForUser(user.id),
+    getUnreadNotificationCount(user.id),
   ]);
 
   return (

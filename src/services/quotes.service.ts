@@ -269,6 +269,7 @@ export async function createQuote(data: QuoteInput): Promise<string> {
     }),
   );
 
+  invalidateCache(CACHE_TAGS.quotes);
   return quote.id;
 }
 
@@ -324,11 +325,13 @@ export async function updateQuote(id: string, data: QuoteInput): Promise<void> {
     if (isUniqueViolation(err)) throw new AppError("Referência de orçamento em conflito.");
     throw err;
   }
+  invalidateCache(CACHE_TAGS.quotes);
 }
 
 export async function deleteQuote(id: string): Promise<void> {
   await requireDraftQuote(id);
   await prisma.quote.delete({ where: { id } });
+  invalidateCache(CACHE_TAGS.quotes);
 }
 
 /** Marks a draft quote as sent, making it visible to the client, and notifies them. */
@@ -346,6 +349,7 @@ export async function sendQuote(id: string): Promise<void> {
     body: `Recebeu um novo orçamento: ${quote.subject}.`,
     href: `/dashboard/orcamentos/${quote.id}`,
   });
+  invalidateCache(CACHE_TAGS.quotes);
 }
 
 // ── Client: accept / reject ─────────────────────────────────────────────────
@@ -419,5 +423,7 @@ export async function decideQuote(
     href: `/admin/orcamentos/${quote.id}`,
   });
 
+  invalidateCache(CACHE_TAGS.quotes);
+  if (orderId) invalidateCache(CACHE_TAGS.orders);
   return orderId;
 }

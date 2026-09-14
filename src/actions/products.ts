@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdminArea, requireClient } from "@/lib/auth-guard";
+import { idSchema, booleanSchema } from "@/lib/schemas";
+import { guardAction } from "@/lib/errors";
 import {
   createProduct as createProductService,
   updateProduct as updateProductService,
@@ -33,7 +35,7 @@ export async function updateProduct(id: string, input: ProductInput) {
   await requireAdminArea("armazem");
   const data = productSchema.parse(input);
 
-  await updateProductService(id, data);
+  await updateProductService(idSchema.parse(id), data);
 
   revalidatePath("/admin/produtos");
   revalidatePath("/dashboard/catalogo");
@@ -42,7 +44,7 @@ export async function updateProduct(id: string, input: ProductInput) {
 export async function setProductActive(id: string, active: boolean) {
   await requireAdminArea("armazem");
 
-  await setProductActiveService(id, active);
+  await setProductActiveService(idSchema.parse(id), booleanSchema.parse(active));
 
   revalidatePath("/admin/produtos");
   revalidatePath("/dashboard/catalogo");
@@ -61,11 +63,13 @@ export async function placeCatalogOrder(input: CatalogOrderInput) {
 
 /** Bulk import of catalog products from a parsed/validated CSV (see ProductsImportModal). */
 export async function importProducts(input: ProductImportRow[]) {
-  await requireAdminArea("armazem");
-  const data = bulkImportProductsSchema.parse(input);
-  const result = await importProductsService(data);
+  return guardAction(async () => {
+    await requireAdminArea("armazem");
+    const data = bulkImportProductsSchema.parse(input);
+    const result = await importProductsService(data);
 
-  revalidatePath("/admin/produtos");
-  revalidatePath("/dashboard/catalogo");
-  return result;
+    revalidatePath("/admin/produtos");
+    revalidatePath("/dashboard/catalogo");
+    return result;
+  });
 }

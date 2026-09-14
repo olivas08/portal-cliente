@@ -1,13 +1,12 @@
 export const dynamic = "force-dynamic";
 
-import { auth } from "@/auth";
+import { requireSessionUser } from "@/lib/auth-guard";
 import { getRequestsForCompany } from "@/lib/data";
 import { ClientRequestsList } from "@/components/ClientRequestsList";
 import { NewRequestModal } from "@/components/NewRequestModal";
 
 export default async function ClientRequestsPage() {
-  const session = await auth();
-  const user = session!.user;
+  const user = await requireSessionUser();
   const myRequests = user.companyId
     ? await getRequestsForCompany(user.companyId)
     : [];

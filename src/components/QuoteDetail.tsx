@@ -8,6 +8,7 @@ import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
 import { QuoteStatusBadge } from "@/components/QuoteBadges";
 import { sendQuote, decideQuote } from "@/actions/quotes";
 import { actionError } from "@/lib/action-result";
+import { formatEur } from "@/lib/format";
 
 async function downloadQuotePdf(quote: QuoteVM) {
   const mod = await import("@/lib/generatePdf");
@@ -115,7 +116,7 @@ export function QuoteDetail({ quote, isAdmin }: { quote: QuoteVM; isAdmin: boole
                   {l.quantity} {l.unit}
                 </td>
                 <td className="px-4 py-2.5 text-right font-medium text-slate-700">
-                  {l.lineTotalEur.toFixed(2)} €
+                  {formatEur(l.lineTotalEur)}
                 </td>
               </tr>
             ))}
@@ -126,7 +127,7 @@ export function QuoteDetail({ quote, isAdmin }: { quote: QuoteVM; isAdmin: boole
             Margem incluída: {quote.marginPercent}%
           </span>
           <span className="text-base font-bold text-slate-800">
-            Total: {quote.totalEur.toFixed(2)} €
+            Total: {formatEur(quote.totalEur)}
           </span>
         </div>
       </div>

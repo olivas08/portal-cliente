@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { requireSessionUser } from "@/lib/auth-guard";
 import { getOrderById, getOrderProduction } from "@/lib/data";
 import { OrderDetail } from "@/components/OrderDetail";
 
@@ -11,14 +11,13 @@ export default async function ClientOrderDetail({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await auth();
-  const user = session!.user;
+  const user = await requireSessionUser();
+  if (!user.companyId) redirect("/dashboard");
 
-  const order = await getOrderById(id);
+  const order = await getOrderById(id, user.companyId);
   if (!order) notFound();
-  if (order.companyId !== user.companyId) redirect("/dashboard");
 
-  const production = await getOrderProduction(id);
+  const production = await getOrderProduction(id, user.companyId);
 
   return (
     <OrderDetail

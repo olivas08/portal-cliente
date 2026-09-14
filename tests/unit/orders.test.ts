@@ -168,6 +168,7 @@ const validOrderInput = {
   companyId: "c1",
   batchNumber: "LT-2026-090",
   expectedDate: "2026-08-01",
+  priority: "normal" as const,
   items: [
     { reference: "REF-1", description: "Peça X", quantity: 10, unit: "un", unitPriceEur: 2.5 },
   ],

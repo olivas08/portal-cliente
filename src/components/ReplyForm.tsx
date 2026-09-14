@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { Send } from "lucide-react";
+import { actionError } from "@/lib/action-result";
+import { Alert } from "@/components/ui/Alert";
 import { addRequestMessage } from "@/actions/requests";
 
 export function ReplyForm({
@@ -14,14 +16,25 @@ export function ReplyForm({
   buttonLabel: string;
 }) {
   const [reply, setReply] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const submit = () => {
     const text = reply.trim();
     if (!text || pending) return;
+    setError(null);
     startTransition(async () => {
-      await addRequestMessage(requestId, text);
-      setReply("");
+      try {
+        const res = await addRequestMessage(requestId, text);
+        const msg = actionError(res);
+        if (msg) {
+          setError(msg);
+          return;
+        }
+        setReply("");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Ocorreu um erro.");
+      }
     });
   };
 
@@ -31,8 +44,10 @@ export function ReplyForm({
         e.preventDefault();
         submit();
       }}
-      className="bg-white rounded-xl shadow-sm p-4 flex gap-3 items-end"
+      className="bg-white rounded-xl shadow-sm p-4 flex flex-col gap-3"
     >
+      {error && <Alert>{error}</Alert>}
+      <div className="flex gap-3 items-end">
       <textarea
         value={reply}
         onChange={(e) => setReply(e.target.value)}
@@ -50,6 +65,7 @@ export function ReplyForm({
       >
         <Send size={14} /> {buttonLabel}
       </button>
+      </div>
     </form>
   );
 }

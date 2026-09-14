@@ -19,6 +19,7 @@ import type {
 } from "@/lib/types";
 import { MACHINE_STATE_LABELS } from "@/lib/types";
 import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
+import { formatRelativeTime } from "@/lib/format";
 import {
   createMachine,
   setMachineActive,
@@ -29,17 +30,6 @@ interface Props {
   machines: MachineVM[];
   discrepancies: DiscrepancyVM[];
   stations: WorkstationOptionVM[];
-}
-
-function timeAgo(iso: string | null): string {
-  if (!iso) return "nunca";
-  const secs = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-  if (secs < 5) return "agora";
-  if (secs < 60) return `há ${secs}s`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `há ${mins}min`;
-  const h = Math.floor(mins / 60);
-  return `há ${h}h`;
 }
 
 const STATE_STYLE: Record<MachineVM["state"], string> = {
@@ -253,7 +243,7 @@ export function MachinesView({ machines, discrepancies, stations }: Props) {
                 </div>
                 <p className="mt-0.5 text-xs text-slate-400 font-mono">
                   {m.code} · {m.stationName ?? "sem posto"} ·{" "}
-                  {timeAgo(m.lastSeenAt)}
+                  {formatRelativeTime(m.lastSeenAt)}
                 </p>
               </div>
               <div className="flex items-center gap-1">

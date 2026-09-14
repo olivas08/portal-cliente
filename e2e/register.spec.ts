@@ -1,35 +1,20 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Registo de novos clientes", () => {
-  test("empresa regista-se e entra automaticamente no dashboard", async ({
+  test("página de registo explica que o acesso é por convite", async ({
     page,
   }) => {
-    const stamp = Date.now();
-    const email = `e2e-${stamp}@empresa-teste.pt`;
-
     await page.goto("/login");
-    await page.getByRole("link", { name: /Registar a minha empresa/ }).click();
+    await page.getByRole("link", { name: /Pedir convite/ }).click();
     await expect(page).toHaveURL(/\/registo/);
-
-    await page.getByPlaceholder("Ex: Auto Peças Mota, Lda.").fill(`Empresa Teste ${stamp}`);
-    await page.getByPlaceholder("Ex: Jorge Mota").fill("Utilizador Teste");
-    await page.getByPlaceholder("o.seu@email.pt").fill(email);
-    await page.getByPlaceholder("Mínimo 6 caracteres").fill("password123");
-    await page.getByRole("button", { name: "Criar conta" }).click();
-
-    await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.getByText("Bem-vindo", { exact: false })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Registo por convite/ })).toBeVisible();
+    await expect(page.getByText(/acesso ao portal é concedido pela fábrica/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Criar conta" })).toHaveCount(0);
   });
 
-  test("rejeita registo com email já existente", async ({ page }) => {
+  test("não existe formulário de auto-registo", async ({ page }) => {
     await page.goto("/registo");
-    await page.getByPlaceholder("Ex: Auto Peças Mota, Lda.").fill("Outra Empresa");
-    await page.getByPlaceholder("Ex: Jorge Mota").fill("Alguém");
-    await page.getByPlaceholder("o.seu@email.pt").fill("compras@motapecas.pt");
-    await page.getByPlaceholder("Mínimo 6 caracteres").fill("password123");
-    await page.getByRole("button", { name: "Criar conta" }).click();
-
-    await expect(page.getByText(/Já existe uma conta/)).toBeVisible();
-    await expect(page).toHaveURL(/\/registo/);
+    await expect(page.getByPlaceholder("Ex: Auto Peças Mota, Lda.")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Já tem conta/ })).toBeVisible();
   });
 });

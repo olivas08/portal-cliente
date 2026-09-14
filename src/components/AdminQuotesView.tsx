@@ -7,6 +7,7 @@ import type { QuoteSummaryVM, QuoteStatus } from "@/lib/types";
 import { matchesSearch } from "@/lib/search";
 import { SearchInput } from "@/components/SearchInput";
 import { QuoteStatusBadge } from "@/components/QuoteBadges";
+import { formatEur } from "@/lib/format";
 
 const STATUS_FILTERS: { id: QuoteStatus | "all"; label: string }[] = [
   { id: "all", label: "Todos" },
@@ -125,7 +126,7 @@ export function AdminQuotesView({
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
                 <span className="text-sm font-semibold text-slate-700">
-                  {q.totalEur.toFixed(2)} €
+                  {formatEur(q.totalEur)}
                 </span>
                 <QuoteStatusBadge status={q.status} />
               </div>

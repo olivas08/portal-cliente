@@ -3,14 +3,17 @@
 import { useState, useTransition } from "react";
 import { Check } from "lucide-react";
 import type { OrderStatus } from "@/lib/types";
+import { ORDER_STATUS_LABELS } from "@/lib/types";
+import { actionError } from "@/lib/action-result";
+import { Alert } from "@/components/ui/Alert";
 import { updateOrderStatus } from "@/actions/orders";
 
-const STAGES: { id: OrderStatus; label: string; desc: string }[] = [
-  { id: "pending", label: "Pendente", desc: "Aguarda início de produção" },
-  { id: "production", label: "Em Produção", desc: "A ser fabricada" },
-  { id: "quality", label: "Controlo Qualidade", desc: "Inspeção em curso" },
-  { id: "shipped", label: "Expedido", desc: "Enviado ao cliente" },
-  { id: "delivered", label: "Entregue", desc: "Receção confirmada" },
+const STAGES: { id: OrderStatus; desc: string }[] = [
+  { id: "pending", desc: "Aguarda início de produção" },
+  { id: "production", desc: "A ser fabricada" },
+  { id: "quality", desc: "Inspeção em curso" },
+  { id: "shipped", desc: "Enviado ao cliente" },
+  { id: "delivered", desc: "Receção confirmada" },
 ];
 
 export function OrderStatusControl({
@@ -21,14 +24,25 @@ export function OrderStatusControl({
   status: OrderStatus;
 }) {
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const handleStatusChange = (next: OrderStatus) => {
     if (next === status || pending) return;
+    setError(null);
     startTransition(async () => {
-      await updateOrderStatus(orderId, next);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      try {
+        const res = await updateOrderStatus(orderId, next);
+        const msg = actionError(res);
+        if (msg) {
+          setError(msg);
+          return;
+        }
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Ocorreu um erro.");
+      }
     });
   };
 
@@ -45,8 +59,11 @@ export function OrderStatusControl({
         )}
       </div>
 
+      {error && <Alert className="mb-3">{error}</Alert>}
+
       <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
-        {STAGES.map(({ id: stageId, label, desc }) => {
+        {STAGES.map(({ id: stageId, desc }) => {
+          const label = ORDER_STATUS_LABELS[stageId];
           const isCurrent = status === stageId;
           return (
             <button

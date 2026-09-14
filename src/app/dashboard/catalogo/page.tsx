@@ -1,12 +1,11 @@
 export const dynamic = "force-dynamic";
 
-import { auth } from "@/auth";
+import { requireSessionUser } from "@/lib/auth-guard";
 import { getCatalogForCompany } from "@/lib/data";
 import { CatalogView } from "@/components/CatalogView";
 
 export default async function CatalogPage() {
-  const session = await auth();
-  const user = session!.user;
+  const user = await requireSessionUser();
   const products = user.companyId
     ? await getCatalogForCompany(user.companyId)
     : [];

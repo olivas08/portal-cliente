@@ -1,15 +1,14 @@
 "use server";
 
-import { AuthError } from "next-auth";
-import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { AuthError } from "next-auth";
 import { signIn, signOut } from "@/auth";
-import { prisma } from "@/lib/prisma";
-import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
-import { sendPasswordResetEmail } from "@/lib/email";
-import { getBaseUrl } from "@/lib/url";
-import { createResetToken, hashToken } from "@/lib/reset-token";
+import { AppError } from "@/lib/errors";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import {
+  requestPasswordResetForEmail,
+  resetPasswordWithToken,
+} from "@/services/auth.service";
 
 export type LoginResult = "ok" | "invalid" | "error" | "rate-limited";
 
@@ -44,89 +43,40 @@ export async function logoutAction() {
   await signOut({ redirectTo: "/login" });
 }
 
-const registerSchema = z.object({
-  companyName: z.string().trim().min(2, "Nome da empresa obrigatório.").max(150),
-  name: z.string().trim().min(2, "Nome obrigatório.").max(150),
-  email: z.string().trim().toLowerCase().email("Email inválido."),
-  password: z.string().min(6, "A palavra-passe deve ter pelo menos 6 caracteres."),
-});
-
 export type RegisterResult =
   | { ok: true }
   | { ok: false; error: string };
 
-export async function registerAction(input: {
+/**
+ * Public self-registration is closed. New client companies are created by
+ * factory invitation (`inviteUser`); this action exists only so leftover
+ * callers fail closed instead of creating a tenant.
+ */
+export async function registerAction(input?: {
   companyName: string;
   name: string;
   email: string;
   password: string;
 }): Promise<RegisterResult> {
-  const ip = await getClientIp();
-  const ipOk = await checkRateLimit(`register:ip:${ip}`, { max: 5, windowMs: 60 * 60 * 1000 });
-  if (!ipOk) {
-    return { ok: false, error: "Demasiados registos a partir deste endereço. Tente novamente mais tarde." };
-  }
-
-  const parsed = registerSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
-  }
-  const { companyName, name, email, password } = parsed.data;
-
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return { ok: false, error: "Já existe uma conta com este email." };
-  }
-
-  const passwordHash = await bcrypt.hash(password, 10);
-
-  await prisma.$transaction(async (tx) => {
-    const company = await tx.company.create({ data: { name: companyName } });
-    await tx.user.create({
-      data: {
-        name,
-        email,
-        passwordHash,
-        role: "CLIENT",
-        companyId: company.id,
-      },
-    });
-  });
-  invalidateCache(CACHE_TAGS.companies);
-
-  try {
-    await signIn("credentials", { email, password, redirect: false });
-  } catch {
-    // Account was created successfully even if the auto-login fails;
-    // the user can still log in manually with their new credentials.
-  }
-
-  return { ok: true };
+  void input;
+  return {
+    ok: false,
+    error:
+      "O registo público está desativado. Contacte a fábrica para receber um convite.",
+  };
 }
 
 export async function requestPasswordReset(rawEmail: string): Promise<void> {
   const email = z.string().trim().toLowerCase().email().safeParse(rawEmail);
   if (!email.success) return;
 
-  // Same "always behave the same way" reasoning applies to rate limiting:
-  // fail silently (no distinguishing error) so an attacker can't use this
-  // to fingerprint which emails exist or how the limiter is tuned.
   const allowed = await checkRateLimit(`reset-request:${email.data}`, {
     max: 3,
     windowMs: 60 * 60 * 1000,
   });
   if (!allowed) return;
 
-  const user = await prisma.user.findUnique({ where: { email: email.data } });
-  // Always behave the same way regardless of whether the user exists,
-  // to avoid leaking which emails are registered.
-  if (!user) return;
-
-  const token = await createResetToken(user.id);
-
-  const baseUrl = await getBaseUrl();
-  const resetUrl = `${baseUrl}/reset-password?token=${token}`;
-  await sendPasswordResetEmail(user.email, resetUrl);
+  await requestPasswordResetForEmail(email.data);
 }
 
 export type ResetPasswordResult =
@@ -146,41 +96,13 @@ export async function resetPassword(
     return { ok: false, error: "Demasiadas tentativas. Tente novamente dentro de alguns minutos." };
   }
 
-  const password = z
-    .string()
-    .min(6, "A palavra-passe deve ter pelo menos 6 caracteres.")
-    .safeParse(newPassword);
-  if (!password.success) {
-    return { ok: false, error: password.error.issues[0]?.message ?? "Palavra-passe inválida." };
+  try {
+    await resetPasswordWithToken(token, newPassword);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof AppError) {
+      return { ok: false, error: error.message };
+    }
+    throw error;
   }
-  if (!token) {
-    return { ok: false, error: "Link inválido." };
-  }
-
-  const tokenHash = hashToken(token);
-  const record = await prisma.passwordResetToken.findUnique({
-    where: { tokenHash },
-  });
-
-  if (!record || record.usedAt || record.expiresAt < new Date()) {
-    return { ok: false, error: "Este link é inválido ou já expirou." };
-  }
-
-  const passwordHash = await bcrypt.hash(password.data, 10);
-
-  await prisma.$transaction([
-    prisma.user.update({
-      // Also (re)activates the account — this same flow completes an
-      // invited user's very first sign-up, not just password resets.
-      where: { id: record.userId },
-      data: { passwordHash, active: true },
-    }),
-    prisma.passwordResetToken.update({
-      where: { id: record.id },
-      data: { usedAt: new Date() },
-    }),
-  ]);
-
-  return { ok: true };
 }
-

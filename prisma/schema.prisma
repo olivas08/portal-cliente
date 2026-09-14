@@ -83,6 +83,7 @@ model Company {
   productPrices ProductPrice[]
   quotes        Quote[]
   createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model User {
@@ -97,6 +98,7 @@ model User {
   // or after an admin deactivates the account (login is blocked either way).
   active              Boolean              @default(true)
   createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
   passwordResetTokens PasswordResetToken[]
   notifications       Notification[]
 
@@ -179,6 +181,7 @@ model Order {
   updatedAt     DateTime        @updatedAt
 
   @@index([companyId])
+  @@index([companyId, status])
 }
 
 model OrderItem {
@@ -189,6 +192,7 @@ model OrderItem {
   description  String
   quantity     Float
   unit         String
+  /// Stored as Float today; planned migration to Decimal(12,2) — see AGENTS.md.
   unitPriceEur Float
   workOrders   WorkOrder[]
 
@@ -347,6 +351,13 @@ model Workstation {
   @@index([active])
 }
 
+enum MachineState {
+  run
+  idle
+  down
+  offline
+}
+
 model Machine {
   id               String             @id @default(cuid())
   code             String             @unique
@@ -355,7 +366,7 @@ model Machine {
   workstation      Workstation?       @relation(fields: [workstationId], references: [id], onDelete: SetNull)
   tokenHash        String
   active           Boolean            @default(true)
-  state            String             @default("offline")
+  state            MachineState       @default(offline)
   stateSince       DateTime?
   lastSeenAt       DateTime?
   steps            WorkOrderStep[]
@@ -363,6 +374,7 @@ model Machine {
   maintenancePlans MaintenancePlan[]
   maintenanceTasks MaintenanceTask[]
   createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
   @@index([active])
   @@index([workstationId])
@@ -424,7 +436,7 @@ model WorkOrder {
   id              String              @id @default(cuid())
   reference       String              @unique
   orderId         String
-  order           Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order           Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
   orderItemId     String?
   orderItem       OrderItem?          @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
   productRef      String
@@ -605,7 +617,7 @@ model WorkOrderMaterialBatch {
 model StockMovement {
   id              String         @id @default(cuid())
   materialId      String
-  material        Material       @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  material        Material       @relation(fields: [materialId], references: [id], onDelete: Restrict)
   delta           Float
   reason          String
   workOrderId     String?
@@ -775,7 +787,7 @@ model MaintenanceTask {
 model Invoice {
   id           String          @id @default(cuid())
   orderId      String          @unique
-  order        Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order        Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
   provider     InvoiceProvider
   status       InvoiceStatus   @default(pending)
   externalId   String?

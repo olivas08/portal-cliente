@@ -51,6 +51,13 @@ async function main() {
   assertSeedAllowed();
 
   console.log("🌱 A limpar dados existentes...");
+  await prisma.invoice.deleteMany();
+  await prisma.workOrderMaterialBatch.deleteMany();
+  await prisma.materialBatch.deleteMany();
+  await prisma.maintenanceTask.deleteMany();
+  await prisma.maintenancePlan.deleteMany();
+  await prisma.notification.deleteMany();
+  await prisma.passwordResetToken.deleteMany();
   await prisma.workOrderStep.deleteMany();
   await prisma.nonConformity.deleteMany();
   await prisma.machineReading.deleteMany();
@@ -198,7 +205,7 @@ async function main() {
         name: def.name,
         workstationId: stations[def.station],
         tokenHash: hash(def.token),
-        state: def.state,
+        state: def.state as "idle" | "run",
         stateSince: new Date(),
         lastSeenAt: new Date(),
       },

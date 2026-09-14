@@ -18,8 +18,10 @@ import {
   type ProductCsvRowResult,
 } from "@/lib/import-schemas";
 import { importProducts } from "@/actions/products";
+import { actionError } from "@/lib/action-result";
 import { CsvColumnMapping } from "@/components/CsvColumnMapping";
 import { Modal } from "@/components/ui/Modal";
+import { formatEur } from "@/lib/format";
 
 /**
  * Lets an admin bulk-create/update catalog products from a CSV export of the
@@ -110,7 +112,18 @@ export function ProductsImportModal() {
     startTransition(async () => {
       try {
         const res = await importProducts(validRows.map((r) => r.data));
-        setSummary(res);
+        const msg = actionError(res);
+        if (msg) {
+          setError(msg);
+          return;
+        }
+        setSummary(
+          res as {
+            created: number;
+            updated: number;
+            errors: { row: number; reference?: string; message: string }[];
+          },
+        );
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Ocorreu um erro.");
@@ -248,7 +261,7 @@ export function ProductsImportModal() {
                           {r.ok ? r.data.name : "—"}
                         </td>
                         <td className="px-3 py-1.5 text-slate-700">
-                          {r.ok ? `${r.data.unitPriceEur.toFixed(2)} €` : "—"}
+                          {r.ok ? formatEur(r.data.unitPriceEur) : "—"}
                         </td>
                         <td className="px-3 py-1.5">
                           {r.ok ? (

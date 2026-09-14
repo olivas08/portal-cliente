@@ -225,7 +225,7 @@ describe("importProducts action", () => {
       importProducts([
         { reference: "PROD-1", name: "Reservatório", description: "", unit: "un", unitPriceEur: 100, category: "" },
       ]),
-    ).rejects.toThrow("Não autorizado.");
+    ).resolves.toEqual({ error: "Não autorizado." });
     expect(prismaMock.product.create).not.toHaveBeenCalled();
   });
 
@@ -272,6 +272,7 @@ describe("importProducts action", () => {
       { reference: "PROD-3", name: "B", description: "", unit: "un", unitPriceEur: 1, category: "" },
     ]);
     expect(res).toMatchObject({ created: 1, updated: 0 });
+    if (!res || "error" in res) throw new Error("expected import result");
     expect(res.errors).toHaveLength(1);
     expect(res.errors[0].message).toMatch(/duplicada/i);
   });

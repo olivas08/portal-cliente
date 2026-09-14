@@ -3,9 +3,9 @@ import { auth } from "@/auth";
 import { PortalNav } from "@/components/PortalNav";
 import { BreadcrumbProvider } from "@/components/BreadcrumbContext";
 import {
-  countUnread,
-  listNotifications,
-} from "@/services/notifications.service";
+  getNotificationsForUser,
+  getUnreadNotificationCount,
+} from "@/lib/data";
 import { TENANT } from "@/lib/branding";
 import { isAdminRole } from "@/lib/roles";
 
@@ -22,8 +22,8 @@ export default async function AdminLayout({
   if (!isAdminRole(user.role)) redirect("/dashboard");
 
   const [notifications, unreadCount] = await Promise.all([
-    listNotifications(user.id),
-    countUnread(user.id),
+    getNotificationsForUser(user.id),
+    getUnreadNotificationCount(user.id),
   ]);
 
   return (

@@ -61,6 +61,10 @@ import {
   getPricingSettings as getPricingSettingsService,
   getOperationTypes as getOperationTypesService,
 } from "@/services/quotes.service";
+import {
+  listNotifications,
+  countUnread,
+} from "@/services/notifications.service";
 import type {
   Order,
   OrderItem,
@@ -174,32 +178,47 @@ function toRequestSummaryVM(r: RequestSummaryWith): RequestSummaryVM {
   };
 }
 
-export async function getOrdersForCompany(
-  companyId: string,
-): Promise<OrderSummaryVM[]> {
-  const orders = await prisma.order.findMany({
-    where: { companyId },
-    include: { items: true, company: true },
-    orderBy: { createdDate: "desc" },
-  });
-  return orders.map(toOrderSummaryVM);
-}
+export const getOrdersForCompany = unstable_cache(
+  async (companyId: string): Promise<OrderSummaryVM[]> => {
+    const orders = await prisma.order.findMany({
+      where: { companyId },
+      include: { items: true, company: true },
+      orderBy: { createdDate: "desc" },
+    });
+    return orders.map(toOrderSummaryVM);
+  },
+  ["orders-for-company"],
+  { tags: [CACHE_TAGS.orders], revalidate: false },
+);
 
-export async function getAllOrders(): Promise<OrderSummaryVM[]> {
-  const orders = await prisma.order.findMany({
-    include: { items: true, company: true },
-    orderBy: { createdDate: "desc" },
-  });
-  return orders.map(toOrderSummaryVM);
-}
+export const getAllOrders = unstable_cache(
+  async (): Promise<OrderSummaryVM[]> => {
+    const orders = await prisma.order.findMany({
+      include: { items: true, company: true },
+      orderBy: { createdDate: "desc" },
+    });
+    return orders.map(toOrderSummaryVM);
+  },
+  ["all-orders"],
+  { tags: [CACHE_TAGS.orders], revalidate: false },
+);
 
-export async function getOrderById(id: string): Promise<OrderVM | null> {
-  const order = await prisma.order.findUnique({
-    where: { id },
-    include: { items: true, documents: true, company: true },
-  });
-  return order ? toOrderVM(order) : null;
-}
+export const getOrderById = unstable_cache(
+  async (id: string, companyId?: string): Promise<OrderVM | null> => {
+    const order = companyId
+      ? await prisma.order.findFirst({
+          where: { id, companyId },
+          include: { items: true, documents: true, company: true },
+        })
+      : await prisma.order.findUnique({
+          where: { id },
+          include: { items: true, documents: true, company: true },
+        });
+    return order ? toOrderVM(order) : null;
+  },
+  ["order-by-id"],
+  { tags: [CACHE_TAGS.orders], revalidate: false },
+);
 
 export const getInvoiceForOrder = unstable_cache(
   async (orderId: string): Promise<InvoiceVM | null> => {
@@ -221,40 +240,55 @@ export const getInvoiceForOrder = unstable_cache(
   { tags: [CACHE_TAGS.invoices], revalidate: false },
 );
 
-export async function getRequestsForCompany(
-  companyId: string,
-): Promise<RequestSummaryVM[]> {
-  const requests = await prisma.request.findMany({
-    where: { companyId },
-    include: {
-      company: true,
-      messages: { orderBy: { date: "desc" }, take: 1 },
-      _count: { select: { messages: true } },
-    },
-    orderBy: { createdDate: "desc" },
-  });
-  return requests.map(toRequestSummaryVM);
-}
+export const getRequestsForCompany = unstable_cache(
+  async (companyId: string): Promise<RequestSummaryVM[]> => {
+    const requests = await prisma.request.findMany({
+      where: { companyId },
+      include: {
+        company: true,
+        messages: { orderBy: { date: "desc" }, take: 1 },
+        _count: { select: { messages: true } },
+      },
+      orderBy: { createdDate: "desc" },
+    });
+    return requests.map(toRequestSummaryVM);
+  },
+  ["requests-for-company"],
+  { tags: [CACHE_TAGS.requests], revalidate: false },
+);
 
-export async function getAllRequests(): Promise<RequestSummaryVM[]> {
-  const requests = await prisma.request.findMany({
-    include: {
-      company: true,
-      messages: { orderBy: { date: "desc" }, take: 1 },
-      _count: { select: { messages: true } },
-    },
-    orderBy: { createdDate: "desc" },
-  });
-  return requests.map(toRequestSummaryVM);
-}
+export const getAllRequests = unstable_cache(
+  async (): Promise<RequestSummaryVM[]> => {
+    const requests = await prisma.request.findMany({
+      include: {
+        company: true,
+        messages: { orderBy: { date: "desc" }, take: 1 },
+        _count: { select: { messages: true } },
+      },
+      orderBy: { createdDate: "desc" },
+    });
+    return requests.map(toRequestSummaryVM);
+  },
+  ["all-requests"],
+  { tags: [CACHE_TAGS.requests], revalidate: false },
+);
 
-export async function getRequestById(id: string): Promise<RequestVM | null> {
-  const request = await prisma.request.findUnique({
-    where: { id },
-    include: { messages: { orderBy: { date: "asc" } }, company: true },
-  });
-  return request ? toRequestVM(request) : null;
-}
+export const getRequestById = unstable_cache(
+  async (id: string, companyId?: string): Promise<RequestVM | null> => {
+    const request = companyId
+      ? await prisma.request.findFirst({
+          where: { id, companyId },
+          include: { messages: { orderBy: { date: "asc" } }, company: true },
+        })
+      : await prisma.request.findUnique({
+          where: { id },
+          include: { messages: { orderBy: { date: "asc" } }, company: true },
+        });
+    return request ? toRequestVM(request) : null;
+  },
+  ["request-by-id"],
+  { tags: [CACHE_TAGS.requests], revalidate: false },
+);
 
 function toQuoteLineVM(l: QuoteLine & { operations: QuoteLineOperation[] }): QuoteLineVM {
   return {
@@ -297,34 +331,54 @@ function toQuoteBase(q: Quote & { company: Company }) {
   };
 }
 
-export async function getQuotesForCompany(companyId: string): Promise<QuoteSummaryVM[]> {
-  const quotes = await prisma.quote.findMany({
-    where: { companyId, status: { not: "draft" } },
-    include: { company: true, _count: { select: { lines: true } } },
-    orderBy: { createdDate: "desc" },
-  });
-  return quotes.map((q) => ({ ...toQuoteBase(q), lineCount: q._count.lines }));
-}
+export const getQuotesForCompany = unstable_cache(
+  async (companyId: string): Promise<QuoteSummaryVM[]> => {
+    const quotes = await prisma.quote.findMany({
+      where: { companyId, status: { not: "draft" } },
+      include: { company: true, _count: { select: { lines: true } } },
+      orderBy: { createdDate: "desc" },
+    });
+    return quotes.map((q) => ({ ...toQuoteBase(q), lineCount: q._count.lines }));
+  },
+  ["quotes-for-company"],
+  { tags: [CACHE_TAGS.quotes], revalidate: false },
+);
 
-export async function getAllQuotes(): Promise<QuoteSummaryVM[]> {
-  const quotes = await prisma.quote.findMany({
-    include: { company: true, _count: { select: { lines: true } } },
-    orderBy: { createdDate: "desc" },
-  });
-  return quotes.map((q) => ({ ...toQuoteBase(q), lineCount: q._count.lines }));
-}
+export const getAllQuotes = unstable_cache(
+  async (): Promise<QuoteSummaryVM[]> => {
+    const quotes = await prisma.quote.findMany({
+      include: { company: true, _count: { select: { lines: true } } },
+      orderBy: { createdDate: "desc" },
+    });
+    return quotes.map((q) => ({ ...toQuoteBase(q), lineCount: q._count.lines }));
+  },
+  ["all-quotes"],
+  { tags: [CACHE_TAGS.quotes], revalidate: false },
+);
 
-export async function getQuoteById(id: string): Promise<QuoteVM | null> {
-  const quote = await prisma.quote.findUnique({
-    where: { id },
-    include: {
-      company: true,
-      lines: { include: { operations: true }, orderBy: { sequence: "asc" } },
-    },
-  });
-  if (!quote) return null;
-  return { ...toQuoteBase(quote), lines: quote.lines.map(toQuoteLineVM) };
-}
+export const getQuoteById = unstable_cache(
+  async (id: string, companyId?: string): Promise<QuoteVM | null> => {
+    const quote = companyId
+      ? await prisma.quote.findFirst({
+          where: { id, companyId },
+          include: {
+            company: true,
+            lines: { include: { operations: true }, orderBy: { sequence: "asc" } },
+          },
+        })
+      : await prisma.quote.findUnique({
+          where: { id },
+          include: {
+            company: true,
+            lines: { include: { operations: true }, orderBy: { sequence: "asc" } },
+          },
+        });
+    if (!quote) return null;
+    return { ...toQuoteBase(quote), lines: quote.lines.map(toQuoteLineVM) };
+  },
+  ["quote-by-id"],
+  { tags: [CACHE_TAGS.quotes], revalidate: false },
+);
 
 export const getPricingSettingsVM = unstable_cache(
   async (): Promise<PricingSettingsVM> => {
@@ -525,7 +579,7 @@ export const getWorkOrders = unstable_cache(
   });
   },
   ["work-orders"],
-  { tags: [CACHE_TAGS.workOrders], revalidate: false },
+  { tags: [CACHE_TAGS.workOrders, CACHE_TAGS.materials], revalidate: false },
 );
 
 export const getActiveOperators = unstable_cache(
@@ -646,7 +700,14 @@ export async function getOrdersWithoutProduction(): Promise<
  * order has no production planned yet.
  */
 export const getOrderProduction = unstable_cache(
-  async (orderId: string): Promise<OrderProductionVM | null> => {
+  async (orderId: string, companyId?: string): Promise<OrderProductionVM | null> => {
+  if (companyId) {
+    const owned = await prisma.order.findFirst({
+      where: { id: orderId, companyId },
+      select: { id: true },
+    });
+    if (!owned) return null;
+  }
   const workOrders = await prisma.workOrder.findMany({
     where: { orderId, status: { notIn: ["planned", "cancelled"] } },
     include: {
@@ -1013,6 +1074,9 @@ export const getProductionKpis = unstable_cache(
   ]);
 
   const priceByRef = new Map(products.map((p) => [p.reference, p.unitPriceEur]));
+  // WIP value uses the live catalogue price (not the OrderItem snapshot) — this
+  // is an operational KPI, not a fiscal figure, so it can drift with the
+  // catalogue. Invoice/order history still reads frozen unitPriceEur.
   const wipInputs: WipWorkOrderInput[] = workOrders.map((wo) => ({
     quantityPlanned: wo.quantityPlanned,
     quantityDone: wo.quantityDone,
@@ -1122,7 +1186,7 @@ export const getMachinesWithStatus = unstable_cache(
       name: m.name,
       active: m.active,
       online: m.state !== "offline" && isMachineOnline(m.lastSeenAt, now),
-      state: (m.state as MachineVM["state"]) ?? "offline",
+      state: m.state,
       lastSeenAt: m.lastSeenAt ? m.lastSeenAt.toISOString() : null,
       stationName: m.workstation?.name ?? null,
       stationId: m.workstation?.id ?? null,
@@ -1133,7 +1197,7 @@ export const getMachinesWithStatus = unstable_cache(
   });
   },
   ["machines-with-status"],
-  { tags: [CACHE_TAGS.machines], revalidate: false },
+  { tags: [CACHE_TAGS.machines, CACHE_TAGS.workOrders], revalidate: false },
 );
 
 /**
@@ -1484,5 +1548,29 @@ export const getRecentStockMovements = unstable_cache(
   },
   ["recent-stock-movements"],
   { tags: [CACHE_TAGS.materials], revalidate: false },
+);
+
+export const getCompanyName = unstable_cache(
+  async (companyId: string): Promise<string> => {
+    const c = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { name: true },
+    });
+    return c?.name ?? "";
+  },
+  ["company-name"],
+  { tags: [CACHE_TAGS.companies], revalidate: false },
+);
+
+export const getNotificationsForUser = unstable_cache(
+  async (userId: string) => listNotifications(userId),
+  ["notifications-for-user"],
+  { tags: [CACHE_TAGS.notifications], revalidate: false },
+);
+
+export const getUnreadNotificationCount = unstable_cache(
+  async (userId: string) => countUnread(userId),
+  ["unread-notification-count"],
+  { tags: [CACHE_TAGS.notifications], revalidate: false },
 );
 

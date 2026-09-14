@@ -144,7 +144,7 @@ export function LoginForm() {
               href="/registo"
               className="font-medium text-brand hover:text-accent-dark transition-colors"
             >
-              Registar a minha empresa
+              Pedir convite
             </Link>
           </p>
         </div>

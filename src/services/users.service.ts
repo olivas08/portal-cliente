@@ -87,3 +87,13 @@ export async function setUserActive(
   }
   await prisma.user.update({ where: { id: userId }, data: { active } });
 }
+
+export async function listUsersInScope(scope: {
+  companyId: string | null;
+}): Promise<InvitedUserVM[]> {
+  return prisma.user.findMany({
+    where: { companyId: scope.companyId },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
+  });
+}

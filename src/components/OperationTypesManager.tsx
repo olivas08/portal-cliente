@@ -9,6 +9,8 @@ import {
   deleteOperationType,
 } from "@/actions/quotes";
 import { actionError } from "@/lib/action-result";
+import { formatEur } from "@/lib/format";
+import { inputCls } from "@/components/ui/Input";
 
 interface RowForm {
   key: string;
@@ -19,9 +21,6 @@ interface RowForm {
 }
 
 const EMPTY_ROW: RowForm = { key: "", name: "", unit: "", ratePerUnitEur: "0", active: true };
-
-const inputCls =
-  "w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400";
 
 function toRowForm(t: OperationTypeVM): RowForm {
   return {
@@ -192,7 +191,7 @@ export function OperationTypesManager({ operationTypes }: { operationTypes: Oper
                 <td className="py-2 text-slate-700">{t.name}</td>
                 <td className="py-2 text-slate-500">{t.unit}</td>
                 <td className="py-2 text-right text-slate-700">
-                  {t.ratePerUnitEur.toFixed(2)} €
+                  {formatEur(t.ratePerUnitEur)}
                 </td>
                 <td className="py-2 text-center text-slate-500">{t.active ? "Sim" : "Não"}</td>
                 <td className="py-2">

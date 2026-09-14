@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache-tags";
 import { getBaseUrl } from "@/lib/url";
 import { sendOrderStatusUpdateEmail } from "@/lib/email";
 import { ORDER_STATUS_LABELS, type OrderStatus } from "@/lib/types";
@@ -99,6 +100,7 @@ export async function changeOrderStatus(
     body: `Novo estado: ${ORDER_STATUS_LABELS[status]}.`,
     href: `/dashboard/ordens/${existing.id}`,
   });
+  invalidateCache(CACHE_TAGS.orders);
 }
 
 /**
@@ -152,6 +154,7 @@ export async function cancelOrder(
       href: `/dashboard/ordens/${existing.id}`,
     });
   }
+  invalidateCache(CACHE_TAGS.orders);
 }
 
 /**
@@ -181,6 +184,7 @@ export async function reactivateOrder(orderId: string): Promise<void> {
     body: "A encomenda foi reativada e está novamente pendente.",
     href: `/dashboard/ordens/${existing.id}`,
   });
+  invalidateCache(CACHE_TAGS.orders);
 }
 
 export async function createOrder(data: CreateOrderInput): Promise<string> {
@@ -220,6 +224,7 @@ export async function createOrder(data: CreateOrderInput): Promise<string> {
     href: `/dashboard/ordens/${order.id}`,
   });
 
+  invalidateCache(CACHE_TAGS.orders);
   return order.id;
 }
 
@@ -281,6 +286,7 @@ export async function reorderOrder(
     href: `/admin/ordens/${order.id}`,
   });
 
+  invalidateCache(CACHE_TAGS.orders);
   return order.id;
 }
 

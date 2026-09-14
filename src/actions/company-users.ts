@@ -4,19 +4,14 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireCompanyAdmin } from "@/lib/auth-guard";
 import { AppError } from "@/lib/errors";
-import { prisma } from "@/lib/prisma";
-import { inviteUser, setUserActive, type InvitedUserVM } from "@/services/users.service";
+import { inviteUser, setUserActive, listUsersInScope, type InvitedUserVM } from "@/services/users.service";
+import { idSchema, booleanSchema } from "@/lib/schemas";
 
 const DASHBOARD_USERS_PATH = "/dashboard/utilizadores";
 
 export async function listCompanyUsers(): Promise<InvitedUserVM[]> {
   const actor = await requireCompanyAdmin();
-  const users = await prisma.user.findMany({
-    where: { companyId: actor.companyId },
-    orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
-  });
-  return users;
+  return listUsersInScope({ companyId: actor.companyId });
 }
 
 const inviteCompanyUserSchema = z.object({
@@ -63,12 +58,14 @@ export async function setCompanyUserActive(
   active: boolean,
 ): Promise<InviteCompanyUserResult> {
   const actor = await requireCompanyAdmin();
-  if (userId === actor.id && !active) {
+  const parsedId = idSchema.parse(userId);
+  const parsedActive = booleanSchema.parse(active);
+  if (parsedId === actor.id && !parsedActive) {
     return { ok: false, error: "Não pode desativar a sua própria conta." };
   }
 
   try {
-    await setUserActive(userId, active, { companyId: actor.companyId });
+    await setUserActive(parsedId, parsedActive, { companyId: actor.companyId });
   } catch (error) {
     if (error instanceof AppError) {
       return { ok: false, error: error.message };
