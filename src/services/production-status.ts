@@ -34,6 +34,11 @@ export function canCompleteStep(status: StepStatus): boolean {
   return status === "in_progress" || status === "paused";
 }
 
+/** Office/pilot declaration: skip the in-progress hop the terminal requires. */
+export function canDeclareStepDone(status: StepStatus): boolean {
+  return status === "pending" || status === "in_progress" || status === "paused";
+}
+
 /** Only a completed step can be reopened for rework (reprocessing). */
 export function canReworkStep(status: StepStatus): boolean {
   return status === "done";

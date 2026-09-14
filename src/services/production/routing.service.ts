@@ -9,6 +9,7 @@ import {
   canStartStep,
   canPauseStep,
   canCompleteStep,
+  canDeclareStepDone,
   canReworkStep,
   rollUpWorkOrderStatus,
 } from "@/services/production-status";
@@ -165,9 +166,10 @@ export async function resolveNonConformity(id: string): Promise<void> {
 
 // ── Shop-floor execution ────────────────────────────────────────────────────
 
-/** Starts (or resumes) a step, stamping the operator and run interval. */
+/** Starts (or resumes) a step. `operator` is null when an office user
+ * records the start without the shop-floor terminal. */
 export async function startStep(
-  operator: OperatorActor,
+  operator: OperatorActor | null,
   stepId: string,
 ): Promise<void> {
   const now = new Date();
@@ -202,7 +204,7 @@ export async function startStep(
           step.status === "paused" && step.pausedAt
             ? step.downtimeMinutes + elapsedMinutes(step.pausedAt, now)
             : step.downtimeMinutes,
-        operatorId: operator.id,
+        operatorId: operator?.id ?? null,
       },
     });
 
@@ -253,9 +255,10 @@ export async function pauseStep(
   invalidateCache(CACHE_TAGS.machines);
 }
 
-/** Completes a step, recording good/scrap quantities and rolling up state. */
+/** Completes a step, recording good/scrap quantities and rolling up state.
+ * Pass `operator` null for office/pilot declaration (pending steps allowed). */
 export async function completeStep(
-  operator: OperatorActor,
+  operator: OperatorActor | null,
   input: CompleteStepInput,
 ): Promise<void> {
   const now = new Date();
@@ -268,11 +271,26 @@ export async function completeStep(
       },
     });
     if (!step) throw new NotFoundError("Passo não encontrado.");
-    if (!canCompleteStep(step.status)) {
-      throw new AppError("Este passo não pode ser concluído.");
-    }
 
     const wo = step.workOrder;
+    if (operator) {
+      if (!canCompleteStep(step.status)) {
+        throw new AppError("Este passo não pode ser concluído.");
+      }
+    } else {
+      if (!canDeclareStepDone(step.status)) {
+        throw new AppError("Este passo não pode ser concluído.");
+      }
+      if (!isStepReady(step, wo.steps)) {
+        throw new AppError("Conclua primeiro os passos anteriores.");
+      }
+      if (wo.status === "planned") {
+        throw new AppError("Lance a ordem de fabrico antes de a concluir.");
+      }
+      if (wo.status === "cancelled") {
+        throw new AppError("Esta ordem de fabrico foi cancelada.");
+      }
+    }
     const machineVerified = step.machineVerified;
     const finalQty = machineVerified ? step.quantityDone : input.quantityDone;
     const finalScrap = machineVerified ? step.scrapQty : input.scrapQty;
@@ -286,7 +304,7 @@ export async function completeStep(
         quantityDone: finalQty,
         scrapQty: finalScrap,
         declaredQty: input.quantityDone,
-        operatorId: operator.id,
+        operatorId: operator?.id ?? null,
       },
     });
 
@@ -298,7 +316,7 @@ export async function completeStep(
           quantity: input.defect.quantity,
           reason: input.defect.reason,
           disposition: input.defect.disposition,
-          operatorId: operator.id,
+          operatorId: operator?.id ?? null,
         },
       });
     }
@@ -352,4 +370,53 @@ export async function completeStep(
   invalidateCache(CACHE_TAGS.orders);
   invalidateCache(CACHE_TAGS.machines);
   if (input.defect) invalidateCache(CACHE_TAGS.nonConformities);
+}
+
+/** Office: start the current ready step (released → in_progress). */
+export async function startStepFromOffice(stepId: string): Promise<void> {
+  await startStep(null, stepId);
+}
+
+/** Office: complete a ready step using the planned quantity (no tablet). */
+export async function completeStepFromOffice(stepId: string): Promise<void> {
+  const step = await prisma.workOrderStep.findUnique({
+    where: { id: stepId },
+    select: { workOrder: { select: { quantityPlanned: true } } },
+  });
+  if (!step) throw new NotFoundError("Passo não encontrado.");
+  await completeStep(null, {
+    stepId,
+    quantityDone: step.workOrder.quantityPlanned,
+    scrapQty: 0,
+  });
+}
+
+/**
+ * Office: mark every remaining step done, in sequence, with planned qty.
+ * Used when the factory still tracks production on paper.
+ */
+export async function completeWorkOrderFromOffice(
+  workOrderId: string,
+): Promise<void> {
+  const wo = await prisma.workOrder.findUnique({
+    where: { id: workOrderId },
+    include: { steps: { orderBy: { sequence: "asc" } } },
+  });
+  if (!wo) throw new NotFoundError("Ordem de fabrico não encontrada.");
+  if (wo.status === "planned") {
+    throw new AppError("Lance a ordem de fabrico antes de a concluir.");
+  }
+  if (wo.status === "cancelled") {
+    throw new AppError("Esta ordem de fabrico foi cancelada.");
+  }
+  if (wo.status === "done") return;
+
+  for (const step of wo.steps) {
+    if (step.status === "done") continue;
+    await completeStep(null, {
+      stepId: step.id,
+      quantityDone: wo.quantityPlanned,
+      scrapQty: 0,
+    });
+  }
 }

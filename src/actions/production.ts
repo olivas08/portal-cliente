@@ -26,6 +26,9 @@ import {
   startStep,
   pauseStep,
   completeStep,
+  startStepFromOffice,
+  completeStepFromOffice,
+  completeWorkOrderFromOffice,
   setProductRoutingSchema,
   nonConformityIdSchema,
   stepIdSchema,
@@ -207,5 +210,35 @@ export async function completeStepAction(input: CompleteStepInput) {
 
     revalidatePath(TERMINAL);
     revalidatePath(ADMIN_BOARD);
+  });
+}
+
+export async function startStepFromOfficeAction(stepId: string) {
+  return guardAction(async () => {
+    await requireAdminArea("producao");
+    const data = stepIdSchema.parse({ stepId });
+    await startStepFromOffice(data.stepId);
+    revalidatePath(ADMIN_BOARD);
+    revalidatePath(TERMINAL);
+  });
+}
+
+export async function completeStepFromOfficeAction(stepId: string) {
+  return guardAction(async () => {
+    await requireAdminArea("producao");
+    const data = stepIdSchema.parse({ stepId });
+    await completeStepFromOffice(data.stepId);
+    revalidatePath(ADMIN_BOARD);
+    revalidatePath(TERMINAL);
+  });
+}
+
+export async function completeWorkOrderFromOfficeAction(workOrderId: string) {
+  return guardAction(async () => {
+    await requireAdminArea("producao");
+    const data = workOrderIdSchema.parse({ workOrderId });
+    await completeWorkOrderFromOffice(data.workOrderId);
+    revalidatePath(ADMIN_BOARD);
+    revalidatePath(TERMINAL);
   });
 }

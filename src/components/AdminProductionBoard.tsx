@@ -14,6 +14,9 @@ import {
   reopenWorkOrder,
   deleteWorkOrder,
   setWorkOrderPriority,
+  startStepFromOfficeAction,
+  completeStepFromOfficeAction,
+  completeWorkOrderFromOfficeAction,
 } from "@/actions/production";
 import { BreadcrumbSetter } from "@/components/BreadcrumbContext";
 
@@ -196,7 +199,9 @@ export function AdminProductionBoard({ workOrders, unplanned }: Props) {
                 </p>
               )}
 
-              {items.map((wo) => (
+              {items.map((wo) => {
+                const readyStep = wo.steps.find((s) => s.ready);
+                return (
                 <div
                   key={wo.id}
                   className={`bg-white rounded-xl shadow-sm border-l-4 ${accent} border border-slate-100 p-4`}
@@ -255,6 +260,19 @@ export function AdminProductionBoard({ workOrders, unplanned }: Props) {
                             <span className="text-slate-300 truncate max-w-[70px]">
                               {step.operatorName}
                             </span>
+                          )}
+                          {step.ready && wo.status !== "planned" && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                run(() => completeStepFromOfficeAction(step.id))
+                              }
+                              disabled={pending}
+                              title="Concluir este posto (sem terminal)"
+                              className="shrink-0 rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+                            >
+                              Concluir
+                            </button>
                           )}
                         </li>
                       );
@@ -346,8 +364,38 @@ export function AdminProductionBoard({ workOrders, unplanned }: Props) {
                       )}
                     </div>
                   )}
+
+                  {(wo.status === "released" || wo.status === "in_progress") && (
+                    <div className="mt-2 flex items-center gap-2">
+                      {wo.status === "released" && readyStep && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            run(() => startStepFromOfficeAction(readyStep.id))
+                          }
+                          disabled={pending}
+                          title="Passa a em curso sem usar o terminal"
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-amber-500 text-white text-xs font-semibold px-3 py-2 hover:bg-amber-400 disabled:opacity-60"
+                        >
+                          <PlayCircle size={14} /> Iniciar
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          run(() => completeWorkOrderFromOfficeAction(wo.id))
+                        }
+                        disabled={pending}
+                        title="Marca todos os passos restantes como concluídos (piloto sem tablet)"
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold px-3 py-2 hover:bg-emerald-500 disabled:opacity-60"
+                      >
+                        <CheckCircle2 size={14} /> Concluir ordem
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           );
         })}

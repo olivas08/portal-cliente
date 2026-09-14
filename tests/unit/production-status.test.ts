@@ -4,6 +4,7 @@ import {
   canStartStep,
   canPauseStep,
   canCompleteStep,
+  canDeclareStepDone,
   canReworkStep,
   isStepReady,
   currentStep,
@@ -54,6 +55,13 @@ describe("step transition guards", () => {
     expect(canCompleteStep("paused")).toBe(true);
     expect(canCompleteStep("pending")).toBe(false);
     expect(canCompleteStep("done")).toBe(false);
+  });
+
+  it("allows office declaration from pending, in_progress or paused", () => {
+    expect(canDeclareStepDone("pending")).toBe(true);
+    expect(canDeclareStepDone("in_progress")).toBe(true);
+    expect(canDeclareStepDone("paused")).toBe(true);
+    expect(canDeclareStepDone("done")).toBe(false);
   });
 
   it("allows rework only from a completed step", () => {

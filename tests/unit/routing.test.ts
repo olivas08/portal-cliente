@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     workOrderStep: { findUnique: vi.fn(), update: vi.fn() },
-    workOrder: { update: vi.fn() },
+    workOrder: { update: vi.fn(), findUnique: vi.fn() },
     nonConformity: { findUnique: vi.fn(), update: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -20,6 +20,7 @@ import {
   startStep,
   pauseStep,
   resolveNonConformity,
+  completeWorkOrderFromOffice,
 } from "@/services/production/routing.service";
 
 const operator = { id: "op1", name: "Carlos" };
@@ -65,6 +66,26 @@ describe("resolveNonConformity", () => {
     prismaMock.nonConformity.findUnique.mockResolvedValue(null);
     await expect(resolveNonConformity("nc-missing")).rejects.toThrow(
       "Não-conformidade não encontrada.",
+    );
+  });
+});
+
+describe("completeWorkOrderFromOffice", () => {
+  it("rejects a missing work order", async () => {
+    prismaMock.workOrder.findUnique.mockResolvedValue(null);
+    await expect(completeWorkOrderFromOffice("wo-missing")).rejects.toThrow(
+      "Ordem de fabrico não encontrada.",
+    );
+  });
+
+  it("rejects a work order that is still planned", async () => {
+    prismaMock.workOrder.findUnique.mockResolvedValue({
+      id: "wo1",
+      status: "planned",
+      steps: [],
+    });
+    await expect(completeWorkOrderFromOffice("wo1")).rejects.toThrow(
+      /Lance a ordem/,
     );
   });
 });
