@@ -10,7 +10,8 @@ test.describe("Armazém", () => {
     // button lives on the Armazém page — the super-admin covers both areas
     // in one session, same as the material actions below ("armazem").
     await login(page, ACCOUNTS.admin, "/admin");
-    await page.goto("/admin/armazem");
+    await page.goto("/admin/armazem", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Armazém" })).toBeVisible();
 
     // 1) Lançar ordem de fabrico com materiais suficientes.
     const awaitingCard = page

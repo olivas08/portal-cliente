@@ -23,7 +23,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev",
+    // CI already ran `next build`; serving that output avoids on-demand RSC
+    // compiles that abort late Playwright navigations under `next dev`.
+    command: process.env.CI ? "npm start" : "npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

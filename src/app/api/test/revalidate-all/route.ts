@@ -16,11 +16,12 @@ export const dynamic = "force-dynamic";
  * flush the cache over HTTP after reseeding, without needing a real request
  * context to call `revalidateTag` from a bare script.
  *
- * Hard-blocked outside development so it can never be hit in a deployed
- * environment.
+ * Hard-blocked outside development / E2E so it can never be hit in a
+ * deployed environment. CI Playwright serves `next start` (NODE_ENV=
+ * production) with E2E_TEST set, and still needs this flush after seeding.
  */
 export async function POST() {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" && process.env.E2E_TEST !== "true") {
     return NextResponse.json({ error: "Not available." }, { status: 404 });
   }
 
