@@ -39,7 +39,14 @@ export async function loginAction(
       if (!emailOk || !ipOk) return "rate-limited";
     }
 
-    await signIn("credentials", { email, password, redirect: false });
+    await signIn("credentials", {
+      email,
+      password,
+      // Let Next/Auth.js finish with a redirect. `redirect: false` can leave
+      // the Server Action waiting on its own /api/auth round-trip until Vercel
+      // kills the function at 300s.
+      redirectTo: "/",
+    });
     return "ok";
   } catch (error) {
     // Auth.js / Next may still throw a redirect; swallowing it hangs the action.
