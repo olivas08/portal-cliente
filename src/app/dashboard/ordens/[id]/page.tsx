@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { requireSessionUser } from "@/lib/auth-guard";
 import { getOrderById, getOrderProduction } from "@/lib/data";
 import { OrderDetail } from "@/components/OrderDetail";
@@ -15,7 +15,7 @@ export default async function ClientOrderDetail({
   if (!user.companyId) redirect("/dashboard");
 
   const order = await getOrderById(id, user.companyId);
-  if (!order) notFound();
+  if (!order) redirect("/dashboard");
 
   const production = await getOrderProduction(id, user.companyId);
 
